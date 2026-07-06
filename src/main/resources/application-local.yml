@@ -1,0 +1,18 @@
+# 로컬 개발 기본값 — 별도 env 없이도 기동되도록 디폴트 제공
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/madangido}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-secret-change-me-please-0123456789abcdef}
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.springframework.security: info

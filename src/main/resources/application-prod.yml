@@ -1,0 +1,11 @@
+# 운영 — 모든 시크릿은 환경변수 주입 필수 (기본값 없음)
+spring:
+  jpa:
+    properties:
+      hibernate:
+        format_sql: false
+
+logging:
+  level:
+    root: info
+    org.hibernate.SQL: warn
