@@ -1,6 +1,6 @@
 spring:
   application:
-    name: madangido-api
+    name: petkok-api
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
 
@@ -37,7 +37,7 @@ r2:
   account-id: ${R2_ACCOUNT_ID:dummy}
   access-key: ${R2_ACCESS_KEY:dummy}
   secret-key: ${R2_SECRET_KEY:dummy}
-  bucket: ${R2_BUCKET:madangido}
+  bucket: ${R2_BUCKET:petkok}
   endpoint: ${R2_ENDPOINT:https://dummy.r2.cloudflarestorage.com}
   public-base-url: ${R2_PUBLIC_BASE_URL:https://cdn.example.com}
 

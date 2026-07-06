@@ -1,4 +1,4 @@
--- V1__init.sql : 초기 스키마 (마당이도다)
+-- V1__init.sql : 초기 스키마 (PetKok)
 -- PostgreSQL 15+ (Supabase). PK = uuid gen_random_uuid().
 -- 주의: updated_at 은 앱(JPA Auditing @LastModifiedDate)이 관리한다. DB 트리거를 두지 않는다.
 -- 소프트 딜리트는 users, pets 에만 적용 (deleted_at).

@@ -1,4 +1,4 @@
-# 마당이도다 API (madangido-api)
+# PetKok API (petkok-api)
 
 반려동물 다이어리 백엔드. **Spring Boot 3.x / Java 21** 단일 스택 (ADR-001).
 대상: 크레스티드 게코 / 강아지 / 고양이. 게코 특화 로직이 핵심 차별점.
@@ -39,7 +39,7 @@ SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
 
 ## 패키지 구조
 ```
-com.madangido
+com.petkok
 ├── global/
 │   ├── config/       SecurityConfig, JpaAuditingConfig, JacksonConfig, WebConfig, R2Config
 │   ├── common/

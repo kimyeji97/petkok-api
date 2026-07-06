@@ -4,7 +4,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.6"
 }
 
-group = "com.madangido"
+group = "com.petkok"
 version = "0.0.1-SNAPSHOT"
 
 java {

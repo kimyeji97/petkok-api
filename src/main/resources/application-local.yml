@@ -1,7 +1,7 @@
 # 로컬 개발 기본값 — 별도 env 없이도 기동되도록 디폴트 제공
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/madangido}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/petkok}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
   jpa:

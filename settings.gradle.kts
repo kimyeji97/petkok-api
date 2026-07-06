@@ -1,1 +1,1 @@
-rootProject.name = "madangido-api"
+rootProject.name = "petkok-api"
