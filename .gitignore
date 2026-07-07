@@ -2,3 +2,6 @@
 build/
 .gradle/
 !gradle/wrapper/gradle-wrapper.properties
+
+# IntelliJ IDEA (IDE 개인 설정 — 레포에 커밋하지 않음)
+.idea/
