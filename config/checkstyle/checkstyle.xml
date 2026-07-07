@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<!--
+  Google Checks 기반 커스텀 Checkstyle 설정
+  ─────────────────────────────────────────────────────────────────
+  목적: 네이밍·복잡도·미사용 import 검출 (그룹 5 결정)
+  제외: 포맷 관련 규칙 전체 — google-java-format(Spotless)이 담당하므로 충돌 방지
+  원본 참조: https://github.com/checkstyle/checkstyle/blob/master/src/main/resources/google_checks.xml
+-->
+<!DOCTYPE module PUBLIC
+  "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+  "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<module name="Checker">
+  <property name="charset" value="UTF-8"/>
+  <property name="severity" value="warning"/>
+  <property name="fileExtensions" value="java"/>
+
+  <!--
+    SuppressionFilter 제거: 억제(suppression) 없이 strict 적용.
+    구조적 예외는 억제 대신 소스코드를 컨벤션에 맞게 수정하여 해결한다.
+  -->
+
+  <!-- ── 파일 레벨 ────────────────────────────────────────── -->
+  <module name="FileTabCharacter">
+    <!-- 탭 사용 금지 (google-java-format 보조 체크) -->
+    <property name="eachLine" value="true"/>
+  </module>
+
+  <module name="TreeWalker">
+
+    <!-- ── Import ────────────────────────────────────────── -->
+    <module name="AvoidStarImport"/>
+    <module name="UnusedImports"/>
+    <module name="IllegalImport"/>     <!-- sun.* 등 -->
+
+    <!-- ── 네이밍 ─────────────────────────────────────────── -->
+    <module name="PackageName">
+      <!-- 소문자 + 점 구분 -->
+      <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+    </module>
+
+    <module name="TypeName">
+      <!-- 클래스·인터페이스·열거형: UpperCamelCase -->
+      <property name="format" value="^[A-Z][a-zA-Z0-9]*$"/>
+    </module>
+
+    <module name="MemberName">
+      <!-- 인스턴스 필드: lowerCamelCase -->
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+    </module>
+
+    <module name="ParameterName">
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+    </module>
+
+    <module name="LocalVariableName">
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+    </module>
+
+    <module name="ConstantName">
+      <!-- static final: UPPER_SNAKE_CASE -->
+      <property name="format" value="^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"/>
+    </module>
+
+    <module name="MethodName">
+      <!-- 메서드: lowerCamelCase 또는 한글 (테스트 메서드 허용) -->
+      <property name="format" value="^[a-z가-힣][a-zA-Z0-9_가-힣]*$"/>
+    </module>
+
+    <!-- ── 복잡도 ─────────────────────────────────────────── -->
+    <module name="CyclomaticComplexity">
+      <!-- 메서드 순환복잡도 ≤ 15 -->
+      <property name="max" value="15"/>
+    </module>
+
+    <module name="MethodLength">
+      <!-- 메서드 최대 줄 수 150 -->
+      <property name="max" value="150"/>
+    </module>
+
+    <module name="ParameterNumber">
+      <!-- 파라미터 최대 개수 7 -->
+      <property name="max" value="7"/>
+    </module>
+
+    <!-- ── 구조 ──────────────────────────────────────────── -->
+    <module name="HideUtilityClassConstructor"/>
+    <!-- 유틸리티 클래스(static 메서드만)는 public 생성자 금지 -->
+
+    <module name="OneTopLevelClass"/>
+    <!-- 파일 1개 = 최상위 클래스 1개 -->
+
+    <module name="OuterTypeFilename"/>
+    <!-- 파일명 = public 클래스명 일치 -->
+
+  </module>
+</module>

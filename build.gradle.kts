@@ -2,6 +2,9 @@ plugins {
     java
     id("org.springframework.boot") version "3.3.5"
     id("io.spring.dependency-management") version "1.1.6"
+    id("com.diffplug.spotless") version "7.0.2"
+    checkstyle
+    jacoco
 }
 
 group = "com.petkok"
@@ -49,6 +52,41 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
 }
 
-tasks.withType<Test> {
+// ─── Spotless (google-java-format) ──────────────────────────
+spotless {
+    java {
+        googleJavaFormat("1.22.0")
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+// ─── Checkstyle ─────────────────────────────────────────────
+checkstyle {
+    toolVersion = "10.17.0"
+    configFile = file("config/checkstyle/checkstyle.xml")
+    // 게이트 분리:
+    //   - 기본(로컬·lefthook): maxWarnings 무한 → 경고만, 차단 안 함
+    //   - CI(-PciStrict): maxWarnings=0 → 경고 1건이라도 task fail = 머지 게이트
+    maxWarnings = if (project.hasProperty("ciStrict")) 0 else Int.MAX_VALUE
+}
+
+// ─── JaCoCo (측정만 — 게이트 없음) ──────────────────────────
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+    dependsOn(tasks.test)
+}
+
+// ─── 테스트 설정 ─────────────────────────────────────────────
+tasks.test {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
 }
