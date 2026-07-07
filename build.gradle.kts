@@ -42,6 +42,10 @@ dependencies {
     implementation(platform("software.amazon.awssdk:bom:2.28.29"))
     implementation("software.amazon.awssdk:s3")
 
+    // Lombok — @Slf4j 로깅(로거 필드 log → checkstyle ConstantName 충돌 회피) + 보일러플레이트 제거
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
+
     // QueryDSL — timeline union 등 복잡 쿼리 도입 시 활성화 (현재는 미사용)
     // implementation("com.querydsl:querydsl-jpa:5.1.0:jakarta")
     // annotationProcessor("com.querydsl:querydsl-apt:5.1.0:jakarta")
