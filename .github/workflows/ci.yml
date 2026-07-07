@@ -1,0 +1,56 @@
+# .github/workflows/ci.yml — CI 파이프라인 (컨벤션 이식 그룹 5)
+# ─────────────────────────────────────────────────────────────
+# 트리거: PR 생성/업데이트 + main push
+# 게이트: 이 워크플로우 실패 시 GitHub Branch Protection으로 머지 차단
+# 스텝: build(컴파일) → spotlessCheck → checkstyle(-PciStrict) → test → JaCoCo 리포트
+# 참고: ArchUnit(레이어 규칙)은 feature 도메인 도입 시점까지 보류 — 그때 test 스텝에 포함됨.
+# ─────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build (컴파일만, 테스트 제외)
+        run: ./gradlew build -x test
+
+      - name: Spotless Check (포맷 검증)
+        run: ./gradlew spotlessCheck
+
+      - name: Checkstyle (네이밍·복잡도·미사용 import)
+        # -PciStrict: maxWarnings=0 → 경고 1건이라도 실패(머지 게이트). 로컬/lefthook은 플래그 없이 경고만.
+        run: ./gradlew checkstyleMain checkstyleTest -PciStrict
+
+      - name: Test (JUnit5)
+        run: ./gradlew test
+
+      - name: JaCoCo Report 생성
+        run: ./gradlew jacocoTestReport
+        if: always()
+
+      - name: JaCoCo Report 업로드
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-report
+          path: build/reports/jacoco/
+          retention-days: 14

@@ -1,0 +1,30 @@
+# lefthook.yml — Git hooks (그룹 5 결정)
+# ─────────────────────────────────────────────────────────────
+# 강제 수위: pre-commit 은 경고만, 진짜 게이트는 CI (.github/workflows/ci.yml)
+# ─────────────────────────────────────────────────────────────
+
+pre-commit:
+  commands:
+    # 1) 자동 포맷 적용 (google-java-format via Spotless)
+    #    수정된 파일이 생기면 `git add -u` 로 재스테이징 필요
+    spotless:
+      run: ./gradlew spotlessApply --quiet
+
+    # 2) Checkstyle — 경고 출력, 차단하지 않음 (|| true)
+    checkstyle:
+      run: ./gradlew checkstyleMain checkstyleTest --quiet || true
+
+commit-msg:
+  commands:
+    # Conventional Commits 형식 검증 (Node 미도입 — shell + grep 정규식)
+    # 타입은 영어, 제목은 한글 허용. 위반 시 차단(exit 1).
+    # commitlint 도입 금지 — 릴리스 자동화 시점에 승격 예정 (그룹 5 결정).
+    conventional-commit:
+      run: |
+        head -1 {1} | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?: .{1,}' || {
+          echo "✗ 커밋 메시지가 Conventional Commits 형식이 아닙니다."
+          echo "  형식: <type>(<scope>)?: <제목>"
+          echo "  type: feat fix docs style refactor perf test build ci chore revert"
+          echo "  예) feat(user): 회원 가입 기능 추가"
+          exit 1
+        }
