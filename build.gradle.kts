@@ -42,6 +42,11 @@ dependencies {
     implementation(platform("software.amazon.awssdk:bom:2.28.29"))
     implementation("software.amazon.awssdk:s3")
 
+    // spring-java-utility 이식 유틸리티에서 사용
+    implementation("org.apache.commons:commons-lang3:3.17.0")
+    implementation("com.google.guava:guava:33.3.1-jre")
+    implementation("org.apache.commons:commons-compress:1.27.1")
+
     // Lombok — @Slf4j 로깅(로거 필드 log → checkstyle ConstantName 충돌 회피) + 보일러플레이트 제거
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")

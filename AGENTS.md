@@ -41,7 +41,8 @@ com.petkok
 │   │   ├── response/ ApiResponse{data,error}, ErrorResponse
 │   │   └── pagination/ CursorRequest, CursorPage, CursorCodec
 │   ├── security/     AuthPrincipal, @CurrentUser, jwt/(TokenProvider, AuthFilter, Properties)
-│   └── exception/    ErrorCode, BusinessException, GlobalExceptionHandler
+│   ├── exception/    ErrorCode, BusinessException, GlobalExceptionHandler
+│   └── util/         spring-java-utility 이식 (date/json/list/map/number/string/encrypt/file/os/spring/http 하위 유틸리티)
 └── domain/           (다음 단계: auth → user → pet → diary/feeding/activity/weight/shed/gallery/timeline)
 ```
 
