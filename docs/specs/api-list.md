@@ -132,7 +132,16 @@ create index idx_refresh_user_id on refresh_tokens (user_id) where revoked_at is
 - 기존 `ErrorCode.INVALID_TOKEN`으로 충분하다 — 재사용 감지용 코드를 따로 만들지 않는다. 공격자에게 탐지 여부를 알려줄 이유가 없다
 - **만료 행 정리**: `expires_at`이 지난 행은 누적되기만 한다. 정리 배치는 auth 구현 범위에 넣지 않고, 운영 부담이 실제로 보이는 시점에 별도로 다룬다 (스케줄러 도입 결정이 함께 필요하므로)
 
-## 설계 미결정 (구현 전 확정 필요)
+## 공개 경로 범위 (결정됨)
 
-1. **`/api/v1/auth/**`는 permitAll이다** (`SecurityConfig`의 `PUBLIC_PATHS`). 인증이 필요한 엔드포인트를 이 prefix 아래 두면 무인증으로 노출된다. 소셜 계정 연결을 `/users/me/social-accounts`에 배치한 이유다.
-2. **PATCH vs PUT.** 이 문서는 전부 PATCH(부분 수정)로 잡았다. 확정되면 AGENTS.md §5 코드 컨벤션에 반영한다.
+**`/api/v1/auth/**`의 permitAll 범위를 넓히지 않는다.** 이 prefix 아래에는 토큰이 없는 상태에서 호출되는 엔드포인트(`/auth/kakao`, `/auth/refresh`, `/auth/logout`)만 둔다.
+
+- 인증이 필요한 기능은 `/auth/` 아래에 두지 않는다 — permitAll 범위라 무인증으로 노출된다. 소셜 계정 연결을 `/users/me/social-accounts`에 배치한 것이 이 원칙의 적용이다
+- `/auth/logout`은 refresh 토큰을 body로 받아 revoke하므로 access 토큰 없이 동작한다. permitAll 아래에 두는 것이 맞다
+- 새 공개 경로가 필요하면 `SecurityConfig.PUBLIC_PATHS`에 개별 경로로 추가한다. 와일드카드 확장은 하지 않는다
+
+## 부분 수정은 PATCH (결정됨)
+
+**리소스 수정은 PATCH(부분 수정)로 통일한다.** PUT(전체 교체)은 사용하지 않는다.
+
+클라이언트가 수정 화면에서 일부 필드만 보내는 경우가 대부분이고, PUT으로 받으면 누락 필드를 `null` 덮어쓰기와 구분할 수 없기 때문이다. 이 규칙은 AGENTS.md §5에도 반영했다.
