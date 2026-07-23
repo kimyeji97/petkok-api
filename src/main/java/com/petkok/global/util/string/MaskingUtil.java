@@ -70,6 +70,23 @@ public class MaskingUtil {
   }
 
   /**
+   * 자격증명(토큰·API 키 등) 마스킹. 식별 가능한 앞 4자리만 남기고 나머지를 가린다. 로그에 토큰 원문이 남지 않도록 하되, 어떤 값이 쓰였는지는 구분할 수 있게
+   * 한다.
+   *
+   * @param credential 토큰·키 등 민감 문자열
+   * @return 마스킹된 문자열 (null 입력 시 null, 5자 미만이면 전체 마스킹)
+   */
+  public static String maskingCredential(String credential) {
+    if (credential == null) {
+      return null;
+    }
+    if (credential.length() < 5) {
+      return "*".repeat(credential.length());
+    }
+    return credential.substring(0, 4) + "***";
+  }
+
+  /**
    * 핸드폰번호 가운데 마스킹
    *
    * @param phoneNo 전화번호

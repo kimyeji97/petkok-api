@@ -1,5 +1,6 @@
 package com.petkok.global.config;
 
+import com.petkok.global.util.string.MaskingUtil;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -7,12 +8,14 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map.Entry;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpRequest;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
@@ -21,6 +24,10 @@ import org.springframework.util.FileCopyUtils;
 @Slf4j
 public class RestTemplateLoggingInterceptor implements ClientHttpRequestInterceptor {
   private static final int RESPONSE_LOGGING_LENGTH = 500;
+
+  /** 값을 그대로 남기면 안 되는 헤더 (소문자 비교). AGENTS.md §5 민감정보 마스킹 규칙. */
+  private static final Set<String> SENSITIVE_HEADERS =
+      Set.of("authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key");
 
   @Override
   public ClientHttpResponse intercept(
@@ -38,9 +45,29 @@ public class RestTemplateLoggingInterceptor implements ClientHttpRequestIntercep
     log.info("[Method : {}, URI : {}]", request.getMethod(), request.getURI());
     log.info("[Request Headers]");
     for (Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
-      log.info("  -> {}: {}", entry.getKey(), entry.getValue());
+      log.info("  -> {}: {}", entry.getKey(), maskIfSensitive(entry.getKey(), entry.getValue()));
     }
     log.info("[Request Body : {}]", new String(body, StandardCharsets.UTF_8));
+  }
+
+  /** 민감 헤더면 값을 마스킹해 반환한다. 그 외에는 원본을 그대로 반환한다. */
+  private static List<String> maskIfSensitive(String name, List<String> values) {
+    if (name == null || !SENSITIVE_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+      return values;
+    }
+    return values.stream().map(MaskingUtil::maskingCredential).toList();
+  }
+
+  /** 민감 헤더 값을 마스킹한 사본을 만든다. 원본 HttpHeaders 는 변경하지 않는다. */
+  private static HttpHeaders maskSensitiveHeaders(HttpHeaders headers) {
+    if (headers == null) {
+      return null;
+    }
+    HttpHeaders masked = new HttpHeaders();
+    for (Entry<String, List<String>> entry : headers.entrySet()) {
+      masked.addAll(entry.getKey(), maskIfSensitive(entry.getKey(), entry.getValue()));
+    }
+    return masked;
   }
 
   private void traceResponse(ClientHttpResponse response) throws IOException {
@@ -54,7 +81,7 @@ public class RestTemplateLoggingInterceptor implements ClientHttpRequestIntercep
       BufferedReader bufferedReader =
           new BufferedReader(new InputStreamReader(response.getBody(), StandardCharsets.UTF_8));
       char[] buffer =
-          StringUtils.contains(contentType, "text/htmnl") ? new char[1024] : new char[1024 * 10];
+          StringUtils.contains(contentType, "text/html") ? new char[1024] : new char[1024 * 10];
 
       int len = bufferedReader.read(buffer, 0, buffer.length);
       if (len != -1) {
@@ -64,7 +91,7 @@ public class RestTemplateLoggingInterceptor implements ClientHttpRequestIntercep
 
     log.info("[============================RESPONSE==========================================");
     log.info("[Status : {} {}]", response.getStatusCode(), response.getStatusText());
-    log.info("[Headers : {}   ]", response.getHeaders());
+    log.info("[Headers : {}   ]", maskSensitiveHeaders(response.getHeaders()));
     if (inputStringBuilder.length() > RESPONSE_LOGGING_LENGTH) {
       log.info(
           "[Response Body : {} ...]",
@@ -89,8 +116,10 @@ public class RestTemplateLoggingInterceptor implements ClientHttpRequestIntercep
     }
 
     @Override
-    public HttpStatus getStatusCode() throws IOException {
-      return HttpStatus.valueOf(response.getStatusCode().value());
+    public HttpStatusCode getStatusCode() throws IOException {
+      // HttpStatus.valueOf(int) 는 비표준 코드(예: Cloudflare 520)에서 IllegalArgumentException 을
+      // 던지므로 원본 응답의 HttpStatusCode 를 그대로 위임한다.
+      return this.response.getStatusCode();
     }
 
     @Override
