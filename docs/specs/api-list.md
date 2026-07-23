@@ -20,9 +20,11 @@ PetKok API의 구현 예정 엔드포인트 목록이다. `V1__init.sql`의 9개
 | --- | --- | --- |
 | POST | `/auth/kakao` | 카카오 인가코드 → 로그인/자동가입, access+refresh 발급 |
 | POST | `/auth/refresh` | refresh 토큰으로 access 재발급 |
-| POST | `/auth/logout` | refresh 무효화 |
+| POST | `/auth/logout` | refresh 무효화 (저장된 토큰 revoke) |
 
 `user_social_accounts.provider`는 `KAKAO | GOOGLE | APPLE`을 허용한다. 구글·애플은 동일 형태로 확장한다.
+
+**refresh 토큰은 DB에 저장한다** (`refresh_tokens` 테이블, V2 마이그레이션으로 추가). stateless refresh 대신 저장소를 두는 이유는 로그아웃·탈퇴 시 즉시 무효화가 가능해야 하기 때문이다. 상세는 아래 "refresh 토큰 저장소" 참고.
 
 ## 2. User `/api/v1/users`
 
@@ -100,8 +102,33 @@ PetKok API의 구현 예정 엔드포인트 목록이다. `V1__init.sql`의 9개
 
 ---
 
+## refresh 토큰 저장소 (결정됨)
+
+`refresh_tokens` 테이블을 **V2 마이그레이션으로 추가**한다. stateless refresh를 쓰지 않는 이유는 로그아웃·회원 탈퇴 시 즉시 무효화가 가능해야 하기 때문이다.
+
+제안 스키마 (auth 구현 시 확정):
+
+```sql
+create table refresh_tokens (
+    id         uuid         primary key default gen_random_uuid(),
+    user_id    uuid         not null references users (id),
+    token_hash varchar(255) not null,   -- 원문 저장 금지. SHA256Util 로 해시
+    expires_at timestamp    not null,
+    revoked_at timestamp,
+    created_at timestamp    not null default now()
+);
+create unique index uq_refresh_token_hash on refresh_tokens (token_hash);
+create index idx_refresh_user_id on refresh_tokens (user_id) where revoked_at is null;
+```
+
+- 엔티티는 `BaseCreatedEntity` 상속 (`created_at`만 필요 — 무효화는 `revoked_at`으로 표현하며 소프트 딜리트가 아니다)
+- 토큰 원문은 저장하지 않는다. DB 유출 시 그대로 재사용 가능해지기 때문 (`SHA256Util` 사용)
+- `POST /auth/logout` → 해당 토큰 `revoked_at` 설정
+- `DELETE /users/me` (탈퇴) → 해당 사용자 토큰 전체 revoke
+
+**남은 결정**: refresh 로테이션 여부. 매 `/auth/refresh` 호출 시 새 refresh를 발급하고 기존 것을 revoke할지(재사용 감지 가능, 권장), 만료까지 동일 토큰을 재사용할지는 auth 구현 시 정한다. 만료된 행을 정리하는 배치도 함께 검토한다.
+
 ## 설계 미결정 (구현 전 확정 필요)
 
-1. **refresh 토큰 저장소.** `V1__init.sql`에 토큰 테이블이 없어 현재 구조로는 `POST /auth/logout`이 무효화할 대상이 없다. stateless refresh(만료까지 유효)로 갈지, `refresh_tokens` 테이블을 V2 마이그레이션으로 추가할지 auth 착수 전에 정한다.
-2. **`/api/v1/auth/**`는 permitAll이다** (`SecurityConfig`의 `PUBLIC_PATHS`). 인증이 필요한 엔드포인트를 이 prefix 아래 두면 무인증으로 노출된다. 소셜 계정 연결을 `/users/me/social-accounts`에 배치한 이유다.
-3. **PATCH vs PUT.** 이 문서는 전부 PATCH(부분 수정)로 잡았다. 확정되면 AGENTS.md §5 코드 컨벤션에 반영한다.
+1. **`/api/v1/auth/**`는 permitAll이다** (`SecurityConfig`의 `PUBLIC_PATHS`). 인증이 필요한 엔드포인트를 이 prefix 아래 두면 무인증으로 노출된다. 소셜 계정 연결을 `/users/me/social-accounts`에 배치한 이유다.
+2. **PATCH vs PUT.** 이 문서는 전부 PATCH(부분 수정)로 잡았다. 확정되면 AGENTS.md §5 코드 컨벤션에 반영한다.
