@@ -126,7 +126,11 @@ create index idx_refresh_user_id on refresh_tokens (user_id) where revoked_at is
 - `POST /auth/logout` → 해당 토큰 `revoked_at` 설정
 - `DELETE /users/me` (탈퇴) → 해당 사용자 토큰 전체 revoke
 
-**남은 결정**: refresh 로테이션 여부. 매 `/auth/refresh` 호출 시 새 refresh를 발급하고 기존 것을 revoke할지(재사용 감지 가능, 권장), 만료까지 동일 토큰을 재사용할지는 auth 구현 시 정한다. 만료된 행을 정리하는 배치도 함께 검토한다.
+**로테이션을 적용한다.** `POST /auth/refresh` 호출 시마다 새 refresh 토큰을 발급하고 기존 토큰은 즉시 revoke한다. 응답에는 access·refresh를 함께 담아 클라이언트가 저장된 refresh를 교체하도록 한다.
+
+- **재사용 감지**: 이미 `revoked_at`이 찍힌 토큰이 제시되면 탈취로 간주하고 해당 사용자의 모든 refresh 토큰을 revoke한 뒤 `INVALID_TOKEN`(401)을 반환한다. 정상 클라이언트라면 revoke된 토큰을 다시 보낼 일이 없다
+- 기존 `ErrorCode.INVALID_TOKEN`으로 충분하다 — 재사용 감지용 코드를 따로 만들지 않는다. 공격자에게 탐지 여부를 알려줄 이유가 없다
+- **만료 행 정리**: `expires_at`이 지난 행은 누적되기만 한다. 정리 배치는 auth 구현 범위에 넣지 않고, 운영 부담이 실제로 보이는 시점에 별도로 다룬다 (스케줄러 도입 결정이 함께 필요하므로)
 
 ## 설계 미결정 (구현 전 확정 필요)
 
