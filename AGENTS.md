@@ -65,6 +65,8 @@ com.petkok
 - **소프트 딜리트**: `users`, `pets`만 `deleted_at` (`BaseSoftDeleteEntity`)
 - **Enum**: Java Enum + `@Enumerated(STRING)`, DB는 varchar
 - **페이지네이션**: 커서 기반 (opaque base64 `next_cursor`)
+- **수정 메서드**: 리소스 수정은 `PATCH`(부분 수정)로 통일. `PUT`(전체 교체)은 쓰지 않는다 — 누락 필드와 `null` 의도를 구분할 수 없기 때문
+- **공개 경로**: `SecurityConfig.PUBLIC_PATHS`(`/api/v1/auth/**`)에는 토큰 없이 호출되는 엔드포인트만 둔다. 인증이 필요한 기능을 `/auth/` 아래 두면 무인증 노출된다
 - **네이밍/상수**: 클래스 UpperCamelCase, 상수 `UPPER_SNAKE_CASE`, DTO는 `XxxRequest`/`XxxResponse`
 - **로깅**: Lombok `@Slf4j` (필드 `log`). 민감정보(전화번호·토큰 등)는 마스킹
 
