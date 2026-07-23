@@ -8,4 +8,4 @@
 - lefthook 훅이 설치되어 있다면(`.git/hooks/pre-commit` 존재) 커밋 시 `spotlessApply`가 자동 적용되고 Checkstyle 경고가 출력된다. 새 클론·새 워크트리에서는 `lefthook install`을 먼저 실행할 것 — 미설치 상태면 아무 검증도 걸리지 않아 CI `spotlessCheck`에서 터진다
 - 커밋 전 CI 게이트 재현: `./gradlew spotlessApply && ./gradlew build -x test && ./gradlew checkstyleMain -PciStrict`
 - **`src/test`가 아직 없다.** `./gradlew test`는 통과해도 검증된 것이 없다 — "테스트 통과"로 보고하지 말 것. 현재 실질 게이트는 컴파일 + Spotless + Checkstyle뿐
-- `docs/specs/`·`docs/adr/`는 아직 생성되지 않았다 (README의 ADR-001은 README 본문에만 존재)
+- 스펙 문서는 [`docs/specs/api-list.md`](docs/specs/api-list.md) 하나뿐이다 (구현 예정 API 목록 — 설계 초안). `docs/adr/`는 아직 없다 (README의 ADR-001은 README 본문에만 존재)
