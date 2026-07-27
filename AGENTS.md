@@ -69,6 +69,8 @@ com.petkok
 - **공개 경로**: `SecurityConfig.PUBLIC_PATHS`(`/api/v1/auth/**`)에는 토큰 없이 호출되는 엔드포인트만 둔다. 인증이 필요한 기능을 `/auth/` 아래 두면 무인증 노출된다
 - **네이밍/상수**: 클래스 UpperCamelCase, 상수 `UPPER_SNAKE_CASE`, DTO는 `XxxRequest`/`XxxResponse`
 - **로깅**: Lombok `@Slf4j` (필드 `log`). 민감정보(전화번호·토큰 등)는 마스킹
+- **외부 API 응답 버퍼링**: 로깅 인터셉터는 응답을 `BufferingClientHttpResponseWrapper`로 감싼 뒤 로깅한다. 감싸지 않으면 로깅이 응답 스트림을 소비해 호출부가 본문을 읽지 못한다 (에러 없이 빈 본문으로 보인다)
+- **상태코드 위임**: `ClientHttpResponse.getStatusCode()`는 원본 `HttpStatusCode`를 그대로 위임한다. `HttpStatus.valueOf(int)`로 재변환하면 비표준 상태코드 수신 시 `IllegalArgumentException`이 터진다 (예: Cloudflare 520 — R2가 Cloudflare다)
 
 ---
 

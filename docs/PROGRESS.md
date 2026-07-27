@@ -36,7 +36,11 @@
 이 파일(`docs/PROGRESS.md`)을 신설하면서 2026-07-06 baseline 이후 전체 이력을 소급 정리했다.
 레포에 흩어진 진행 기록은 없었다 — README의 "다음 단계"는 로드맵, `docs/specs/api-list.md`는 스펙 문서라 이관 대상이 아니다.
 
-**발견 — README와 실제가 불일치.** README "실행 §1"은 `gradle-wrapper.jar`가 저장소에 없다고 안내하지만(IntelliJ 동기화 또는 `gradle wrapper` 실행 요구), 실제로는 `10f2ad2`(2026-07-07)에서 8.10.2 wrapper를 커밋해 추적 중이다. AGENTS.md §2는 "포함되어 있다"로 맞게 적혀 있어 두 문서가 서로 모순된다. README 쪽이 stale. 미수정 — 다음 작업 후보.
+**계약 승격 — RestTemplate 지적 2건을 AGENTS §5로 올렸다.** 응답 버퍼링 필수 / `getStatusCode()` 원본 위임. 둘 다 "모르는 사람이 고치면 조용히 재발"하는 종류라 로그에 묻으면 안 된다 — PROGRESS.md는 필요할 때만 읽히지만 AGENTS.md는 매 세션 로드된다.
+
+**README stale 수정.** README "실행 §1"이 `gradle-wrapper.jar`가 저장소에 없다고 안내하고 있었다(IntelliJ 동기화 또는 `gradle wrapper` 실행 요구). 실제로는 `10f2ad2`(2026-07-07)에서 8.10.2 wrapper를 커밋해 추적 중이고 AGENTS §2는 "포함되어 있다"로 맞게 적혀 있어, 두 문서가 서로 모순이었다. wrapper 준비 절을 걷어내고 이하 번호를 당겼다.
+
+같은 줄에 있던 **`.env.example` 참조도 함께 제거**했다 — 그 파일은 존재한 적이 없다. 없는 파일을 가리키는 안내는 신규 참여자·에이전트가 탐색에 시간을 쓰게 만든다.
 
 ---
 
