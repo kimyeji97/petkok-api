@@ -45,8 +45,7 @@
 
 > 1~3번은 2026-07-27 Notion 설계 문서 대조에서 나왔다. **Notion API I/F가 계약의 1차 출처이므로 `api-list.md`가 아니라 Notion 쪽을 기준으로 정해야 한다.**
 
-- [ ] **`/auth/logout` 메서드.** Notion API I/F는 `DELETE /auth/logout`, `api-list.md`는 `POST /auth/logout`이다
-- [ ] **`/auth/refresh`·`/auth/logout`의 인증 요구.** Notion API I/F는 둘 다 **🔒 인증 필요 = YES**로 표시돼 있다. 그런데 AGENTS §5에 등재된 계약은 "`/api/v1/auth/**`(permitAll)에는 토큰 없이 호출되는 엔드포인트만 둔다"이다. Notion 표기가 "access 토큰 필요"라는 뜻이면 **두 엔드포인트를 `/auth/` 밖으로 빼거나 `PUBLIC_PATHS`를 개별 경로로 좁혀야 한다.** "refresh 토큰이 필요하다"는 뜻이면 현행 유지가 맞다 — 어느 쪽인지 확인이 필요하다
+- [ ] **`/auth/refresh`·`/auth/logout`의 🔒 표기 의미.** *(경로·메서드는 2026-07-27에 Notion 기준으로 정합 완료 — `DELETE /auth/logout`)* Notion API I/F가 둘 다 **인증 필요 = YES**로 표시하는데, 그것이 **access 토큰**을 뜻하면 `SecurityConfig.PUBLIC_PATHS`를 `/api/v1/auth/kakao` 하나로 좁혀야 하고, **refresh 토큰 제시**를 뜻하면 현행 `/auth/**`가 맞다. **이걸 정하기 전에는 auth 구현을 시작하지 않는다** — 틀리면 두 엔드포인트가 무인증 노출된다
 - [ ] **HTTP 클라이언트.** Notion 소스 구조 §7은 `KakaoOAuthClient`가 **RestClient**를 쓴다고 명시한다. 레포는 REQ-05에서 **RestTemplate** + 로깅 인터셉터를 만들어 뒀다. RestTemplate으로 가고 Notion을 고칠지, RestClient로 갈아탈지(그러면 REQ-05 인터셉터를 다시 만들어야 한다) 결정 필요
 - [ ] **로컬 PostgreSQL 접속 정보.** 세션에서 받은 `localhost:3306` / `root`는 MySQL 것이었다. 실제 PostgreSQL 인스턴스가 로컬에 있는가? 없다면 준비 방법(Docker / Postgres.app / Supabase 무료 티어 직결) 중 무엇으로 갈지
 - [ ] **PostgreSQL 버전.** `gen_random_uuid()`는 13+ 내장이고 그 미만은 `pgcrypto` 확장이 필요하다. README는 15+를 요구하지만 실제 로컬 버전은 확인되지 않았다
@@ -90,6 +89,7 @@ Phase 1~2와 3~6은 PR을 나눈다.
 - **`refresh_tokens.token_hash`는 `varchar(64)`면 충분하다.** api-list.md의 제안 스키마는 `varchar(255)`지만 SHA-256 hex는 64자 고정이다. UNIQUE 인덱스가 걸리는 컬럼이다
 - **엔티티 ID를 앱 코드가 직접 채우면 `save()`가 merge로 빠진다.** Spring Data JPA가 "ID가 있으니 기존 엔티티"로 판단해 INSERT 전에 SELECT를 한 번 더 날린다. `@GeneratedValue`로 Hibernate에 맡긴다
 - **`JwtAuthenticationFilter`는 이미 `isAccessToken()`으로 refresh 토큰의 인증 사용을 막고 있다.** 확인 완료 — 이 검사를 제거하면 refresh 토큰으로 API 호출이 뚫린다
-- **`docs/specs/api-list.md`를 계약으로 믿지 말 것.** Notion API I/F와 대조한 결과 auth 외에도 어긋난 곳이 여럿이다 — 기록 도메인 5종의 경로 단수/복수(`/diary` vs `/diaries` 등), Notion에 없는 엔드포인트 6개(social-accounts 3종·`/weights/chart`·photos 상세·photos PATCH), presigned URL 경로(`/photos/presigned-url` vs `/photos/upload-url`). REQ-08 이후 착수 전에 정합을 맞춰야 한다
-- **`user_social_accounts` 조회/연결/해제 엔드포인트는 Notion API I/F에 없다.** `api-list.md`가 독자적으로 추가한 것이고, "공개 경로 범위" 결정(2026-07-23)의 사례로 인용된 바로 그 엔드포인트다. 실제 구현 대상인지 확인이 필요하다 (REQ-08 범위)
+- **API 계약의 1차 출처는 Notion API I/F다.** `docs/specs/api-list.md`는 파생 요약이며 충돌하면 Notion이 이긴다 (AGENTS §0). 2026-07-27에 39개 엔드포인트 기준으로 정합을 맞췄으나, Notion이 바뀌면 이 문서가 아니라 Notion을 먼저 본다
+- **`user_social_accounts` 조회/연결/해제 엔드포인트는 존재하지 않는다.** `api-list.md`가 독자 추가했던 것을 제거했다. 그런데 이것이 "공개 경로 범위" 결정(2026-07-23)에서 "인증 필요한 기능을 `/auth/` 밖에 둔 사례"로 인용됐던 엔드포인트다 — 근거가 사라졌으므로 위 미결 1번을 반드시 확인해야 한다
+- **`ConditionTag` enum을 만들기 전에 허용값을 확정할 것.** Notion DDL(7개)과 `V1__init.sql`(4개)이 다르다 (REQ-10 범위)
 - **`SecurityConfig.PUBLIC_PATHS`를 넓히지 않는다.** `/api/v1/auth/**`는 permitAll이라 인증이 필요한 기능을 그 아래 두면 무인증 노출된다 *(AGENTS §5에 이미 계약으로 등재됨)*

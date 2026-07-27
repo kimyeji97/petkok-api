@@ -37,6 +37,18 @@
 이 파일(`docs/PROGRESS.md`)을 신설하면서 2026-07-06 baseline 이후 전체 이력을 소급 정리했다.
 레포에 흩어진 진행 기록은 없었다 — README의 "다음 단계"는 로드맵, `docs/specs/api-list.md`는 스펙 문서라 이관 대상이 아니다.
 
+**Notion이 설계의 1차 출처임을 계약으로 등재 (AGENTS §0 신설).**
+
+MySQL 전환 계획을 세우던 중 Notion에 **ADR-002(DB 엔진 선택 — Supabase PostgreSQL, Status: Accepted, 2026-06-29)** 가 이미 있는 것을 발견했다. 레포 문서만 보고 판단한 결과 확정된 아키텍처 결정과 어긋난 계획을 만든 것이다. 원인은 **요구사항·설계·API 계약·ADR의 원본이 레포가 아니라 Notion에 있다는 사실이 어디에도 적혀 있지 않았던 것.** AGENTS.md 맨 앞에 출처 우선순위 표를 두어 매 세션 로드되게 했다.
+
+대조에서 나온 방향별 격차:
+
+- **Notion이 최신 → 레포를 고침**: `api-list.md`의 39개 엔드포인트를 Notion API I/F 기준으로 정합. 기록 도메인 경로가 복수형(`/diaries`)이었으나 원본은 단수(`/diary`), `logout`은 `POST`가 아니라 `DELETE`, presigned URL은 `/photos/upload-url`이 아니라 `/photos/presigned-url`. 근거 없이 추가돼 있던 엔드포인트 6개(social-accounts 3종·`/weights/chart`·photos 상세·PATCH) 제거
+- **레포가 최신 → Notion에 역반영 필요**: refresh 토큰 저장소(Notion은 "이후 결정 DB/Redis"로 열려 있음), Gradle wrapper 포함 여부
+- **Notion 내부 불일치**: 설계 탭 DDL 블록이 소스 구조 문서보다 뒤처져 있다 — `updated_at` 트리거가 남아 있고 `activity_type`에 `HANDLING`이 빠져 있다. 둘 다 소스 구조 문서에서는 확정 반영된 항목이라 **DDL 블록만 갱신 누락.** 그래서 AGENTS §0에 "DDL 블록과 소스 구조 문서가 다르면 소스 구조 문서를 신뢰"를 명시했다
+
+**미해결로 남긴 것**: Notion API I/F가 `/auth/refresh`·`/auth/logout`을 🔒 인증 필요로 표시하는데, 그것이 access 토큰을 뜻하면 `PUBLIC_PATHS`를 `/auth/kakao` 하나로 좁혀야 한다. 현재 `/api/v1/auth/**` 전체가 permitAll이라 **틀리면 두 엔드포인트가 무인증 노출된다.** REQ-07 착수 차단 조건으로 걸어뒀다. `condition_tag` 허용값도 Notion 7개 / `V1__init.sql` 4개로 갈려 미확정.
+
 **계약 승격 — RestTemplate 지적 2건을 AGENTS §5로 올렸다.** 응답 버퍼링 필수 / `getStatusCode()` 원본 위임. 둘 다 "모르는 사람이 고치면 조용히 재발"하는 종류라 로그에 묻으면 안 된다 — PROGRESS.md는 필요할 때만 읽히지만 AGENTS.md는 매 세션 로드된다.
 
 **README stale 수정.** README "실행 §1"이 `gradle-wrapper.jar`가 저장소에 없다고 안내하고 있었다(IntelliJ 동기화 또는 `gradle wrapper` 실행 요구). 실제로는 `10f2ad2`(2026-07-07)에서 8.10.2 wrapper를 커밋해 추적 중이고 AGENTS §2는 "포함되어 있다"로 맞게 적혀 있어, 두 문서가 서로 모순이었다. wrapper 준비 절을 걷어내고 이하 번호를 당겼다.
