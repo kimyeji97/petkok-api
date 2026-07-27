@@ -16,7 +16,8 @@
 | REQ-04 | 공통 유틸리티 이식 (`global/util`, spring-java-utility) | — | 2026-07-23 | ✅ |
 | REQ-05 | RestTemplate 설정 + 요청·응답 로깅 인터셉터 | — | 2026-07-23 | ✅ |
 | REQ-06 | API 설계 초안 + 설계 결정 3건 확정 | [api-list.md](specs/api-list.md) | 2026-07-23 | ✅ |
-| REQ-07 | auth 도메인 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [api-list §1](specs/api-list.md) | — | ⏸ |
+| REQ-13 | **MySQL 전환** (V1 재작성 · 환경/스키마 분리) — REQ-07 선행 | [계획서](plans/2026-07-27-mysql-migration-and-auth.md) | — | ⏸ |
+| REQ-07 | auth 도메인 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [계획서](plans/2026-07-27-mysql-migration-and-auth.md) | — | ⏸ |
 | REQ-08 | user 도메인 (프로필 · 소셜 계정 연결) | [api-list §2](specs/api-list.md) | — | ⏸ |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
