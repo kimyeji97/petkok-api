@@ -47,7 +47,20 @@ MySQL 전환 계획을 세우던 중 Notion에 **ADR-002(DB 엔진 선택 — Su
 - **레포가 최신 → Notion에 역반영 필요**: refresh 토큰 저장소(Notion은 "이후 결정 DB/Redis"로 열려 있음), Gradle wrapper 포함 여부
 - **Notion 내부 불일치**: 설계 탭 DDL 블록이 소스 구조 문서보다 뒤처져 있다 — `updated_at` 트리거가 남아 있고 `activity_type`에 `HANDLING`이 빠져 있다. 둘 다 소스 구조 문서에서는 확정 반영된 항목이라 **DDL 블록만 갱신 누락.** 그래서 AGENTS §0에 "DDL 블록과 소스 구조 문서가 다르면 소스 구조 문서를 신뢰"를 명시했다
 
-**미해결로 남긴 것**: Notion API I/F가 `/auth/refresh`·`/auth/logout`을 🔒 인증 필요로 표시하는데, 그것이 access 토큰을 뜻하면 `PUBLIC_PATHS`를 `/auth/kakao` 하나로 좁혀야 한다. 현재 `/api/v1/auth/**` 전체가 permitAll이라 **틀리면 두 엔드포인트가 무인증 노출된다.** REQ-07 착수 차단 조건으로 걸어뒀다. `condition_tag` 허용값도 Notion 7개 / `V1__init.sql` 4개로 갈려 미확정.
+**차단 조건 2건 해소 — 답은 DB 그리드가 아니라 행 본문에 있었다.**
+
+Notion API I/F를 표(그리드)로만 읽었을 때는 `/auth/refresh`·`/auth/logout`이 똑같이 `🔒 인증 필요 = YES`였다. **각 행을 열어보니 서로 달랐다.**
+
+- `/auth/refresh` → 본문 "🔓 **인증 불필요**", Request Body `{refresh_token}`. 체크박스가 오기였다 (Notion에서 해제)
+- `/auth/logout` → 본문 "🔒 인증 필요, **Request Body 없음**", 204. body가 없으니 **access 토큰이 유일한 사용자 식별 수단**이다
+
+→ **`PUBLIC_PATHS`는 와일드카드를 버리고 개별 경로로 나열한다**(`/auth/kakao`, `/auth/refresh`, `/actuator/health`). 현행 `/api/v1/auth/**`를 두면 `/auth/logout`이 무인증 노출된다. 2026-07-23 결정의 "logout은 refresh를 body로 받으니 access 없이 동작한다"는 **전제가 틀렸다** — 원칙은 유효하고 적용만 바뀌었다. AGENTS §5 갱신.
+
+`condition_tag`도 **7개로 확정**. Notion ERD 설계가 "공통(정상/활발) + 게코 전용(거식/탈피도와줌/탈피완료/거꾸리/구토)"으로 명시하고, 테이블 정의서의 `is_assisted → '탈피도와줌' 연계` 규칙도 같은 값을 참조한다. `V1__init.sql` 주석의 4개가 누락이다.
+
+**교훈**: Notion 데이터베이스는 **그리드 속성만 보면 안 된다.** 속성과 행 본문이 어긋날 수 있고, 이번엔 본문이 맞았다. api-list.md에 "체크박스보다 행 본문이 정확하다"를 명시했다.
+
+**Notion 역반영 (이번에 수행)**: refresh 저장소 결정(소스 구조 §7) · Gradle wrapper 포함(구현 노트) · `updated_at` 트리거 제거(테이블 정의서 3곳 + 공통 설계 원칙) · `activity_type` HANDLING(테이블 정의서·ERD) · FastAPI 잔재 정리(테이블 정의서·ERD·시스템 컨텍스트 분석 11곳) · `/auth/refresh` 체크박스 해제 + 로테이션 응답 스펙 추가. 설계 탭 DDL 코드 블록은 API로 쓸 수 없는 객체(탭)라 사용자가 직접 수정했다. ADR·제약사항 DB는 역사적 기록이라 손대지 않았다.
 
 **계약 승격 — RestTemplate 지적 2건을 AGENTS §5로 올렸다.** 응답 버퍼링 필수 / `getStatusCode()` 원본 위임. 둘 다 "모르는 사람이 고치면 조용히 재발"하는 종류라 로그에 묻으면 안 된다 — PROGRESS.md는 필요할 때만 읽히지만 AGENTS.md는 매 세션 로드된다.
 

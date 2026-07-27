@@ -24,13 +24,15 @@
 
 ## 1. Auth `/api/v1/auth`
 
-| Method | Path | 인증 | 설명 |
+| Method | Path | access 토큰 | 설명 |
 | --- | --- | :---: | --- |
-| POST | `/auth/kakao` | — | 카카오 인가코드 → 로그인/자동가입, access+refresh 발급 |
-| POST | `/auth/refresh` | 🔒 | refresh 토큰으로 access 재발급 |
-| DELETE | `/auth/logout` | 🔒 | refresh 무효화 (저장된 토큰 revoke) |
+| POST | `/auth/kakao` | 불필요 | 카카오 인가코드 → 로그인/자동가입, access+refresh 발급 |
+| POST | `/auth/refresh` | 불필요 | refresh 토큰을 **body로** 받아 access+refresh 재발급 (로테이션) |
+| DELETE | `/auth/logout` | **필요** 🔒 | **Request Body 없음** → access 토큰으로 사용자를 식별해 refresh revoke. 204 |
 
-> ⚠️ **`SecurityConfig.PUBLIC_PATHS` 수정이 필요하다.** 현재 값은 `/api/v1/auth/**` 전체 permitAll인데, Notion API I/F는 `/auth/refresh`와 `/auth/logout`을 **🔒 인증 필요**로 표시한다. 무인증 공개 대상은 `/auth/kakao` 하나뿐이다. 자세한 내용은 아래 "공개 경로 범위" 참고.
+> ⚠️ **`SecurityConfig.PUBLIC_PATHS` 수정이 필요하다.** 현재 값 `/api/v1/auth/**`(전체 permitAll)를 그대로 두면 **`/auth/logout`이 무인증 노출된다.** 아래 "공개 경로 범위" 참고.
+
+`/auth/refresh` 응답은 로테이션에 따라 `access_token` + **새 `refresh_token`** 을 함께 반환한다. 클라이언트는 저장된 refresh 토큰을 교체해야 한다.
 
 `user_social_accounts.provider`는 `KAKAO | GOOGLE | APPLE`을 허용한다. 구글·애플은 동일 형태로 확장 예정이며 이번 범위가 아니다.
 
@@ -72,7 +74,14 @@
 
 `condition_tag`는 관찰 기록만 저장하고 경고는 조회 시 계산한다 (거꾸리 경고 → `DiaryService`).
 
-> ⚠️ **`condition_tag` 허용값이 원본과 어긋난다.** Notion 테이블 정의서 DDL 주석은 7개(`정상 | 활발 | 거식 | 탈피도와줌 | 탈피완료 | 거꾸리 | 구토`), `V1__init.sql`은 4개(`정상 | 활발 | 거꾸리 | 구토`)다. 거식은 `feeding_logs.is_refused`로, 탈피는 `shed_records`로 흡수한 의도적 축소로 보이나 근거 기록이 없다. **`ConditionTag` enum 작성 전에 확정할 것.**
+**`condition_tag` 허용값은 7개다** (확정 — 2026-07-27):
+
+`정상` · `활발` · `거식` · `탈피도와줌` · `탈피완료` · `거꾸리` · `구토`
+
+- 공통(`정상`·`활발`) + 게코 전용(나머지 5개) 구분은 Notion ERD 설계에 명시돼 있다
+- 테이블 정의서의 `shed_records` 규칙도 `is_assisted = true → condition_tag '탈피도와줌'과 연계`로 같은 값을 참조한다
+
+> ⚠️ **`V1__init.sql`의 주석은 4개(`정상 | 활발 | 거꾸리 | 구토`)로 3개가 빠져 있다.** 컬럼이 `varchar(50)`이고 DB CHECK가 없어 스키마 변경은 불필요하지만, **`ConditionTag` enum은 7개로 만들고 V1 주석도 함께 고쳐야 한다.**
 
 ## 5. Feeding `/api/v1/pets/{pet_id}/feeding`
 
@@ -197,16 +206,28 @@ create index idx_refresh_user_id on refresh_tokens (user_id) where revoked_at is
 - 기존 `ErrorCode.INVALID_TOKEN`으로 충분하다 — 재사용 감지용 코드를 따로 만들지 않는다. 공격자에게 탐지 여부를 알려줄 이유가 없다
 - **만료 행 정리**: `expires_at`이 지난 행은 누적되기만 한다. 정리 배치는 auth 구현 범위에 넣지 않고, 운영 부담이 실제로 보이는 시점에 별도로 다룬다 (스케줄러 도입 결정이 함께 필요하므로)
 
-## 공개 경로 범위 (재검토 필요 — 2026-07-27)
+## 공개 경로 범위 (확정 — 2026-07-27)
 
-**원칙은 유효하다**: `SecurityConfig.PUBLIC_PATHS`에는 **토큰 없이 호출되는 엔드포인트만** 둔다. 인증이 필요한 기능을 permitAll 범위에 두면 무인증으로 노출된다 (AGENTS §5 계약).
+**원칙**: `SecurityConfig.PUBLIC_PATHS`에는 **토큰 없이 호출되는 엔드포인트만** 둔다. 인증이 필요한 기능을 permitAll 범위에 두면 무인증으로 노출된다 (AGENTS §5 계약).
 
-**적용이 바뀐다.** 2026-07-23 결정은 "`/auth/logout`은 refresh 토큰을 body로 받으므로 access 토큰 없이 동작한다"는 전제로 `/api/v1/auth/**` 전체를 permitAll로 두었다. 그러나 Notion API I/F는 `/auth/refresh`·`/auth/logout`을 **🔒 인증 필요**로 표시한다.
+**적용**: 와일드카드 `/api/v1/auth/**`를 쓰지 않고 **개별 경로로 나열한다.**
 
-- 그 표기가 "access 토큰 필요"라는 뜻이면 → `PUBLIC_PATHS`를 **`/api/v1/auth/kakao` 하나로 좁혀야 한다**
-- "refresh 토큰 제시가 필요하다"는 뜻이면 → 현행 `/auth/**` 유지가 맞다
+```java
+PUBLIC_PATHS = { "/api/v1/auth/kakao", "/api/v1/auth/refresh", "/actuator/health" }
+```
 
-**어느 쪽인지 확정 전에는 auth 구현을 시작하지 않는다.** 와일드카드 확장은 어느 경우에도 하지 않는다.
+`DELETE /api/v1/auth/logout`은 **인증이 필요하므로 permitAll에서 제외**한다.
+
+근거 — Notion API I/F 각 행의 본문:
+
+| 엔드포인트 | 본문 기재 | 판정 |
+| --- | --- | --- |
+| `POST /auth/refresh` | "🔓 인증 불필요", Request Body `{refresh_token}` | Authorization 헤더 없이 동작 → **공개** |
+| `DELETE /auth/logout` | "🔒 인증 필요. **Request Body 없음**", 204 | body가 없어 access 토큰으로만 사용자 식별 가능 → **인증 필요** |
+
+> 2026-07-23 결정은 "`/auth/logout`은 refresh 토큰을 body로 받으므로 access 토큰 없이 동작한다"는 전제로 `/auth/**` 전체를 permitAll로 두었다. **그 전제가 틀렸다** — 원본 스펙의 logout은 body가 없다. 원칙은 그대로고 적용만 바뀐다.
+>
+> API I/F 그리드의 `🔒 인증 필요` 체크박스는 `/auth/refresh`에서 본문과 어긋나 있었다(2026-07-27 Notion에서 해제 완료). **체크박스보다 행 본문이 정확하다.**
 
 ## 부분 수정은 PATCH (결정됨 — 2026-07-23)
 

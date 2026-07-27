@@ -43,9 +43,8 @@
 
 ## 미결 질문
 
-> 1~3번은 2026-07-27 Notion 설계 문서 대조에서 나왔다. **Notion API I/F가 계약의 1차 출처이므로 `api-list.md`가 아니라 Notion 쪽을 기준으로 정해야 한다.**
+> 2026-07-27 Notion 대조에서 나온 항목 중 **공개 경로**와 **`condition_tag`** 는 해소됐다. 아래 "해소된 질문" 참고.
 
-- [ ] **`/auth/refresh`·`/auth/logout`의 🔒 표기 의미.** *(경로·메서드는 2026-07-27에 Notion 기준으로 정합 완료 — `DELETE /auth/logout`)* Notion API I/F가 둘 다 **인증 필요 = YES**로 표시하는데, 그것이 **access 토큰**을 뜻하면 `SecurityConfig.PUBLIC_PATHS`를 `/api/v1/auth/kakao` 하나로 좁혀야 하고, **refresh 토큰 제시**를 뜻하면 현행 `/auth/**`가 맞다. **이걸 정하기 전에는 auth 구현을 시작하지 않는다** — 틀리면 두 엔드포인트가 무인증 노출된다
 - [ ] **HTTP 클라이언트.** Notion 소스 구조 §7은 `KakaoOAuthClient`가 **RestClient**를 쓴다고 명시한다. 레포는 REQ-05에서 **RestTemplate** + 로깅 인터셉터를 만들어 뒀다. RestTemplate으로 가고 Notion을 고칠지, RestClient로 갈아탈지(그러면 REQ-05 인터셉터를 다시 만들어야 한다) 결정 필요
 - [ ] **로컬 PostgreSQL 접속 정보.** 세션에서 받은 `localhost:3306` / `root`는 MySQL 것이었다. 실제 PostgreSQL 인스턴스가 로컬에 있는가? 없다면 준비 방법(Docker / Postgres.app / Supabase 무료 티어 직결) 중 무엇으로 갈지
 - [ ] **PostgreSQL 버전.** `gen_random_uuid()`는 13+ 내장이고 그 미만은 `pgcrypto` 확장이 필요하다. README는 15+를 요구하지만 실제 로컬 버전은 확인되지 않았다
@@ -53,6 +52,11 @@
 - [ ] **동시 refresh 요청 처리.** 앱 재시작·병렬 요청으로 같은 refresh가 거의 동시에 두 번 오면, 정상 사용자인데도 재사용 감지에 걸려 전 기기 로그아웃된다. 짧은 유예 윈도우를 둘지 감수할지 정해지지 않았다
 - [ ] **Testcontainers 도입 여부.** 로컬 DB 상태에 의존하지 않고 마이그레이션·리포지토리를 검증할 수 있으나, 빌드 시간과 Docker 의존이 따라온다
 - [ ] **Kakao 앱 등록 여부.** REST API 키·redirect URI가 있어야 연동 단계 검증이 가능하다
+
+### 해소된 질문 (2026-07-27)
+
+- [x] **공개 경로 범위.** Notion API I/F 행 본문에 답이 있었다 — `/auth/refresh`는 "🔓 인증 불필요"(refresh 토큰을 body로 수령), `/auth/logout`은 "🔒 인증 필요, **Request Body 없음**"이다. body가 없으니 access 토큰으로만 사용자를 식별할 수 있다. → **`PUBLIC_PATHS`는 `/auth/kakao` + `/auth/refresh` + `/actuator/health`를 개별 경로로 나열하고, `/auth/logout`은 제외한다.** 와일드카드 `/auth/**`는 쓰지 않는다 (AGENTS §5 갱신 완료)
+- [x] **`condition_tag` 허용값 → 7개.** Notion ERD 설계가 "공통(정상/활발) + 게코 전용(거식/탈피도와줌/탈피완료/거꾸리/구토)"으로 명시한다. `V1__init.sql` 주석의 4개가 누락이다 (컬럼은 `varchar(50)`이라 스키마 변경은 불필요)
 
 ## 작업 단계
 
@@ -91,5 +95,6 @@ Phase 1~2와 3~6은 PR을 나눈다.
 - **`JwtAuthenticationFilter`는 이미 `isAccessToken()`으로 refresh 토큰의 인증 사용을 막고 있다.** 확인 완료 — 이 검사를 제거하면 refresh 토큰으로 API 호출이 뚫린다
 - **API 계약의 1차 출처는 Notion API I/F다.** `docs/specs/api-list.md`는 파생 요약이며 충돌하면 Notion이 이긴다 (AGENTS §0). 2026-07-27에 39개 엔드포인트 기준으로 정합을 맞췄으나, Notion이 바뀌면 이 문서가 아니라 Notion을 먼저 본다
 - **`user_social_accounts` 조회/연결/해제 엔드포인트는 존재하지 않는다.** `api-list.md`가 독자 추가했던 것을 제거했다. 그런데 이것이 "공개 경로 범위" 결정(2026-07-23)에서 "인증 필요한 기능을 `/auth/` 밖에 둔 사례"로 인용됐던 엔드포인트다 — 근거가 사라졌으므로 위 미결 1번을 반드시 확인해야 한다
-- **`ConditionTag` enum을 만들기 전에 허용값을 확정할 것.** Notion DDL(7개)과 `V1__init.sql`(4개)이 다르다 (REQ-10 범위)
+- **`SecurityConfig.PUBLIC_PATHS`에 와일드카드를 쓰지 않는다.** `/api/v1/auth/**`로 두면 `DELETE /auth/logout`이 무인증 노출된다 — 이 엔드포인트는 Request Body가 없어 access 토큰이 유일한 사용자 식별 수단이다. Phase 5에서 반드시 개별 경로로 좁힐 것 (AGENTS §5 계약)
+- **`ConditionTag` enum은 7개다.** `V1__init.sql` 주석이 4개로 빠져 있으니 함께 고칠 것 (REQ-10 범위)
 - **`SecurityConfig.PUBLIC_PATHS`를 넓히지 않는다.** `/api/v1/auth/**`는 permitAll이라 인증이 필요한 기능을 그 아래 두면 무인증 노출된다 *(AGENTS §5에 이미 계약으로 등재됨)*

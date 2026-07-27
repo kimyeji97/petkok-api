@@ -86,7 +86,7 @@ com.petkok
 - **Enum**: Java Enum + `@Enumerated(STRING)`, DB는 varchar
 - **페이지네이션**: 커서 기반 (opaque base64 `next_cursor`)
 - **수정 메서드**: 리소스 수정은 `PATCH`(부분 수정)로 통일. `PUT`(전체 교체)은 쓰지 않는다 — 누락 필드와 `null` 의도를 구분할 수 없기 때문
-- **공개 경로**: `SecurityConfig.PUBLIC_PATHS`(`/api/v1/auth/**`)에는 토큰 없이 호출되는 엔드포인트만 둔다. 인증이 필요한 기능을 `/auth/` 아래 두면 무인증 노출된다
+- **공개 경로**: `SecurityConfig.PUBLIC_PATHS`에는 **access 토큰 없이 호출되는 엔드포인트만 개별 경로로** 나열한다. **`/api/v1/auth/**` 같은 와일드카드를 쓰지 않는다** — `/auth/` 아래에도 인증이 필요한 엔드포인트가 있어(`DELETE /auth/logout`) 무인증 노출된다. 현재 공개 대상: `/api/v1/auth/kakao`, `/api/v1/auth/refresh`, `/actuator/health`
 - **네이밍/상수**: 클래스 UpperCamelCase, 상수 `UPPER_SNAKE_CASE`, DTO는 `XxxRequest`/`XxxResponse`
 - **로깅**: Lombok `@Slf4j` (필드 `log`). 민감정보(전화번호·토큰 등)는 마스킹
 - **외부 API 응답 버퍼링**: 로깅 인터셉터는 응답을 `BufferingClientHttpResponseWrapper`로 감싼 뒤 로깅한다. 감싸지 않으면 로깅이 응답 스트림을 소비해 호출부가 본문을 읽지 못한다 (에러 없이 빈 본문으로 보인다)
