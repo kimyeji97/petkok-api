@@ -68,6 +68,29 @@ Notion API I/F를 표(그리드)로만 읽었을 때는 `/auth/refresh`·`/auth/
 
 같은 줄에 있던 **`.env.example` 참조도 함께 제거**했다 — 그 파일은 존재한 적이 없다. 없는 파일을 가리키는 안내는 신규 참여자·에이전트가 탐색에 시간을 쓰게 만든다.
 
+### 함정 — Notion 탭 페이지는 API로 수정할 수 없다
+
+「설계」 섹션의 DB·API 탭 본문은 `notion-update-page`가 **`validation_error: Object ... is not a page or database`** 로 거부한다. `fetch`로 읽히고 URL도 페이지처럼 생겼지만 쓰기가 안 되는 객체(탭)다. 같은 프로젝트의 일반 페이지(테이블 정의서·ERD 설계·소스 구조)는 정상 수정된다.
+
+- 증상만 보면 권한 문제로 오인하기 쉽다. **읽기는 되는데 쓰기만 막히면 객체 타입을 의심할 것**
+- 우회: 같은 내용이 실린 일반 페이지를 고치고, 탭 안의 원본(이번엔 DDL 코드 블록·HTTP 상태 코드 표)은 **사람이 직접 수정**해야 한다
+- 이번에는 DDL 블록 4곳을 사용자가 직접 처리했다
+
+### 브랜치 — 머지된 브랜치에 새 작업을 얹지 않는다
+
+작업을 시작한 `docs/api-list`는 PR #7로 **이미 머지된 브랜치**였다. 여기에 커밋을 쌓아 새 PR을 열면 머지된 PR 페이지까지 어수선해진다. `docs/progress-and-mysql-plan`을 새로 파고 `origin/main` 위로 리베이스해 PR #8을 열었다.
+
+> 로컬 `docs/api-list`에 리베이스 전 커밋 3개가 고아로 남아 있다(원격에는 없음). 내용은 새 브랜치에 모두 보존돼 있으므로 `git branch -f docs/api-list origin/docs/api-list`로 정리하면 된다.
+
+### 다음 — 노션 현행화 C단계 (내일)
+
+Notion 소스 구조 §5 패키지 트리와 실제 구현이 갈린 4건. 구현 노트가 일부 설명하고 있으나 본문 표·트리를 먼저 읽으면 오해한다.
+
+1. 예외 서브클래스 트리(`NotFoundException`/`ForbiddenException`/`ConflictException`) — 실제로는 `ErrorCode` enum + 단일 `BusinessException`
+2. 베이스 엔티티가 **3단계**(`BaseCreatedEntity` → `BaseTimeEntity` → `BaseSoftDeleteEntity`) — 표에는 2단계만
+3. `global/util/` 계층 통째 누락 (REQ-04에서 이식한 30개)
+4. `RestTemplateConfig` · `RestTemplateLoggingInterceptor` 누락 (REQ-05)
+
 ---
 
 ## 2026-07-23
