@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-07-27
+> 최종 갱신: 2026-07-28
 
 ## 요구사항 인덱스
 
@@ -17,6 +17,7 @@
 | REQ-05 | RestTemplate 설정 + 요청·응답 로깅 인터셉터 | — | 2026-07-23 | ✅ |
 | REQ-06 | API 설계 초안 + 설계 결정 3건 확정 | [api-list.md](specs/api-list.md) | 2026-07-23 | ✅ |
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
+| REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | — | 🟡 |
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ⏸ |
 | REQ-08 | user 도메인 (프로필 · 소셜 계정 연결) | [api-list §2](specs/api-list.md) | — | ⏸ |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
@@ -31,6 +32,47 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-07-28
+
+### 노션 현행화 C단계 — 설계 문서와 구현이 갈린 4건
+
+「소스 구조 / 아키텍처 설계」의 패키지 트리·global 표를 실제 코드와 대조해 맞췄다. 예외 서브클래스 트리(`NotFoundException`/`ForbiddenException`/`ConflictException`)는 채택된 적이 없고 실제는 `ErrorCode` enum + 단일 `BusinessException`, 베이스 엔티티는 2단계가 아니라 3단계, `global/util/` 30개와 `RestTemplateConfig`·`RestTemplateLoggingInterceptor`는 문서에 아예 없었다.
+
+**범위 밖에서 더 심각한 걸 발견했다.** §5 표의 `SecurityConfig` 행이 아직 `/auth/**` permitAll로 적혀 있었다 — 2026-07-27에 확정한 "와일드카드 금지, 개별 경로 나열"과 정면으로 충돌한다. 하루 전에 정한 결정이 문서 다른 절에 반영 안 된 상태였다. 같이 고쳤다.
+
+「다음 단계」 체크리스트는 REQ-01·04·05가 끝났는데도 전부 미체크였다. 완료 처리하면서 **코드 쪽 미해결 2건을 명시로 올렸다** — `SecurityConfig.PUBLIC_PATHS`가 아직 `/api/v1/auth/**`인 것, `V1__init.sql`의 condition_tag 주석이 7종이 아니라 4종인 것. 둘 다 REQ-07에서 처리한다.
+
+### 함정 — 노션 코드블록이 이스케이프 문자열을 그대로 저장하고 있었다
+
+§2 패키지 트리 블록이 박스문자·한글을 `├`, `도` 같은 **텍스트로** 담고 있었다. 노션에서도 깨져 보였을 것이다. 문제는 이 상태에서 부분 수정이 **불가능**하다는 것 — `update_content`의 `old_str`에 리터럴 `\uXXXX`를 실어 보낼 방법이 없다(항상 실제 문자로 디코딩된다). 박스문자는 "`u251c` → ASCII 마커 → 실제 문자" 2단계 치환으로 우회했지만, 한글은 코드포인트 조합이 75개를 넘어 비현실적이었다. **결국 `replace_content` 전체 교체가 유일한 해법이었다.**
+
+여기서 시간을 태운 진짜 원인은 따로 있다. **`old_str`과 `new_str`을 같은 문자열로 써 놓고 성공 응답을 받아 고쳤다고 착각한 것.** 이스케이프를 다루다 보니 양쪽이 같은 값이 되기 쉬웠고 도구는 성공을 반환한다. no-op 프로브(다른 문자열로 매칭 시도)를 걸고 나서야 저장 형태를 확정할 수 있었다. 같은 원인으로 §4 표의 🦎가 깨져 있던 것도 함께 복구했다.
+
+→ 이 3건은 **`CLAUDE.md`로 승격**했다. 모르면 "수정이 안 먹는다"를 권한 문제로 오진한다.
+
+### 패키지 구조 재설계 확정 — `business` / `data` / `framework`
+
+기존 `global` + `domain` 단일 트리에서 3분할로 바꾸기로 했다. 도메인 코드가 0개인 지금이 이행 비용 최저점이다.
+
+**결정의 핵심은 `data` 밑을 도메인별로 쪼갠 것이고, 근거는 ArchUnit이다.** 처음 제안은 `data/entity`·`data/domain`에 전부 평면으로 모으는 안이었는데, 그러면 `FeedingLog`와 `ShedRecord`가 같은 패키지라 Slices가 나뉘지 않아 **도메인 간 참조 금지 규칙이 성립하지 않는다.** 대안으로 클래스명 접두사 기반 커스텀 `ArchCondition`을 검토했으나 이름 규칙이 흔들리면 같이 무너져 기각했다. `business/{도메인}`과 `data/{도메인}`이 같은 이름을 쓰면 `slices().matching("com.petkok.*.(*)..")` 한 줄로 끝난다 — 같은 도메인끼리는 같은 슬라이스라 허용되고 교차 참조만 걸린다.
+
+같이 정한 것:
+
+- **DTO 패키지는 `domain`이 아니라 `dto`.** `domain`은 DDD에서 핵심 비즈니스 모델을 뜻해 entity와 혼동된다
+- **repository는 entity 옆**(`data/{도메인}/repository`). 반환 타입이 Entity라 결합이 강하고, `business`에 두면 business 트리가 JPA를 알게 되면서 `business → data` 단방향이 깨져 규칙을 한 줄로 못 쓴다
+- `uri`·`const`는 `data`가 아니다 — URI는 API 계약이라 `framework/constant`, 도메인 전용 값은 `data/{도메인}/enums`
+- 베이스 엔티티는 `framework`가 아니라 `data/common/entity`. framework는 JPA 매핑 규약을 알지 않아야 한다
+- `JwtAuthenticationFilter`는 `framework/processor/filter`. `security/jwt`에 두는 편이 응집도는 높지만, 요청 파이프라인에 끼어드는 위치가 성격을 결정한다고 봤다
+- **`processor/resolver/`는 두지 않는다** — `@CurrentUser`가 `@AuthenticationPrincipal` 메타 애노테이션이라 ArgumentResolver가 실제로 존재하지 않는다(코드 확인). 설계상 있을 법해서 문서에 남으면 없는 클래스를 찾게 된다
+
+노션 「소스 구조」에 **§13 구조 강제(ArchUnit)** 절을 신설해 규칙 5종을 코드로 적었다. **컴파일·실행해 본 적 없는 스케치**이고 문서에도 그렇게 명시했다.
+
+> ⚠️ `business/{도메인}`과 `data/{도메인}`의 이름이 어긋나면 ArchUnit 규칙이 **에러 없이 조용히 무력화**된다 — 서로 다른 슬라이스로 잡혀 규칙은 통과하는데 경계는 안 지켜진다. AGENTS.md §3에 계약으로 등재했다.
+
+### 이행은 아직 안 했다
+
+`com.petkok.global.*` 55개 파일이 구 위치 그대로다. 문서(노션 §2·§5, AGENTS.md §3)는 목표 구조를 기술하고 있어 **코드와 어긋난 상태**이며, 그 사실을 양쪽에 명시로 적어 뒀다(조용한 drift 방지). 이행은 auth 착수 전에 별도 PR로 간다 — 계획서 [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md).
 
 ## 2026-07-27
 
