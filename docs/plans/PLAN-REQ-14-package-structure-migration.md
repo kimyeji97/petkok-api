@@ -1,6 +1,6 @@
 # PLAN-REQ-14 · 프로젝트 소스 구조 변경안
 
-> 출처: 2026-07-28 세션 · 작성: 2026-07-28 · 상태: 🟡 진행
+> 출처: 2026-07-28 세션 · 작성: 2026-07-28 · 상태: ✅ 완료 (2026-07-28, PR #10 머지)
 
 ## 배경
 
@@ -46,34 +46,35 @@
 ## 미결 질문
 
 - [x] **현재 브랜치(`docs/progress-and-mysql-plan`) 처리 순서** — 구조 확정(`AGENTS.md` §3 + `CLAUDE.md` 함정)을 현재 브랜치에 커밋해 PR #8에 포함시키고, 머지 후 `main`에서 분기하기로 확정(2026-07-28). 이렇게 해야 이행 PR의 diff가 순수 이동만 담는다
-- [ ] **빈 패키지를 미리 만들 것인가.** `framework/constant`, `processor/aspect`, `processor/converter`는 지금 넣을 클래스가 없다. 자리만 만들어 둘지, 필요할 때 만들지 안 정했다
-- [ ] **이행 검증 범위 — `bootRun`까지 할 것인가.** 컴파일·Spotless·Checkstyle은 DB 없이 되지만, 빈 등록·컴포넌트 스캔이 실제로 뜨는지는 기동해야 안다. 기동에는 로컬 Postgres가 필요하다(Flyway `V1__init.sql`). 어디까지를 완료로 볼지 미정
+- [x] **빈 패키지를 미리 만들 것인가** — 만들지 않기로 확정. 넣을 클래스가 없고 git이 빈 디렉터리를 추적하지 못한다. 설계는 Notion §2에 남긴다
+- [x] **이행 검증 범위 — `bootRun`까지 할 것인가** — 생략하기로 확정. 컴포넌트 스캔이 `@SpringBootApplication` + `@ConfigurationPropertiesScan("com.petkok")` 기준이라 하위 패키지 재배치의 영향을 받지 않고, 순수 이동이라 기동 리스크가 낮다고 판단. **다만 빈 등록이 실제로 뜨는지는 여전히 확인되지 않았다** — REQ-07에서 로컬 Postgres를 세울 때 함께 확인할 것
 - [ ] **ArchUnit §13 규칙이 실제로 동작하는지 미검증.** 특히 Slices 패턴 `com.petkok.*.(*)..`이 `business`/`data`를 건너뛰고 도메인명만 슬라이스 키로 잡는지 확인 안 됐다. `timeline` 예외 처리 방식도 스케치 수준
 - [ ] `data/timeline`을 만들 것인가. timeline은 자체 테이블이 없어 `business/timeline`만 두기로 했으나, DTO가 필요하면 `data/timeline/dto`가 생긴다 — 조건부로만 합의됨
 - [ ] `ApiUri`(엔드포인트 경로 상수 클래스) 도입 여부. `framework/constant`에 "둘 경우 여기"까지만 정했고 도입 자체는 미정
 
 ## 작업 단계
 
-- [ ] **Phase 0** — 현재 브랜치 처리 (미결 질문 1번 해소 후)
-      완료 기준: `main`이 구조 확정 문서를 포함하고, working tree가 clean
+- [x] **Phase 0** — 현재 브랜치 처리
+      완료 기준 충족: `main`이 구조 확정 문서를 포함, working tree clean
+      **⚠️ 계획과 달랐던 부분** — PR #8이 낡은 head(`1f4297d`) 기준으로 머지되면서 커밋 3건이 `main`에 누락됐다. 같은 브랜치로 PR #9를 새로 열어 복구했다. 원인과 재발 방지는 PROGRESS.md 2026-07-28 및 AGENTS.md §4 참조
 
-- [ ] **Phase 1** — `main`에서 `refactor/package-structure` 분기
-      완료 기준: `git log origin/main..HEAD`가 비어 있는 상태에서 시작
+- [x] **Phase 1** — `main`에서 `refactor/package-structure` 분기
+      완료 기준 충족
 
-- [ ] **Phase 2** — 패키지 이동 (`git mv` + `package`/`import` 선언 수정)
-      완료 기준: `./gradlew build -x test` 성공. `com.petkok.global` 문자열이 소스 전체에서 0건
+- [x] **Phase 2** — 패키지 이동 (`git mv` + `package`/`import` 선언 수정)
+      완료 기준 충족: `build -x test` 성공, `com.petkok.global` 0건
+      **계획에 없던 작업** — 자리를 바꾼 3개(`RestTemplateLoggingInterceptor`·`GlobalExceptionHandler`·`JwtAuthenticationFilter`)가 이전엔 같은 패키지라 `import`가 없었던 탓에 컴파일 에러 5건 발생. import 4줄 추가가 필요했다
 
-- [ ] **Phase 3** — CI 게이트 재현
-      완료 기준: `./gradlew spotlessApply` → `build -x test` → `checkstyleMain -PciStrict` 세 개 모두 통과, **Checkstyle 경고 0건**
+- [x] **Phase 3** — CI 게이트 재현
+      완료 기준 충족: spotlessApply / build -x test / checkstyleMain -PciStrict / spotlessCheck 전부 통과, Checkstyle 경고 0건
 
-- [ ] **Phase 4** — 기동 확인
-      완료 기준: **미정** (미결 질문 3번)
+- [ ] ~~**Phase 4** — 기동 확인~~ — **생략(보류)**. 완료 기준을 정하지 못했고(미결 3번), 컴포넌트 스캔이 패키지 재배치의 영향을 받지 않아 리스크가 낮다고 판단했다. **빈 등록이 실제로 뜨는지는 확인되지 않은 채로 남아 있다** — REQ-07에서 로컬 Postgres를 세울 때 확인한다
 
-- [ ] **Phase 5** — PR 생성 + CI 통과
-      완료 기준: PR 템플릿 작성, CI `SUCCESS`, diff가 **이동/이름변경만**이고 로직 변경 0건임을 리뷰로 확인
+- [x] **Phase 5** — PR 생성 + CI 통과
+      완료 기준 충족: PR #10, CI `pass`(42s, `86a1cfd` 기준), diff 전량 rename + import 4줄임을 기계적으로 확인
 
-- [ ] **Phase 6** — 노션 + AGENTS.md 역반영
-      완료 기준: 노션 §5 도입부·구현 노트, AGENTS.md §1·§3에서 "아직 `com.petkok.global.*`" 경고가 사라지고 코드와 문서가 일치
+- [x] **Phase 6** — 노션 + AGENTS.md 역반영
+      완료 기준 충족: 노션 §2·§5 헤더와 구현 노트, AGENTS.md §1·§3에서 "아직 `com.petkok.global.*`" 경고 제거
 
 ## 제약·함정
 

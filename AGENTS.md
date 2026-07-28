@@ -107,6 +107,8 @@ com.petkok
 - **브랜치**: GitHub Flow. `main` + feature 브랜치. 네이밍: `feat/kebab-case`, `fix/…`, `chore/…` 등
 - **커밋**: Conventional Commits. 타입은 영어(`feat` `fix` `refactor` …), 제목·본문은 한글. lefthook `commit-msg`가 형식 검증(위반 시 차단)
 - **PR**: PR 필수, 템플릿([`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)) 작성. CI 통과가 머지 조건
+- ⚠️ **머지 직전에 PR head SHA와 로컬 HEAD를 반드시 대조한다.** GitHub이 푸시를 PR에 반영하지 못하는 경우가 실제로 있었다 — 원격 브랜치와 `GET /branches/…`는 새 SHA인데 `GET /pulls/{n}`만 낡은 SHA를 5분 넘게 반환했고, 그대로 머지되어 **커밋 3건이 `main`에 누락**됐다(2026-07-27→28, PR #8 → #9로 복구)
+- ⚠️ **CI 초록불은 SHA와 함께 확인한다.** `gh pr checks`는 이전 실행분 결과를 그대로 보여줄 수 있다. `gh run list --branch <브랜치> --json headSha,conclusion`으로 **어느 커밋 기준인지** 확인할 것 — 위 사고에서 통과로 읽은 체크는 전날 실행분이었다
 
 ---
 
