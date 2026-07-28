@@ -19,17 +19,14 @@
 - PostgreSQL 15+ (Supabase 무료 티어 가능)
 
 ## 실행
-### 1) Gradle Wrapper 준비
-`gradle-wrapper.jar` 바이너리는 저장소에 포함되어 있지 않습니다. 둘 중 하나:
-- **IntelliJ IDEA 로 프로젝트 열기** → Gradle 동기화 시 wrapper 자동 생성 (권장)
-- 로컬에 Gradle 설치 후: `gradle wrapper --gradle-version 8.10.2`
+> `gradle-wrapper.jar`(8.10.2) 는 저장소에 포함되어 있습니다. 별도 준비 없이 `./gradlew` 를 바로 쓰세요.
 
-### 2) 환경변수
-`.env.example` 참고. 로컬은 `application-local.yml` 에 기본값이 있어 DB만 있으면 바로 뜹니다.
+### 1) 환경변수
+로컬은 `application-local.yml` 에 기본값이 있어 DB만 있으면 바로 뜹니다.
 필수(운영): `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`(32바이트+),
 그리고 gallery 사용 시 `R2_*`.
 
-### 3) 기동
+### 2) 기동
 ```bash
 ./gradlew bootRun            # 기본 프로파일 local
 # 또는 프로파일 지정

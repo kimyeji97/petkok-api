@@ -1,7 +1,27 @@
 # AGENTS.md
 
 이 파일은 AI 에이전트(Claude, Copilot 등)를 위한 프로젝트 진입점이다.
-사람이 읽는 상세 문서는 [`README.md`](README.md)가 1차 출처다 — 스택·패키지 구조·컨벤션은 README를 신뢰하라.
+
+## 0. 출처 우선순위 (먼저 읽을 것)
+
+**요구사항·설계·API 계약·ADR의 원본은 이 저장소가 아니라 Notion에 있다.**
+<https://app.notion.com/p/yjkim97/PetKok-389b81b56e6080f6bfc2f7972108e778>
+
+| 대상 | 1차 출처 |
+| --- | --- |
+| 요구사항, 유저 스토리, 비즈니스 규칙, 제약사항 | **Notion** → 기획/분석 |
+| ADR (ADR-001 스택 선택, ADR-002 DB 엔진 선택) | **Notion** → 기획/분석. `docs/adr/`는 비어 있다 |
+| 테이블 정의서(DDL), ERD | **Notion** → 설계 → DB 탭 |
+| **API 계약 (엔드포인트·메서드·인증 여부)** | **Notion** → 설계 → API 탭 → `API I/F` DB |
+| 소스 구조·레이어 규칙·파생 로직 설계 | **Notion** → 설계 → 소스 구조/아키텍처 설계 |
+| 스택·패키지 구조·로컬 실행 | [`README.md`](README.md) |
+| 코드 컨벤션·CI 게이트 | 이 문서 (§5·§6) |
+| 진행 이력·판단 근거 | [`docs/PROGRESS.md`](docs/PROGRESS.md) |
+
+- `docs/specs/api-list.md`는 **Notion API I/F의 파생 요약**이다. 원본이 아니다. **충돌하면 언제나 Notion이 이긴다**
+- 설계 관련 판단이 필요하면 레포 문서만 보고 결정하지 말 것. 실제로 레포 문서만 보고 진행했다가 이미 Accepted 상태이던 ADR-002(DB 엔진)와 어긋난 계획을 세운 적이 있다
+- 반대로 레포에서 확정한 내용이 Notion보다 앞서는 경우도 있다(예: refresh 토큰 저장소). 그때는 **Notion에 역반영을 제안**하고, 어느 쪽이 최신인지 날짜로 판단한다
+- Notion DDL 블록은 소스 구조 문서보다 갱신이 늦는다. 둘이 다르면 소스 구조 문서와 `V1__init.sql`을 신뢰하고 확인을 요청한다
 
 ---
 
@@ -66,9 +86,11 @@ com.petkok
 - **Enum**: Java Enum + `@Enumerated(STRING)`, DB는 varchar
 - **페이지네이션**: 커서 기반 (opaque base64 `next_cursor`)
 - **수정 메서드**: 리소스 수정은 `PATCH`(부분 수정)로 통일. `PUT`(전체 교체)은 쓰지 않는다 — 누락 필드와 `null` 의도를 구분할 수 없기 때문
-- **공개 경로**: `SecurityConfig.PUBLIC_PATHS`(`/api/v1/auth/**`)에는 토큰 없이 호출되는 엔드포인트만 둔다. 인증이 필요한 기능을 `/auth/` 아래 두면 무인증 노출된다
+- **공개 경로**: `SecurityConfig.PUBLIC_PATHS`에는 **access 토큰 없이 호출되는 엔드포인트만 개별 경로로** 나열한다. **`/api/v1/auth/**` 같은 와일드카드를 쓰지 않는다** — `/auth/` 아래에도 인증이 필요한 엔드포인트가 있어(`DELETE /auth/logout`) 무인증 노출된다. 현재 공개 대상: `/api/v1/auth/kakao`, `/api/v1/auth/refresh`, `/actuator/health`
 - **네이밍/상수**: 클래스 UpperCamelCase, 상수 `UPPER_SNAKE_CASE`, DTO는 `XxxRequest`/`XxxResponse`
 - **로깅**: Lombok `@Slf4j` (필드 `log`). 민감정보(전화번호·토큰 등)는 마스킹
+- **외부 API 응답 버퍼링**: 로깅 인터셉터는 응답을 `BufferingClientHttpResponseWrapper`로 감싼 뒤 로깅한다. 감싸지 않으면 로깅이 응답 스트림을 소비해 호출부가 본문을 읽지 못한다 (에러 없이 빈 본문으로 보인다)
+- **상태코드 위임**: `ClientHttpResponse.getStatusCode()`는 원본 `HttpStatusCode`를 그대로 위임한다. `HttpStatus.valueOf(int)`로 재변환하면 비표준 상태코드 수신 시 `IllegalArgumentException`이 터진다 (예: Cloudflare 520 — R2가 Cloudflare다)
 
 ---
 
