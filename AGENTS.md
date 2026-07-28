@@ -29,7 +29,7 @@
 
 **PetKok API** — 반려동물(크레스티드 게코 / 강아지 / 고양이) 다이어리 백엔드. 게코 특화 로직이 핵심 차별점.
 현재 **개발 1단계 = 뼈대(skeleton)** 상태: 공통 계층 + 베이스 엔티티 + Flyway 초기 스키마까지. 도메인(auth/user/pet/…)은 다음 단계.
-2026-07-28에 패키지 구조를 `business`/`data`/`framework` 3분할로 재확정했다(§3). **코드 이행은 아직 안 됐다** — 실제 소스는 `com.petkok.global.*`이다.
+2026-07-28에 패키지 구조를 `business`/`data`/`framework` 3분할로 재확정하고 이행까지 끝냈다(§3). `com.petkok.global.*`은 더 이상 없다.
 
 **스택**: Java 21 · Spring Boot 3.3.x (Gradle **Kotlin DSL**) · Spring Data JPA(Hibernate 6) · Spring Security · Bean Validation · **PostgreSQL(Supabase) + Flyway** · JWT(Access/Refresh) + Kakao OAuth2 · Cloudflare R2(S3 호환).
 
@@ -90,7 +90,15 @@ com.petkok
 - `@CurrentUser`는 `@AuthenticationPrincipal` 메타 애노테이션이라 별도 ArgumentResolver가 없다 (`processor/resolver/`를 두지 않는 이유)
 - 베이스 엔티티는 `framework`가 아니라 `data/common/entity`. framework는 JPA 매핑 규약을 알지 않는다
 
-> ⚠️ **현재 코드는 아직 구조가 `com.petkok.global.*`이다.** 위 구조는 확정된 목표이고, 55개 파일 이행은 auth 도메인 착수 전에 별도 PR로 진행한다. 이행 전까지 코드와 이 문서가 다르다.
+> ✅ **이행 완료 (2026-07-28).** 55개 파일을 위 구조로 옮겼고 `com.petkok.global.*`은 남아 있지 않다. `business/`·`data/{도메인}`은 도메인 코드가 들어올 때 생성된다(현재는 `data/common/entity`만 존재).
+>
+> 이행 중 자리를 바꾼 3개 — 이유가 없으면 원위치로 되돌리기 쉬우므로 근거를 남긴다.
+>
+> | 클래스 | 이동 | 이유 |
+> |---|---|---|
+> | `RestTemplateLoggingInterceptor` | `config/` → `processor/interceptor/` | 설정이 아니라 호출 파이프라인에 끼어드는 컴포넌트 |
+> | `GlobalExceptionHandler` | `exception/` → `processor/handler/` | 예외 **정의**가 아니라 응답 변환 처리기 |
+> | `JwtAuthenticationFilter` | `security/jwt/` → `processor/filter/` | 요청 파이프라인 위치가 성격을 결정. 토큰 발급·검증(`JwtTokenProvider`)은 `security/`에 남는다 |
 
 ---
 
