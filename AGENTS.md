@@ -28,7 +28,8 @@
 ## 1. 프로젝트 개요
 
 **PetKok API** — 반려동물(크레스티드 게코 / 강아지 / 고양이) 다이어리 백엔드. 게코 특화 로직이 핵심 차별점.
-현재 **개발 1단계 = 뼈대(skeleton)** 상태: `global` 공통 계층 + 베이스 엔티티 + Flyway 초기 스키마까지. 도메인(auth/user/pet/…)은 다음 단계.
+현재 **개발 1단계 = 뼈대(skeleton)** 상태: 공통 계층 + 베이스 엔티티 + Flyway 초기 스키마까지. 도메인(auth/user/pet/…)은 다음 단계.
+2026-07-28에 패키지 구조를 `business`/`data`/`framework` 3분할로 재확정했다(§3). **코드 이행은 아직 안 됐다** — 실제 소스는 `com.petkok.global.*`이다.
 
 **스택**: Java 21 · Spring Boot 3.3.x (Gradle **Kotlin DSL**) · Spring Data JPA(Hibernate 6) · Spring Security · Bean Validation · **PostgreSQL(Supabase) + Flyway** · JWT(Access/Refresh) + Kakao OAuth2 · Cloudflare R2(S3 호환).
 
@@ -52,19 +53,44 @@
 
 ## 3. 패키지 구조
 
+**2026-07-28 확정 — `business` / `data` / `framework` 3분할.** 각 트리 안은 반드시 도메인 단위로 묶는다.
+
 ```
 com.petkok
-├── global/
-│   ├── config/       SecurityConfig, JpaAuditingConfig, JacksonConfig, WebConfig, R2Config
-│   ├── common/
-│   │   ├── entity/   BaseCreatedEntity → BaseTimeEntity → BaseSoftDeleteEntity
-│   │   ├── response/ ApiResponse{data,error}, ErrorResponse
-│   │   └── pagination/ CursorRequest, CursorPage, CursorCodec
-│   ├── security/     AuthPrincipal, @CurrentUser, jwt/(TokenProvider, AuthFilter, Properties)
-│   ├── exception/    ErrorCode, BusinessException, GlobalExceptionHandler
-│   └── util/         spring-java-utility 이식 (date/json/list/map/number/string/encrypt/file/os/spring/http 하위 유틸리티)
-└── domain/           (다음 단계: auth → user → pet → diary/feeding/activity/weight/shed/gallery/timeline)
+├── business/                   도메인별 진입 + 비즈니스 로직
+│   └── {도메인}/
+│       ├── controller/         XxxController
+│       └── service/            XxxService, *Calculator(I/O 없는 순수 계산)
+├── data/                       영속 객체 + 전송 객체
+│   ├── common/entity/          BaseCreatedEntity → BaseTimeEntity → BaseSoftDeleteEntity
+│   └── {도메인}/
+│       ├── entity/             JPA 엔티티
+│       ├── repository/         JpaRepository + 커스텀 쿼리(keyset, 소프트딜리트 필터)
+│       ├── dto/                XxxRequest / XxxResponse (record)
+│       └── enums/              도메인 전용 enum
+└── framework/                  도메인 무관 횡단 관심사
+    ├── config/                 Security, JpaAuditing, Jackson, Web, R2(+R2Properties), RestTemplate
+    ├── processor/              filter/(JwtAuthenticationFilter) · handler/(GlobalExceptionHandler)
+    │                           · interceptor/(RestTemplateLoggingInterceptor) · aspect/ · converter/
+    ├── security/               AuthPrincipal, @CurrentUser, jwt/(JwtTokenProvider, JwtProperties)
+    ├── response/               ApiResponse{data,error}, ErrorResponse
+    ├── pagination/             CursorRequest, CursorPage, CursorCodec
+    ├── exception/              ErrorCode, BusinessException
+    ├── constant/               전역 상수 · ApiUri
+    └── util/                   spring-java-utility 이식 30개
+                                (date/encrypt/file/http/json/list/map/number/os/spring/string + 루트 4종)
 ```
+
+도메인 10개: auth · user · pet · diary · feeding · activity · weight · shed · gallery · timeline
+
+- **`business/{도메인}`과 `data/{도메인}`은 같은 이름을 쓴다.** ArchUnit Slices가 이 이름을 슬라이스 키로 삼아 도메인 간 참조를 막는다 — 이름이 어긋나면 규칙이 무력해진다
+- **DTO 패키지 이름은 `dto`.** `domain`으로 부르지 않는다 (DDD의 도메인 모델과 혼동)
+- **repository는 entity 옆(`data/{도메인}/repository`).** 반환 타입이 Entity라 결합이 강하고, `business → data` 단방향을 깨지 않는다
+- `timeline`은 자체 테이블이 없어 `business/timeline`만 둔다. 여러 도메인 Repository를 조합하므로 도메인 간 참조 금지 규칙의 **유일한 예외**다
+- `@CurrentUser`는 `@AuthenticationPrincipal` 메타 애노테이션이라 별도 ArgumentResolver가 없다 (`processor/resolver/`를 두지 않는 이유)
+- 베이스 엔티티는 `framework`가 아니라 `data/common/entity`. framework는 JPA 매핑 규약을 알지 않는다
+
+> ⚠️ **현재 코드는 아직 구조가 `com.petkok.global.*`이다.** 위 구조는 확정된 목표이고, 55개 파일 이행은 auth 도메인 착수 전에 별도 PR로 진행한다. 이행 전까지 코드와 이 문서가 다르다.
 
 ---
 
@@ -79,6 +105,7 @@ com.petkok
 ## 5. 코드 컨벤션 (핵심)
 
 - **레이어**: Controller → Service → Repository → Entity/DTO (단방향). **Entity는 Service 밖으로 나가지 않는다** (응답은 DTO)
+- **트리 방향**: `business → data` 단방향. `framework`는 `business`·`data`를 **참조하지 않는다**(역참조 금지). 다른 도메인 참조 금지 — 예외는 `business/timeline` 하나뿐
 - **응답**: 공통 wrapper `ApiResponse<T>` (`{data, error}`). 전역 snake_case (Jackson). 에러는 `BusinessException` + `ErrorCode` enum → `GlobalExceptionHandler` 전역 처리
 - **스키마 소유 = Flyway.** Supabase 대시보드 수동 DDL 금지 (drift 방지)
 - **감사(auditing)**: `created_at = @CreatedDate`, `updated_at = @LastModifiedDate` (JPA Auditing, DB 트리거 없음). 베이스 엔티티 상속으로 처리
@@ -100,7 +127,7 @@ CI([`.github/workflows/ci.yml`](.github/workflows/ci.yml))에서 강제한다. *
 
 - **Spotless**: google-java-format 포맷 검증
 - **Checkstyle** (`-PciStrict`): 네이밍·복잡도·미사용 import (경고 1건도 실패)
-- **ArchUnit**: 레이어 의존 방향·도메인 간 참조 규칙 — **feature 도메인 도입 시점까지 보류**(현재 검사 대상 없음). 억제(suppression) 없이 strict 유지가 원칙
+- **ArchUnit**: 레이어 의존 방향·도메인 간 참조 규칙 — **`src/test` 신설 시점까지 보류**(현재 테스트 소스셋 자체가 없다). 억제(suppression) 없이 strict 유지가 원칙. 도입할 규칙 5종(도메인 간 참조 금지 · 레이어 방향 · Entity 누출 금지 · 트리 단방향 · 네이밍)은 Notion 「소스 구조」 §13에 스케치해 뒀다 — **§3의 패키지 이름 규칙이 곧 이 규칙의 전제**다
 
 ---
 
