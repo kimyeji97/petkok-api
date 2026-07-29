@@ -9,7 +9,7 @@
 - 커밋 전 CI 게이트 재현: `./gradlew spotlessApply && ./gradlew build -x test && ./gradlew checkstyleMain -PciStrict`
 - ⚠️ **게이트를 `| tail`·`| head` 같은 파이프에 물리지 말 것.** 파이프라인 종료코드가 마지막 명령의 것이 되어 gradle 실패가 가려진다. 실측: `./gradlew build -q 2>&1 | tail -15 && echo OK` → **컴파일 에러 5건인데 `OK`가 출력됐다.** 출력을 줄이려면 파이프 대신 `-q`만 쓰고 `set -e`로 각각 실행한다
 - **`src/test`가 아직 없다.** `./gradlew test`는 통과해도 검증된 것이 없다 — "테스트 통과"로 보고하지 말 것. 현재 실질 게이트는 컴파일 + Spotless + Checkstyle뿐
-- 스펙 문서는 [`docs/specs/api-list.md`](docs/specs/api-list.md) 하나뿐이며 **Notion API I/F의 파생 요약이다** — 원본이 아니다. `docs/adr/`는 비어 있고 **ADR-001·ADR-002의 원본은 Notion에 있다.** 설계 판단 전에 AGENTS.md §0(출처 우선순위)을 먼저 볼 것
+- `docs/specs/`의 두 문서 — [`api-list.md`](docs/specs/api-list.md)(Notion API I/F 파생), [`db-schema.md`](docs/specs/db-schema.md)(Notion 테이블 정의서 파생) — 는 **둘 다 파생 요약이다.** 원본이 아니다. `docs/adr/`는 비어 있고 **ADR-001·ADR-002의 원본은 Notion에 있다.** 설계 판단 전에 AGENTS.md §0(출처 우선순위)을 먼저 볼 것
 
 ## Notion 편집 함정 (AGENTS.md §0 보완)
 
