@@ -1,4 +1,4 @@
-# DB 스키마 (V1)
+# DB 스키마 (V1 + V2)
 
 > ⚠️ **이 문서는 원본이 아니다.** 테이블 정의서·ERD의 1차 출처는 **Notion「PetKok」→ 설계 → 「테이블 정의서」와 DB 탭**이다.
 > 이 문서는 구현 편의를 위한 파생 요약이며, 충돌하면 **언제나 Notion이 이긴다.**
@@ -19,7 +19,7 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| DB | PostgreSQL 15+ (Supabase, ADR-002) |
+| DB | PostgreSQL **17** (Supabase, ADR-002) — 운영 17.6 / 로컬 17.10 (2026-07-29 실측, 메이저 통일) |
 | 문자셋 | UTF-8 |
 | PK | `uuid` / `default gen_random_uuid()` |
 | 마이그레이션 | Flyway (`ddl-auto: validate`) |
@@ -41,6 +41,7 @@
 | 7 | `weight_logs` | 체중 기록 | 공통 | `BaseCreatedEntity` |
 | 8 | `shed_records` | 탈피 기록 | 🦎 게코 전용 | `BaseCreatedEntity` |
 | 9 | `photos` | 갤러리 사진 | 공통 | `BaseCreatedEntity` |
+| 10 | `refresh_tokens` | refresh 토큰 저장소 (**V2**, 2026-07-29) | 공통 | `BaseCreatedEntity` |
 
 > 베이스 엔티티 3단계: `BaseCreatedEntity`(created_at) → `BaseTimeEntity`(+updated_at) → `BaseSoftDeleteEntity`(+deleted_at).
 > 위치는 `framework`가 아니라 `data/common/entity` — framework는 JPA 매핑 규약을 알지 않는다.
@@ -206,6 +207,37 @@
 
 ---
 
+## 10. refresh_tokens (V2)
+
+> refresh 토큰 저장소. **저장소 = DB 확정(2026-07-23)** — Redis는 기각(로그아웃·탈퇴 시 즉시 무효화 필요, 인프라를 늘릴 이유 없음).
+> 원본: [`V2__refresh_tokens.sql`](../../src/main/resources/db/migration/V2__refresh_tokens.sql) · 엔티티: `data/auth/entity/RefreshToken`
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | uuid | NOT NULL | `gen_random_uuid()` | PK | |
+| `user_id` | uuid | NOT NULL | — | FK → `users.id` | 아래 ⚠️ 참고 — 엔티티는 연관관계가 아니다 |
+| `token_hash` | varchar(64) | NOT NULL | — | UNIQUE | **토큰 원문 미저장.** SHA-256 hex는 **64자 고정** |
+| `expires_at` | timestamp | NOT NULL | — | | 만료 시각 |
+| `revoked_at` | timestamp | NULL | — | | 무효화 시각. NULL=유효 |
+| `created_at` | timestamp | NOT NULL | `now()` | | 발급일시 |
+
+| 인덱스/제약 | 컬럼 | 목적 |
+| --- | --- | --- |
+| `uq_refresh_tokens_token_hash` | `(token_hash)` | 해시 중복 방지 |
+| `idx_refresh_tokens_user_id` | `user_id` | 재사용 감지 시 "해당 사용자 전체 revoke" · 로그아웃 |
+
+**비즈니스 규칙**
+
+- **로테이션** — refresh 호출마다 새 토큰 발급 + 기존 토큰 즉시 revoke
+- **재사용 감지** — `revoked_at`이 찍힌 토큰이 재제시되면 탈취로 간주, 해당 사용자 전체 revoke 후 `INVALID_TOKEN`(401). 전용 ErrorCode는 두지 않는다(탐지 여부 노출 방지)
+- 만료 행 정리 배치는 auth 구현 범위 제외 — 스케줄러 도입 결정이 함께 필요하다
+
+> ⚠️ **`user_id`는 엔티티에서 `@ManyToOne`이 아니라 생 `UUID` 컬럼이다.** `RefreshToken`은 `data/auth`, `User`는 `data/user`라 연관관계를 걸면 `data/auth → data/user` 도메인 간 참조가 되어 ArchUnit에 걸린다. 토큰 행에서 User로 탐색할 일이 없어 잃는 것도 없다. **DB의 FK 제약은 그대로 있다** — 객체 매핑만 끊은 것이다.
+
+> `updated_at`이 없다. 토큰 행은 발급 후 `revoked_at`이 한 번 찍힐 뿐이라 `BaseCreatedEntity`를 상속한다.
+
+---
+
 ## 공통 설계 원칙
 
 ### `updated_at` — JPA Auditing (2026-07-03 확정)
@@ -245,8 +277,11 @@
 
 | 항목 | 상태 |
 | --- | --- |
-| `V1__init.sql:54` `condition_tag` 주석이 4종만 기재 (확정값은 7종) | ⬜ 미정정 — Notion 「소스 구조」 '다음 단계'에도 등재 |
+| `V1__init.sql:54` `condition_tag` 주석이 4종만 기재 (확정값은 7종) | ⬜ 미정정 — 아래 ⚠️ 참고. **주석이라도 그냥 못 고친다** |
+
+> ⚠️ **적용이 끝난 마이그레이션 파일은 주석 한 글자도 고칠 수 없다.** Flyway는 `flyway_schema_history`에 저장한 체크섬을 기동 시 대조하므로(`validateOnMigrate` 기본 `true`), `V1__init.sql`을 수정하면 이미 V1을 적용한 모든 DB에서 **체크섬 불일치로 기동이 막힌다.** 로컬은 `flyway repair`로 풀 수 있지만 운영 DB에도 같은 조치가 필요하다.
+> 따라서 위 주석 정정은 ① 그냥 두고 이 문서·정의서를 SoT로 삼거나 ② `V3__` 코멘트 마이그레이션으로 처리하거나 ③ 아직 V1을 적용한 환경이 로컬뿐인 지금 `repair`로 밀어붙이는 선택지가 있다. **"주석이니까 안전하다"는 판단만 하지 말 것** — Notion 「소스 구조」 '다음 단계'에 이 항목이 그대로 등재돼 있다.
 | `feeding_logs.amount_unit` 단위 예시 주석이 V1에 없음 | ℹ️ 조치 불필요 (본 문서·정의서에 기재) |
 
-**대조 범위 밖 — `refresh_tokens` (V2 예정)**
-Notion 테이블 정의서에는 아직 없고 「소스 구조」 §7에만 결정이 있다(2026-07-23, 저장소가 Notion보다 앞선 케이스). auth 도메인 구현 시 `V2__` 마이그레이션 추가와 함께 **Notion 테이블 정의서에 역반영**이 필요하다. 확정된 요건: 토큰 원문 미저장(SHA-256 `token_hash`) · refresh 호출마다 로테이션 + 기존 토큰 revoke · `revoked_at` 찍힌 토큰 재제시 시 해당 사용자 전체 revoke 후 `INVALID_TOKEN`(401).
+**`refresh_tokens` (V2) — 2026-07-29 구현 + Notion 역반영 완료**
+「소스 구조」 §7에만 있던 결정(2026-07-23)을 `V2__refresh_tokens.sql`로 구현하고 **Notion 테이블 정의서에 §10으로 역반영했다**(저장소가 Notion보다 앞선 케이스가 닫혔다). 스키마는 아래 §10 참조.
