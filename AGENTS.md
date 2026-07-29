@@ -137,7 +137,10 @@ CI([`.github/workflows/ci.yml`](.github/workflows/ci.yml))에서 강제한다. *
 
 - **Spotless**: google-java-format 포맷 검증
 - **Checkstyle** (`-PciStrict`): 네이밍·복잡도·미사용 import (경고 1건도 실패)
-- **ArchUnit**: 레이어 의존 방향·도메인 간 참조 규칙 — **`src/test` 신설 시점까지 보류**(현재 테스트 소스셋 자체가 없다). 억제(suppression) 없이 strict 유지가 원칙. 도입할 규칙 5종(도메인 간 참조 금지 · 레이어 방향 · Entity 누출 금지 · 트리 단방향 · 네이밍)은 Notion 「소스 구조」 §13에 스케치해 뒀다 — **§3의 패키지 이름 규칙이 곧 이 규칙의 전제**다
+- **ArchUnit**: **도입 완료(2026-07-29).** `src/test/java/com/petkok/architecture/` 에 규칙 8개 — 도메인 간 참조 금지 · 레이어 방향 · Entity 누출 금지 · 트리 단방향 2종 · 네이밍 3종. 억제(suppression) 없이 strict 유지가 원칙
+	- **도메인 간 참조 규칙은 `DomainBoundaryTest` 로 분리돼 있다.** `@AnalyzeClasses` 범위를 `business`·`data` 로 좁혀야 하기 때문이다 — `framework` 가 섞이면 `framework.config` 가 "config" 슬라이스로 잡혀 규칙이 엉뚱해진다
+	- ⚠️ **슬라이스 패턴은 `com.petkok.*.(*)..` 이다. 첫 세그먼트를 캡처하면(`(business|data)`) 규칙이 정반대로 동작한다** — 트리 이름이 슬라이스 키에 포함돼 `business/feeding` 과 `data/feeding` 이 다른 슬라이스가 되고 같은 도메인 참조까지 위반으로 잡힌다
+	- **§3의 패키지 이름 규칙이 곧 이 규칙의 전제**다. 이름이 어긋나면 규칙은 통과하는데 경계는 안 지켜진다
 
 ---
 
