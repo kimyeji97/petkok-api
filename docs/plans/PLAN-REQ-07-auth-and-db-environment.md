@@ -1,6 +1,6 @@
 # PLAN-REQ-07 · auth 도메인 + DB 환경 구성
 
-> 출처: 2026-07-27 세션 · 작성: 2026-07-27 · 최종 갱신: 2026-07-29 · 상태: 🟡 진행 (Phase 1 완료)
+> 출처: 2026-07-27 · 2026-07-29 세션 · 작성: 2026-07-27 · 최종 갱신: 2026-07-29 · 상태: 🟡 진행 (Phase 1~2 완료)
 
 ## 배경
 
@@ -25,9 +25,12 @@
 - Kakao 인가코드 로그인 / 자동가입
 - refresh 로테이션 + 재사용 감지
 - **RestTemplate 인터셉터의 응답 본문 마스킹** — REQ-05에서 "실제 연동 시점에 결정"으로 미뤄둔 항목이 이번 작업이다
-- `src/test` 신설 · ArchUnit 활성화
+- ~~`src/test` 신설 · ArchUnit 활성화~~ → **REQ-14에서 선처리됨(2026-07-29).** 남은 것은 auth 로직 테스트뿐
 
 **제외**
+- **Testcontainers** — 2026-07-29 기각. 순수 로직은 DB 없이 검증되고, 리포지토리·마이그레이션은 로컬 DB로 확인한다. 빌드 시간과 Docker 의존을 지금 떠안지 않는다
+- **Supabase 프로젝트 분리** — 2026-07-29 기각. 무료 플랜이 활성 2개를 허용해 가능하지만, 스키마 분리 방침을 유지한다
+- **`local` 소켓 scram 전환** — `yjkim` 롤에 비밀번호가 없어 지금 바꾸면 관리 접속이 잠긴다. 앱이 쓰는 TCP 경로는 이미 scram이라 실질 보호는 걸려 있다
 - **MySQL 전환** — 2026-07-27 대화에서 검토 후 기각. 아래 "결정" 참조
 - **만료 refresh 행 정리 배치** — 스케줄러 도입 결정이 함께 필요하다. 운영 부담이 실제로 보이는 시점에 별도로 다룬다 *(2026-07-23 결정)*
 - **user / pet 도메인** — REQ-08 · REQ-09로 분리. `PetAccessGuard` 소유권 앵커도 여기 포함되지 않는다
@@ -40,20 +43,29 @@
 | DB 엔진 | **PostgreSQL 유지** | **Notion ADR-002(Status: Accepted, 2026-06-29)가 Supabase PostgreSQL을 정식 채택**했다. 코드 변경도 0이다 — `V1__init.sql`이 PostgreSQL 전용 기능(부분 인덱스 7개, `uuid` 타입, `gen_random_uuid()`)에 이미 의존한다 | **MySQL/MariaDB 전환.** 스키마 전면 재작성 + 부분 인덱스 7개 포기 + 드라이버·Flyway 모듈 교체 + 문서 4곳 수정 + ADR이 따라온다. 얻는 것이 없다. *(전환 검토의 발단은 로컬 접속 정보 `localhost:3306`/`root` — MySQL 기본 포트·관례 계정이었다. 로컬에 깔린 다른 엔진 정보였던 것으로 확인)* |
 | PK 전략 | **현행 유지** (`uuid` + `gen_random_uuid()`) | PostgreSQL은 heap 테이블이라 PK 순서가 물리 배치를 좌우하지 않는다. 랜덤 UUID를 그대로 써도 된다 | **`binary(16)` + 시간 정렬 UUID.** InnoDB 클러스터드 인덱스의 페이지 분할을 피하려던 것으로, MySQL 전제에서만 성립한다 |
 | 계획 범위 | DB 환경 구성 + auth | 환경 없이는 auth를 검증할 수 없다. 반대로 auth 없이 환경만 잡으면 그 환경이 맞는지 알 수 없다 | auth 단독 / 환경 단독 / auth→user→pet 수직 슬라이스 전체 |
+| **HTTP 클라이언트** (2026-07-29) | **`framework/util/http/RestClientBase` 상속.** `KakaoOAuthClient extends RestClientBase` | REQ-05에서 만든 자산을 그대로 쓴다. `@Autowired RestTemplate` + get/post/exchange 래퍼가 이미 있고, 로깅 인터셉터와 거기서 얻은 계약 2건(응답 버퍼링 필수 · `getStatusCode()` 원본 위임)이 살아 있다 | **RestClient 전환.** Notion 소스 구조 §7이 RestClient로 적고 있으나, 갈아타면 REQ-05 로깅 인터셉터를 다시 만들고 버퍼링·비표준 상태코드 대응을 처음부터 재현해야 한다 → **Notion §7을 RestTemplate 기준으로 역반영한다** |
+| **dev/prod 분리** (2026-07-29) | **한 Supabase 프로젝트 안에서 스키마로 분리** | 2026-07-27 방침 유지. 프로젝트가 하나라 접속 정보·대시보드·백업이 한 곳에 모인다 | **Supabase 프로젝트 2개.** 무료 플랜이 활성 프로젝트 2개를 허용해 물리적 분리가 가능하고 Flyway·Hibernate 스키마 설정을 건드릴 필요도 없지만, 채택하지 않았다 |
+| **스키마 이름** (2026-07-29) | **`petkok_dev` · `petkok_prod`**, 로컬은 **`petkok_local`** | 로컬까지 이름 있는 스키마를 쓰는 이유는 **설정 경로를 매일 실행시키기 위해서**다. 로컬만 `public`으로 두면 Flyway·Hibernate 스키마 지정이 로컬에서 한 번도 검증되지 않고 **dev 배포에서 처음 갈린다** | **로컬만 `public` 유지.** 이미 V1이 적용돼 있어 손이 덜 가지만, 위 이유로 기각. 로컬 `petkok` DB의 `public` 스키마에 있는 기존 테이블은 버린다(행 0건) |
+| **Testcontainers** (2026-07-29) | **도입하지 않는다** | auth 핵심 로직(토큰 만료·로테이션·재사용 감지)은 I/O 없는 순수 로직이라 DB 없이 단위테스트로 검증된다. 리포지토리·마이그레이션은 로컬 DB로 확인한다 | **Testcontainers.** 로컬 DB 상태에 의존하지 않고 CI에서 실제 PostgreSQL 17에 마이그레이션을 적용해볼 수 있으나, 빌드 시간과 Docker 의존이 따라온다 |
 
 이전 세션에서 확정되어 [api-list.md](../specs/api-list.md)에 반영된 결정(refresh 토큰 DB 저장, 로테이션 적용, 공개 경로 범위, PATCH 통일)은 여기서 다시 다루지 않는다.
+
+> ⚠️ **스키마 분리를 택했으므로 아래 두 가지가 이 계획의 최대 리스크다.**
+> ① Flyway와 Hibernate **양쪽 모두**에 스키마를 알려야 한다. 한쪽만 설정하면 테이블은 지정 스키마에 생기는데 조회는 `public`을 보는(또는 그 반대) 상태가 된다. **에러 없이 "테이블이 없다"로 나타난다.**
+> ② `V1__init.sql`은 스키마를 명시하지 않아 `search_path`에 의존한다. **이 의존은 유지한다** — Flyway `default-schema`가 `search_path`를 잡아 주므로 마이그레이션 파일에 스키마를 하드코딩하면 오히려 환경별로 못 쓰게 된다.
+>
+> **로컬까지 `petkok_local`을 쓰기로 한 것이 이 리스크의 완화책이다.** 로컬만 `public`이면 스키마 지정 경로가 한 번도 실행되지 않아 dev 배포에서 처음 갈린다.
 
 ## 미결 질문
 
 > 2026-07-27 Notion 대조에서 나온 항목 중 **공개 경로**와 **`condition_tag`** 는 해소됐다. 아래 "해소된 질문" 참고.
 
-- [ ] **HTTP 클라이언트.** Notion 소스 구조 §7은 `KakaoOAuthClient`가 **RestClient**를 쓴다고 명시한다. 레포는 REQ-05에서 **RestTemplate** + 로깅 인터셉터를 만들어 뒀다. RestTemplate으로 가고 Notion을 고칠지, RestClient로 갈아탈지(그러면 REQ-05 인터셉터를 다시 만들어야 한다) 결정 필요
 - [x] **로컬 PostgreSQL 접속 정보** — **Postgres.app으로 확정(2026-07-29).** `localhost:5433` / DB `petkok` / 롤 `root`(비슈퍼유저, DB 소유자). Docker는 쓰지 않는다. `public` 스키마 소유자가 `pg_database_owner`라 **DB 소유권만 넘기면** Flyway의 `CREATE` 권한이 따라온다
 - [x] **PostgreSQL 버전** — **17로 확정.** 로컬 17.10, 운영 Supabase 17.6. `gen_random_uuid()`는 13+ 코어 제공이라 `pgcrypto` 불필요하고 `V1__init.sql`에도 `CREATE EXTENSION`이 없다. **Supabase는 18을 아직 지원하지 않는다**(2026-01 목표를 넘겼고 "eventually in 2026") — 로컬을 18로 두면 운영보다 앞서므로 선택지가 아니었다
-- [ ] **dev/prod 분리 방식.** "스키마로 분리"라고만 정해져 있다. 같은 데이터베이스 안의 schema로 나눌지, 데이터베이스 자체를 나눌지 미확정. Supabase 무료 티어는 DB가 하나뿐이라 이 선택이 인프라 형태에 묶인다
-- [ ] **동시 refresh 요청 처리.** 앱 재시작·병렬 요청으로 같은 refresh가 거의 동시에 두 번 오면, 정상 사용자인데도 재사용 감지에 걸려 전 기기 로그아웃된다. 짧은 유예 윈도우를 둘지 감수할지 정해지지 않았다
-- [ ] **Testcontainers 도입 여부.** 로컬 DB 상태에 의존하지 않고 마이그레이션·리포지토리를 검증할 수 있으나, 빌드 시간과 Docker 의존이 따라온다
-- [ ] **Kakao 앱 등록 여부.** REST API 키·redirect URI가 있어야 연동 단계 검증이 가능하다
+- [x] **스키마 이름과 적용 범위** — **`petkok_local` / `petkok_dev` / `petkok_prod` 확정(2026-07-29).** 로컬까지 이름 있는 스키마를 쓴다. 기존 로컬 `public` 테이블은 버린다(행 0건이라 잃을 게 없다)
+- [ ] **동시 refresh 요청 처리.** 앱 재시작·병렬 요청으로 같은 refresh가 거의 동시에 두 번 오면, 정상 사용자인데도 재사용 감지에 걸려 전 기기 로그아웃된다. 짧은 유예 윈도우를 둘지 감수할지 정해지지 않았다 *(Phase 5에서 결정해도 늦지 않다)*
+- [ ] **Kakao 앱 등록 여부.** REST API 키·redirect URI가 있어야 Phase 4 검증이 가능하다. **등록 전까지 Phase 4는 착수할 수 없다**
+- [ ] **응답 본문 마스킹 범위.** `RestTemplateLoggingInterceptor`가 본문을 `log.info`로 그대로 찍는다. 카카오 토큰 응답에 `access_token`이 평문으로 온다. 전체 본문을 끌지, 키 단위로 마스킹할지, 특정 URL만 예외로 둘지 미정
 
 ### 해소된 질문 (2026-07-27)
 
@@ -68,25 +80,37 @@
       **계획에 없던 작업 2건** — ① `pg_hba`가 전부 `trust`라 비밀번호가 검증되지 않아 `host` 라인을 `scram-sha-256`으로 전환했다 ② Flyway가 PostgreSQL 16까지만 검증돼 경고를 내서 10.10.0 → 10.22.0으로 상향했다(Spring Boot BOM 고정값 덮어쓰기).
       ⚠️ **`ddl-auto: validate`는 사실상 아무것도 검증하지 않았다** — `@Entity` 클래스가 0개다. 실효는 Phase 3에서 생긴다
 
-- [ ] **Phase 2 — 환경 분리와 시크릿**
-      local/dev/prod 프로파일별 접속 분리, `.gitignore`에 로컬 override 패턴 추가.
-      완료 기준: 레포에 실제 비밀번호가 없고, 프로파일 전환만으로 접속 대상이 바뀐다
-      *(dev/prod 실제 구축은 인프라가 생긴 뒤 — 여기서는 설정 구조만)*
+- [x] **Phase 2 — 환경 분리와 스키마 지정** — **완료 (2026-07-29)**
+      완료 기준 4개 모두 충족.
+      ① **세 프로파일 전부 실제로 띄워 확인했다.** 같은 로컬 DB에 프로파일만 바꿔 붙였더니 `petkok_local`/`petkok_dev`/`petkok_prod`가 각각 생성되고 V1이 적용됐다(dev·prod 스키마는 확인 후 삭제). prod까지 띄운 이유는 `application-prod.yml`의 오타가 **배포 시점에야 드러나기 때문**이다
+      ② `petkok_local`을 통째로 지우고 새 설정 경로로 재생성했다 — `Creating schema "petkok_local"` → `Successfully applied 1 migration`, 테이블 9개 + `flyway_schema_history`. `public` 스키마는 존재하지 않아 fallback 위험도 없다
+      ③ 세 프로파일 모두 `/actuator/health` 200
+      ④ 레포에서 실제 비밀번호를 제거했다 — 아래 "계획에 없던 작업" 참조
+      **설계**: 스키마 값의 출처를 `db.schema` **한 곳**으로 모으고 Flyway·Hibernate가 함께 참조하게 했다. "한쪽만 지정" 사고(위 최대 리스크 ①)가 구조적으로 불가능해진다. `application.yml`에는 기본값을 두지 않아 프로파일이 값을 빠뜨리면 기동 즉시 실패한다.
+      **계획에 없던 작업 3건** —
+      ① **`docs/PROGRESS.md`에 로컬 DB 실제 비밀번호가 평문으로 커밋돼 있었다**(2026-07-29 `5c7313b`, public 레포에 이미 푸시됨). URI 파싱 함정을 설명하며 실제 값을 예시로 쓴 것이다. 문서는 더미 값으로 교체했으나 **git 이력에는 남아 있다** — 로컬 비밀번호 교체 여부는 별도 판단 필요
+      ② `application-local.yml` 기본값이 Phase 1 실측과 어긋나 있었다(`5432`/`postgres`/`postgres` → `5433`/`root`). `DB_PASSWORD`는 기본값을 **제거**했다 — scram 환경에서 더미 값은 "비밀번호 틀림"으로만 보여 오진을 부른다
+      ③ `.env`의 `KEY=`(빈 값)은 미설정이 아니라 **빈 문자열**이라 `${VAR:기본값}`의 기본값을 무력화한다. README가 권하는 `set -a && . ./.env` 경로에서 실제로 밟는 함정이라 `.env.example`·README에 경고를 넣었다
+      *(dev/prod 인스턴스 실제 구축은 인프라가 생긴 뒤 — 여기서는 설정 구조와 로컬 검증까지)*
+      ⚠️ **Hibernate가 같은 스키마를 보는지는 아직 검증되지 않았다.** `@Entity` 0개라 `validate`가 아무것도 안 한다 — Phase 3에서 처음 실증된다
 
-- [ ] **Phase 3 — V2 마이그레이션 + 엔티티**
+- [ ] **Phase 3 — V2 마이그레이션 + 엔티티** ← **다음 작업**
       `refresh_tokens` 테이블, `User`/`UserSocialAccount`/`RefreshToken`.
       완료 기준: V2 적용 후 `validate` 통과 (엔티티 매핑과 DDL 불일치가 여기서 잡힌다)
 
-- [ ] **Phase 4 — Kakao 로그인**
+- [ ] **Phase 4 — Kakao 로그인** *(Kakao 앱 등록이 선행돼야 검증 가능)*
       인가코드 → 토큰 교환 → 사용자 정보 → 조회/자동가입 → access+refresh 발급.
-      완료 기준: 로그인 왕복 성공 + **로그에 토큰 원문이 남지 않는다**
+      `KakaoOAuthClient extends RestClientBase` (`business/auth/service/oauth/`).
+      완료 기준: 로그인 왕복 성공 + **로그에 토큰 원문이 남지 않는다**(실제 로그를 눈으로 확인)
 
 - [ ] **Phase 5 — 로테이션 / 로그아웃**
       완료 기준: refresh 재발급 시 이전 토큰이 즉시 무효 · revoke된 토큰 재제시 시 해당 사용자 전체 revoke + `INVALID_TOKEN`
 
 - [ ] **Phase 6 — 검증 체계** *(선행 절반은 2026-07-29에 이미 끝났다)*
       ~~`src/test` 신설, ArchUnit 활성화~~ → **REQ-14에서 완료.** `src/test/java/com/petkok/architecture/`에 구조 규칙 8개가 CI 게이트로 동작한다. 따라서 이 Phase에 남은 것은 **auth 로직 테스트뿐**이다.
+      Testcontainers는 쓰지 않는다 — 순수 로직은 단위테스트, 리포지토리·마이그레이션은 로컬 DB로 확인.
       완료 기준: 토큰 만료·로테이션·재사용 감지 테스트 통과 + CI green
+      ※ **`business/auth`·`data/auth`가 생기는 순간 ArchUnit 규칙이 처음으로 실제 검사를 시작한다.** 두 패키지는 반드시 같은 이름이어야 한다(AGENTS §3)
 
 Phase 1~2와 3~6은 PR을 나눈다.
 

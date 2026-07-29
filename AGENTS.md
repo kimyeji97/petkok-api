@@ -118,6 +118,10 @@ com.petkok
 - **트리 방향**: `business → data` 단방향. `framework`는 `business`·`data`를 **참조하지 않는다**(역참조 금지). 다른 도메인 참조 금지 — 예외는 `business/timeline` 하나뿐
 - **응답**: 공통 wrapper `ApiResponse<T>` (`{data, error}`). 전역 snake_case (Jackson). 에러는 `BusinessException` + `ErrorCode` enum → `GlobalExceptionHandler` 전역 처리
 - **스키마 소유 = Flyway.** Supabase 대시보드 수동 DDL 금지 (drift 방지)
+- **DB 스키마는 프로파일별로 분리한다** — `local`/`dev`/`prod` = `petkok_local`/`petkok_dev`/`petkok_prod`. 값의 출처는 `application-{profile}.yml`의 **`db.schema` 한 곳**이고, `application.yml`이 이 값을 Flyway(`spring.flyway.schemas` + `default-schema`)와 Hibernate(`hibernate.default_schema`) **양쪽**에 배선한다
+	- ⚠️ **스키마를 손볼 때 이 배선 중 한쪽만 바꾸지 말 것.** 테이블이 생기는 곳과 조회하는 곳이 갈리는데 **에러 없이 "테이블이 없다"로만 나타난다.** 값을 바꿔야 하면 `db.schema`만 바꾼다
+	- `V1__init.sql`은 스키마를 명시하지 않고 `search_path`에 의존한다. **이 의존은 의도적이다** — Flyway `default-schema`가 잡아 주므로 마이그레이션에 스키마를 하드코딩하면 환경별로 못 쓰게 된다
+	- `application.yml`의 `${db.schema}`에는 기본값이 없다. 프로파일이 값을 빠뜨리면 기동 즉시 실패한다(조용히 `public`으로 새는 것보다 낫다)
 - **감사(auditing)**: `created_at = @CreatedDate`, `updated_at = @LastModifiedDate` (JPA Auditing, DB 트리거 없음). 베이스 엔티티 상속으로 처리
 - **소프트 딜리트**: `users`, `pets`만 `deleted_at` (`BaseSoftDeleteEntity`)
 - **Enum**: Java Enum + `@Enumerated(STRING)`, DB는 varchar
