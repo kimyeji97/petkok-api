@@ -87,6 +87,65 @@ public class MaskingUtil {
   }
 
   /**
+   * JSON 본문에서 값을 가려야 하는 키. 문자열 값만 대상으로 한다.
+   *
+   * <p>{@code code} 는 여기 없다 — 인가 코드는 form 요청에만 실리고, 오히려 카카오 오류 응답의 {@code {"code":-401,"msg":"ip
+   * mismatched!"}} 처럼 진단에 필요한 값이 같은 이름을 쓴다. 그걸 가리면 원인 파악이 막힌다.
+   */
+  private static final Pattern JSON_CREDENTIAL =
+      Pattern.compile(
+          "(\"(?:access_token|refresh_token|id_token|client_secret|token|secret)\"\\s*:\\s*\")"
+              + "([^\"]*)(\")");
+
+  /**
+   * form-urlencoded 본문에서 값을 가려야 하는 파라미터.
+   *
+   * <p>{@code code}(인가 코드)는 1회용이지만 로그에 남길 이유가 없어 포함한다.
+   *
+   * <p>{@code client_id}(카카오 REST API 키)도 포함한다 — {@code client_secret} 만큼은 아니어도 앱을 식별하는 서버측 키이고, 실측
+   * 로그에서 전체 값이 평문으로 찍히는 것을 2026-07-29 에 확인했다. 앞 4자는 남으므로 어떤 앱 키가 쓰였는지는 여전히 구분된다.
+   */
+  private static final Pattern FORM_CREDENTIAL =
+      Pattern.compile(
+          "((?:^|&)(?:access_token|refresh_token|id_token|client_secret|client_id|token|secret|code)=)"
+              + "([^&]*)");
+
+  /**
+   * 요청·응답 <b>본문</b>의 자격증명 값을 마스킹한다. 헤더 마스킹({@link #maskingCredential})과 짝이다.
+   *
+   * <p>필요한 이유: 카카오 토큰 교환은 <b>응답 본문</b>에 {@code access_token}·{@code refresh_token} 을 평문으로 담아 준다.
+   * 헤더만 가리면 토큰이 그대로 로그에 남는다 (AGENTS.md §5 위반). 요청 쪽도 form 본문에 {@code client_secret} 과 인가 코드가 실린다.
+   *
+   * <p>JSON 과 form-urlencoded 를 모두 처리한다. 값의 형태만 보고 자르지 않고 <b>키 이름으로</b> 판단하므로, 카카오 오류 응답의 {@code
+   * msg} 처럼 진단에 필요한 값은 그대로 남는다.
+   *
+   * @param body 원본 본문. {@code null}·공백이면 그대로 반환한다
+   * @return 자격증명 값이 {@code 앞4자+***} 로 바뀐 본문
+   */
+  public static String maskingCredentialsInBody(String body) {
+    if (StringUtils.isBlank(body)) {
+      return body;
+    }
+    String masked = replaceCredential(JSON_CREDENTIAL, body);
+    return replaceCredential(FORM_CREDENTIAL, masked);
+  }
+
+  /** 캡처 그룹 2(값)만 마스킹하고 나머지는 그대로 둔다. */
+  private static String replaceCredential(Pattern pattern, String body) {
+    Matcher matcher = pattern.matcher(body);
+    StringBuilder sb = new StringBuilder();
+    while (matcher.find()) {
+      String replacement = matcher.group(1) + maskingCredential(matcher.group(2));
+      if (matcher.groupCount() >= 3) {
+        replacement += matcher.group(3);
+      }
+      matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+    }
+    matcher.appendTail(sb);
+    return sb.toString();
+  }
+
+  /**
    * 핸드폰번호 가운데 마스킹
    *
    * @param phoneNo 전화번호

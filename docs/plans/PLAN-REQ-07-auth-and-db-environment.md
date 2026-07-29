@@ -1,6 +1,6 @@
 # PLAN-REQ-07 · auth 도메인 + DB 환경 구성
 
-> 출처: 2026-07-27 · 2026-07-29 세션 · 작성: 2026-07-27 · 최종 갱신: 2026-07-29 · 상태: 🟡 진행 (Phase 1~3 완료)
+> 출처: 2026-07-27 · 2026-07-29 세션 · 작성: 2026-07-27 · 최종 갱신: 2026-07-29 · 상태: 🟡 진행 (Phase 1~4 완료)
 
 ## 배경
 
@@ -43,7 +43,7 @@
 | DB 엔진 | **PostgreSQL 유지** | **Notion ADR-002(Status: Accepted, 2026-06-29)가 Supabase PostgreSQL을 정식 채택**했다. 코드 변경도 0이다 — `V1__init.sql`이 PostgreSQL 전용 기능(부분 인덱스 7개, `uuid` 타입, `gen_random_uuid()`)에 이미 의존한다 | **MySQL/MariaDB 전환.** 스키마 전면 재작성 + 부분 인덱스 7개 포기 + 드라이버·Flyway 모듈 교체 + 문서 4곳 수정 + ADR이 따라온다. 얻는 것이 없다. *(전환 검토의 발단은 로컬 접속 정보 `localhost:3306`/`root` — MySQL 기본 포트·관례 계정이었다. 로컬에 깔린 다른 엔진 정보였던 것으로 확인)* |
 | PK 전략 | **현행 유지** (`uuid` + `gen_random_uuid()`) | PostgreSQL은 heap 테이블이라 PK 순서가 물리 배치를 좌우하지 않는다. 랜덤 UUID를 그대로 써도 된다 | **`binary(16)` + 시간 정렬 UUID.** InnoDB 클러스터드 인덱스의 페이지 분할을 피하려던 것으로, MySQL 전제에서만 성립한다 |
 | 계획 범위 | DB 환경 구성 + auth | 환경 없이는 auth를 검증할 수 없다. 반대로 auth 없이 환경만 잡으면 그 환경이 맞는지 알 수 없다 | auth 단독 / 환경 단독 / auth→user→pet 수직 슬라이스 전체 |
-| **HTTP 클라이언트** (2026-07-29) | **`framework/util/http/RestClientBase` 상속.** `KakaoOAuthClient extends RestClientBase` | REQ-05에서 만든 자산을 그대로 쓴다. `@Autowired RestTemplate` + get/post/exchange 래퍼가 이미 있고, 로깅 인터셉터와 거기서 얻은 계약 2건(응답 버퍼링 필수 · `getStatusCode()` 원본 위임)이 살아 있다 | **RestClient 전환.** Notion 소스 구조 §7이 RestClient로 적고 있으나, 갈아타면 REQ-05 로깅 인터셉터를 다시 만들고 버퍼링·비표준 상태코드 대응을 처음부터 재현해야 한다 → **Notion §7을 RestTemplate 기준으로 역반영한다** |
+| **HTTP 클라이언트** (2026-07-29) | **`framework/util/http/RestClientBase` 상속.** `KakaoOAuthClient extends RestClientBase` | REQ-05에서 만든 자산을 그대로 쓴다. `@Autowired RestTemplate` + get/post/exchange 래퍼가 이미 있고, 로깅 인터셉터와 거기서 얻은 계약 2건(응답 버퍼링 필수 · `getStatusCode()` 원본 위임)이 살아 있다 | **RestClient 전환.** 갈아타면 REQ-05 로깅 인터셉터를 다시 만들고 버퍼링·비표준 상태코드 대응을 처음부터 재현해야 한다. ~~Notion §7을 RestTemplate 기준으로 역반영한다~~ → **2026-07-29 확인 결과 Notion 「소스 구조」에는 `RestClient` 표기가 없고 §5·§12·구현 노트가 전부 RestTemplate 기준이다. 역반영할 것이 없었다 — 이 칸의 기술이 낡았던 것이다** |
 | **dev/prod 분리** (2026-07-29) | **한 Supabase 프로젝트 안에서 스키마로 분리** | 2026-07-27 방침 유지. 프로젝트가 하나라 접속 정보·대시보드·백업이 한 곳에 모인다 | **Supabase 프로젝트 2개.** 무료 플랜이 활성 프로젝트 2개를 허용해 물리적 분리가 가능하고 Flyway·Hibernate 스키마 설정을 건드릴 필요도 없지만, 채택하지 않았다 |
 | **스키마 이름** (2026-07-29) | **`petkok_dev` · `petkok_prod`**, 로컬은 **`petkok_local`** | 로컬까지 이름 있는 스키마를 쓰는 이유는 **설정 경로를 매일 실행시키기 위해서**다. 로컬만 `public`으로 두면 Flyway·Hibernate 스키마 지정이 로컬에서 한 번도 검증되지 않고 **dev 배포에서 처음 갈린다** | **로컬만 `public` 유지.** 이미 V1이 적용돼 있어 손이 덜 가지만, 위 이유로 기각. 로컬 `petkok` DB의 `public` 스키마에 있는 기존 테이블은 버린다(행 0건) |
 | **Testcontainers** (2026-07-29) | **도입하지 않는다** | auth 핵심 로직(토큰 만료·로테이션·재사용 감지)은 I/O 없는 순수 로직이라 DB 없이 단위테스트로 검증된다. 리포지토리·마이그레이션은 로컬 DB로 확인한다 | **Testcontainers.** 로컬 DB 상태에 의존하지 않고 CI에서 실제 PostgreSQL 17에 마이그레이션을 적용해볼 수 있으나, 빌드 시간과 Docker 의존이 따라온다 |
@@ -66,7 +66,9 @@
 - [ ] **동시 refresh 요청 처리.** 앱 재시작·병렬 요청으로 같은 refresh가 거의 동시에 두 번 오면, 정상 사용자인데도 재사용 감지에 걸려 전 기기 로그아웃된다. 짧은 유예 윈도우를 둘지 감수할지 정해지지 않았다 *(Phase 5에서 결정해도 늦지 않다)*
 - [x] **Kakao 앱 등록 여부** — **등록·왕복 검증 완료(2026-07-29).** 설정 골격(`kakao.client-id`/`client-secret`/`redirect-uri`)을 선배치하고 `.env`에 실값을 채운 뒤, **인가코드 → 토큰 교환 → `/v2/user/me` 왕복을 실제로 성공**시켰다. Client Secret은 콘솔에서 "사용함" 상태이고 그대로 동작한다. Phase 4 착수 조건이 풀렸다
       *(검증 스크립트는 `.env`를 읽어 실키를 다루므로 레포에 두지 않았다 — 필요하면 재작성한다)*
-- [ ] **응답 본문 마스킹 범위.** `RestTemplateLoggingInterceptor`가 본문을 `log.info`로 그대로 찍는다. 카카오 토큰 응답에 `access_token`이 평문으로 온다. 전체 본문을 끌지, 키 단위로 마스킹할지, 특정 URL만 예외로 둘지 미정
+- [x] **응답 본문 마스킹 범위** — **키 단위 마스킹으로 확정 (2026-07-29).** 전체 본문을 끄는 안은 기각했다: 카카오 오류 응답(`invalid_grant`/`KOE320`/`ip mismatched!`)이 진단의 거의 전부인데 그걸 같이 잃는다. URL별 예외도 기각 — 대상이 늘 때마다 빠뜨린다. `MaskingUtil.maskingCredentialsInBody`가 **키 이름으로** 판단하며 JSON·form 양쪽을 처리한다(REQ-07-09~11).
+      **실측으로 결함 1건이 나왔다** — `client_id`(카카오 REST API 키)가 form 본문에 평문으로 찍히고 있었다. 잘못된 인가코드로 실제 왕복을 태워 로그를 눈으로 보다가 발견했고, 마스킹 대상에 추가했다. **`client_secret`만 챙기고 `client_id`는 넘길 뻔했다.**
+- [ ] **`business/auth` → `data/user` ArchUnit 예외 — 임시. 개선 방향 논의 필요 (2026-07-29 등록).** 자동가입이 `users` 행을 만들어 생긴 참조다. 지금은 `DomainBoundaryTest`에 예외 1건으로 열어 두고 Phase 4를 완주했으나, `data.common`·`timeline`·`framework` 세 예외와 달리 **"설계상 옳다"고 확정된 것이 아니다.** 선택지: 예외 유지 / auth·user 도메인 병합 / user 쪽에 프로비저닝 진입점을 두고 참조 방향만 바꾸기(예외 개수는 그대로)
 
 ### 해소된 질문 (2026-07-27)
 
@@ -110,14 +112,19 @@
       ⚠️ **엔티티에 Lombok `@Getter`·`@NoArgsConstructor(PROTECTED)`를 썼다.** `data/common/entity`의 베이스 3종은 수동 getter라 선례가 갈린다. `build.gradle.kts`가 Lombok을 "보일러플레이트 제거"용으로 명시하고 있어 따랐으나, 되돌리려면 지금이 가장 싸다.
       *(Repository는 만들지 않았다 — 이 Phase 범위가 아니고 쓰는 쪽이 없다. Phase 4에서 추가한다)*
 
-- [ ] **Phase 4 — Kakao 로그인** *(앱 등록 완료 — 선행 조건 해제됨)* ← **다음 작업**
-      인가코드 → 토큰 교환 → 사용자 정보 → 조회/자동가입 → access+refresh 발급.
-      `KakaoOAuthClient extends RestClientBase` (`business/auth/service/oauth/`).
-      설정 3개(`kakao.client-id`/`client-secret`/`redirect-uri`)는 2026-07-29에 선배치됐다 — 바인딩 클래스(`KakaoProperties`)는 이 Phase에서 만든다.
-      **카카오 쪽 왕복은 curl로 이미 검증됐다(2026-07-29)** — 남은 것은 서버 코드로 같은 흐름을 재현하는 일이다. 수신 필드는 `id`(Long) · `nickname` · `profile_image_url`이고 **`email`은 `null`이다**(위 「제약·함정」).
-      완료 기준: 로그인 왕복 성공 + **로그에 토큰 원문이 남지 않는다**(실제 로그를 눈으로 확인)
+- [x] **Phase 4 — Kakao 로그인** — **완료 (2026-07-29)**
+      `KakaoProperties` · `KakaoOAuthClient` · `AuthService`(자동가입 + 토큰 발급) · `AuthController`(`POST /auth/kakao`) · user/auth Repository 3종 · 본문 마스킹.
+      **완료 기준 ②(로그에 토큰 원문이 남지 않는다) 충족** — 잘못된 인가코드로 **실제 카카오 왕복을 태워** 로그를 눈으로 확인했다: form 본문의 `client_id`·`code`·`client_secret`이 모두 `앞4자+***` 형태로 찍힌다(값은 더미로 옮겨 적지 않는다). 성공 응답의 `access_token`·`refresh_token` 경로는 유효한 1회용 코드가 필요해 실물로 못 태우므로 REQ-07-09로 고정했다.
+      ⚠️ **완료 기준 ①(로그인 왕복 성공)은 수동 확인이 남았다.** 유효한 인가코드는 사람이 브라우저로 로그인해야 나온다. 코드 경로는 전부 배선됐고 카카오까지 실제로 요청이 나가는 것(`KOE320` 수신)까지 확인했다.
+      **계획에 없던 작업 2건** —
+      ① **ArchUnit `NO_CROSS_DOMAIN_DEPENDENCY`에 결함이 있었다.** 슬라이스 패턴이 *의존 대상*에도 적용돼 `framework.config`가 "config" 도메인으로 잡히는 바람에 **`business/auth` → `framework/config`가 위반**으로 떨어졌다. `@AnalyzeClasses` 범위를 좁히는 것으로는 못 막는다(문제는 의존 방향의 끝이다). AGENTS §5가 허용하는 방향이므로 `framework`를 대상에서 제외했고, **프로브로 교차 도메인은 여전히 잡히는 것을 확인**했다. 도메인 코드가 0개라 그동안 드러나지 않았다
+      ② **`SecurityConfig.PUBLIC_PATHS` 와일드카드 제거** — 원래 Phase 5 항목인데 이 Phase가 해당 엔드포인트를 만드는 시점이라 함께 처리했다(위 「검증 계약」)
+      **결정** — `profile_image_url`은 **저장 전 `https`로 정규화**한다(`KakaoOAuthClient.toHttps`). 클라이언트가 그대로 쓰면 iOS ATS·Android cleartext에 막히고, 같은 경로가 `https`로 200인 것은 2026-07-29에 확인했다. 정규화 지점을 클라이언트로 둔 이유는 provider별 차이를 그 계층에서 흡수하기 위해서다.
 
-- [ ] **Phase 5 — 로테이션 / 로그아웃**
+- [ ] **Phase 5 — 로테이션 / 로그아웃** ← **다음 작업**
+      `POST /auth/refresh`(로테이션) · `DELETE /auth/logout`.
+      Phase 4에서 깔린 것 — `RefreshTokenRepository.findByTokenHash`(revoke된 행도 반환해야 재사용 감지가 성립한다) · `revokeAllByUserId` · `RefreshToken.revoke()`(이미 revoke면 최초 시각 유지). **호출부만 없다.**
+      `PUBLIC_PATHS`에 `/auth/refresh`는 이미 들어가 있고 `/auth/logout`은 **의도적으로 빠져 있다** — Request Body가 없어 access 토큰이 유일한 식별 수단이다.
       완료 기준: refresh 재발급 시 이전 토큰이 즉시 무효 · revoke된 토큰 재제시 시 해당 사용자 전체 revoke + `INVALID_TOKEN`
 
 - [ ] **Phase 6 — 검증 체계** *(선행 절반은 2026-07-29에 이미 끝났다)*
@@ -127,6 +134,43 @@
       ※ **`business/auth`·`data/auth`가 생기는 순간 ArchUnit 규칙이 처음으로 실제 검사를 시작한다.** 두 패키지는 반드시 같은 이름이어야 한다(AGENTS §3)
 
 Phase 1~2와 3~6은 PR을 나눈다.
+
+## 검증 계약
+
+> 작성: 2026-07-29 · 근거: 이 계획서 + [api-list.md](../specs/api-list.md) · 검증: `/testrun REQ-07`
+> `결과` 열은 `/checkpoint`가 채운다. 케이스 ID는 테스트명에 `[REQ-07-01]` 형태로 박혀 있다.
+
+| ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
+|----|------|--------|:----:|------|:----:|:----:|
+| REQ-07-01 | `SecurityConfig.PUBLIC_PATHS` | 정확히 3경로만 허용 | 불변식 | api-list § 공개 경로 — "와일드카드 `/api/v1/auth/**`를 쓰지 않고 **개별 경로로 나열한다**" | 5 | — |
+| REQ-07-02 | `SecurityConfig.PUBLIC_PATHS` | `/auth/logout`이 어떤 공개 경로에도 매칭되지 않는다 | 예외 | 제약·함정 — "`/api/v1/auth/**`로 두면 `DELETE /auth/logout`이 무인증 노출된다" | 5 | — |
+| REQ-07-03 | `SecurityConfig.PUBLIC_PATHS` | 와일드카드 문자 미사용 | 불변식 | 제약·함정 — "Phase 5에서 반드시 개별 경로로 좁힐 것" | 5 | — |
+| REQ-07-04 | `JwtTokenProvider.isAccessToken` | refresh 토큰 → `false` | 회귀 | 제약·함정 — "이 검사를 제거하면 refresh 토큰으로 API 호출이 뚫린다" | 6 | — |
+| REQ-07-05 | `JwtTokenProvider.isAccessToken` | access 토큰 → `true` | 정상 | 제약·함정 — "`isAccessToken()`으로 refresh 토큰의 인증 사용을 막고 있다" | 6 | — |
+| REQ-07-06 | `JwtTokenProvider.validate` | 만료 토큰 → `false` | 경계 | Phase 6 완료 기준 — "토큰 만료·로테이션·재사용 감지 테스트 통과" | 6 | — |
+| REQ-07-07 | `SHA256Util.encrypt` | hex 64자 고정 | 경계 | api-list § refresh 토큰 저장소 — "SHA256Util 해시 (hex 64자 고정)" | 5 | — |
+| REQ-07-08 | `RefreshToken.tokenHash` | 컬럼 길이 64 | 회귀 | 제약·함정 — "`refresh_tokens.token_hash`는 `varchar(64)`면 충분하다" | 3 | — |
+| REQ-07-09 | `MaskingUtil.maskingCredentialsInBody` | 토큰 응답 본문의 access/refresh 원문 미노출 | 예외 | Phase 4 완료 기준 — "로그에 토큰 원문이 남지 않는다" | 4 | — |
+| REQ-07-10 | 〃 | 토큰 교환 form 본문의 `client_secret`·`client_id`·`code` 마스킹 | 예외 | 〃 + 2026-07-29 실측(아래) | 4 | — |
+| REQ-07-11 | 〃 | 카카오 오류 응답의 진단 정보는 보존 | 경계 | 제약·함정 — "토큰이 발급됐다면 키 3개는 정상"(IP 오진 방지) | 4 | — |
+
+~~**REQ-07-01·02·03은 Phase 5까지 실패한다.**~~ → **2026-07-29 해소.** Phase 4가 `/auth/kakao`·`/auth/refresh`를
+실제로 만드는 시점이라 그때 `PUBLIC_PATHS`를 개별 3경로로 좁혔다. 상수 한 줄이고, AGENTS §5·Notion §5·§7이 이미 개별 나열을
+계약으로 적고 있어 **코드만 뒤처져 있던** 상태였다. Phase 5에서 `logout`을 붙일 때부터 인증이 맞게 걸린다.
+
+**코드로 쓰지 않은 케이스 (미결)**
+
+| 케이스 | 왜 |
+|--------|-----|
+| 로테이션 — 재발급 시 이전 토큰 즉시 revoke | Phase 5. `RefreshTokenRepository.revokeAllByUserId`까지는 있고 호출부가 없다 |
+| 재사용 감지 — 전체 revoke + `INVALID_TOKEN` | 〃 |
+| 동시 refresh 유예 윈도우 | 미결 질문 — "짧은 유예 윈도우를 둘지 감수할지 정해지지 않았다" |
+| 자동가입 왕복 | **유효한 인가코드가 있어야 한다** — 1회용이고 사람이 브라우저로 로그인해야 얻는다. 자동화 대상이 아니라 수동 확인 항목으로 남긴다 |
+
+**Phase 4에서 결정돼 케이스로 승격된 것** — 마스킹 범위(REQ-07-09~11), `profile_image_url` https 정규화(아래 「결정」).
+
+기대값이 정해지지 않은 것을 지어내면 그 틀린 기대값이 테스트로 굳어 올바른 구현을 막는다.
+Phase 5에서 결정이 나오면 그때 케이스로 승격한다.
 
 ## 제약·함정
 

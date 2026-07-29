@@ -47,7 +47,10 @@ public class RestTemplateLoggingInterceptor implements ClientHttpRequestIntercep
     for (Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
       log.info("  -> {}: {}", entry.getKey(), maskIfSensitive(entry.getKey(), entry.getValue()));
     }
-    log.info("[Request Body : {}]", new String(body, StandardCharsets.UTF_8));
+    // 본문도 마스킹한다. 카카오 토큰 교환 요청은 form 본문에 client_secret 과 인가 코드를 싣는다.
+    log.info(
+        "[Request Body : {}]",
+        MaskingUtil.maskingCredentialsInBody(new String(body, StandardCharsets.UTF_8)));
   }
 
   /** 민감 헤더면 값을 마스킹해 반환한다. 그 외에는 원본을 그대로 반환한다. */
@@ -92,12 +95,15 @@ public class RestTemplateLoggingInterceptor implements ClientHttpRequestIntercep
     log.info("[============================RESPONSE==========================================");
     log.info("[Status : {} {}]", response.getStatusCode(), response.getStatusText());
     log.info("[Headers : {}   ]", maskSensitiveHeaders(response.getHeaders()));
-    if (inputStringBuilder.length() > RESPONSE_LOGGING_LENGTH) {
+    // ⚠️ 자르기 전에 마스킹한다. 먼저 자르면 잘린 지점에 따라 토큰 앞부분이 그대로 남는다.
+    // 카카오 토큰 응답은 access_token·refresh_token 을 본문에 평문으로 담아 준다.
+    String maskedBody = MaskingUtil.maskingCredentialsInBody(inputStringBuilder.toString());
+    if (maskedBody.length() > RESPONSE_LOGGING_LENGTH) {
       log.info(
           "[Response Body : {} ...]",
-          StringUtils.substring(inputStringBuilder.toString(), 0, RESPONSE_LOGGING_LENGTH));
+          StringUtils.substring(maskedBody, 0, RESPONSE_LOGGING_LENGTH));
     } else {
-      log.info("[Response Body : {}]", inputStringBuilder);
+      log.info("[Response Body : {}]", maskedBody);
     }
     log.info("[=========================REST TEMPLATE END====================================]");
 
