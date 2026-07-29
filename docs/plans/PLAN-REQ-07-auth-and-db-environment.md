@@ -64,7 +64,8 @@
 - [x] **PostgreSQL 버전** — **17로 확정.** 로컬 17.10, 운영 Supabase 17.6. `gen_random_uuid()`는 13+ 코어 제공이라 `pgcrypto` 불필요하고 `V1__init.sql`에도 `CREATE EXTENSION`이 없다. **Supabase는 18을 아직 지원하지 않는다**(2026-01 목표를 넘겼고 "eventually in 2026") — 로컬을 18로 두면 운영보다 앞서므로 선택지가 아니었다
 - [x] **스키마 이름과 적용 범위** — **`petkok_local` / `petkok_dev` / `petkok_prod` 확정(2026-07-29).** 로컬까지 이름 있는 스키마를 쓴다. 기존 로컬 `public` 테이블은 버린다(행 0건이라 잃을 게 없다)
 - [ ] **동시 refresh 요청 처리.** 앱 재시작·병렬 요청으로 같은 refresh가 거의 동시에 두 번 오면, 정상 사용자인데도 재사용 감지에 걸려 전 기기 로그아웃된다. 짧은 유예 윈도우를 둘지 감수할지 정해지지 않았다 *(Phase 5에서 결정해도 늦지 않다)*
-- [x] **Kakao 앱 등록 여부** — **등록 완료·키 보유(2026-07-29).** Phase 4 착수 조건이 풀렸다. 설정 골격(`kakao.client-id`/`client-secret`/`redirect-uri`)도 선배치했다. 콘솔 설정 검증은 별도 진행 중
+- [x] **Kakao 앱 등록 여부** — **등록·왕복 검증 완료(2026-07-29).** 설정 골격(`kakao.client-id`/`client-secret`/`redirect-uri`)을 선배치하고 `.env`에 실값을 채운 뒤, **인가코드 → 토큰 교환 → `/v2/user/me` 왕복을 실제로 성공**시켰다. Client Secret은 콘솔에서 "사용함" 상태이고 그대로 동작한다. Phase 4 착수 조건이 풀렸다
+      *(검증 스크립트는 `.env`를 읽어 실키를 다루므로 레포에 두지 않았다 — 필요하면 재작성한다)*
 - [ ] **응답 본문 마스킹 범위.** `RestTemplateLoggingInterceptor`가 본문을 `log.info`로 그대로 찍는다. 카카오 토큰 응답에 `access_token`이 평문으로 온다. 전체 본문을 끌지, 키 단위로 마스킹할지, 특정 URL만 예외로 둘지 미정
 
 ### 해소된 질문 (2026-07-27)
@@ -102,6 +103,7 @@
       인가코드 → 토큰 교환 → 사용자 정보 → 조회/자동가입 → access+refresh 발급.
       `KakaoOAuthClient extends RestClientBase` (`business/auth/service/oauth/`).
       설정 3개(`kakao.client-id`/`client-secret`/`redirect-uri`)는 2026-07-29에 선배치됐다 — 바인딩 클래스(`KakaoProperties`)는 이 Phase에서 만든다.
+      **카카오 쪽 왕복은 curl로 이미 검증됐다(2026-07-29)** — 남은 것은 서버 코드로 같은 흐름을 재현하는 일이다. 수신 필드는 `id`(Long) · `nickname` · `profile_image_url`이고 **`email`은 `null`이다**(위 「제약·함정」).
       완료 기준: 로그인 왕복 성공 + **로그에 토큰 원문이 남지 않는다**(실제 로그를 눈으로 확인)
 
 - [ ] **Phase 5 — 로테이션 / 로그아웃**
@@ -122,6 +124,9 @@ Phase 1~2와 3~6은 PR을 나눈다.
 - **`kakao.client-secret`이 비어 있으면 토큰 교환 요청에서 파라미터 자체를 생략해야 한다.** 빈 값을 실어 보내면 카카오가 거부한다. 콘솔에서 "사용함"으로 켠 경우에만 필요한 값이라 비어 있는 상태가 정상 시나리오다
 - **`redirect-uri`는 콘솔 등록값·클라이언트가 인가 요청에 쓴 값과 문자 단위로 같아야 한다.** 서버가 리다이렉트를 받지는 않지만 토큰 교환 요청에 들어간다. 다르면 `KOE006`/`invalid_grant`로 떨어진다
 - **Kakao 앱 키는 4종이다 — 서버가 쓰는 것은 REST API 키.** 네이티브·JavaScript 키와 혼동하기 쉽고, **Admin 키는 전권이라 서버에도 두지 않는다**
+- ⚠️ **콘솔 「허용 IP 주소」는 `kapi.kakao.com`에만 걸린다.** 실측(2026-07-29): 등록되지 않은 IP에서 토큰 교환(`kauth.kakao.com/oauth/token`)은 **성공**했는데 `kapi.kakao.com/v2/user/me`만 `{"code":-401,"msg":"ip mismatched!"}`로 거부됐다. **키가 틀린 것으로 오진하기 쉽다** — 토큰이 발급됐다면 키 3개는 정상이다. 값이 하나라도 등록돼 있으면 allowlist가 켜진 것으로 동작하므로, **배포 시 서버 egress IP를 등록하거나 이 설정을 비워야 한다.** 고정 egress IP가 없는 실행 환경이면 운영 로그인이 통째로 막힌다
+- **이메일은 내려오지 않는다.** 실측(2026-07-29) `kakao_account.email`이 `null`이었다. 이메일은 **비즈니스 앱 전환 + 검수**가 필요한 동의항목이라 현재 앱에서는 받을 수 없다. `users.email`이 NULL 허용이라 자동가입은 막히지 않지만, **Kakao 사용자에게는 `email`이 항상 비어 있다고 보고 설계해야 한다** — 식별자는 `(provider, provider_user_id)` 하나뿐이고 `idx_users_email`은 당분간 빈 인덱스다
+- **`profile_image_url`이 `http://` 스킴으로 온다.** 실측(2026-07-29) `http://k.kakaocdn.net/...`. `varchar(500)`이라 저장은 문제없지만 클라이언트가 그대로 쓰면 iOS ATS·Android cleartext 정책에 막힌다. **같은 경로를 `https://`로 요청하면 200이 나오는 것을 확인했으므로**(2026-07-29 실측) 저장 시 스킴을 `https`로 정규화할지 Phase 4에서 정한다
 - **`refresh_tokens.token_hash`는 `varchar(64)`면 충분하다.** api-list.md의 제안 스키마는 `varchar(255)`지만 SHA-256 hex는 64자 고정이다. UNIQUE 인덱스가 걸리는 컬럼이다
 - **엔티티 ID를 앱 코드가 직접 채우면 `save()`가 merge로 빠진다.** Spring Data JPA가 "ID가 있으니 기존 엔티티"로 판단해 INSERT 전에 SELECT를 한 번 더 날린다. `@GeneratedValue`로 Hibernate에 맡긴다
 - **`JwtAuthenticationFilter`는 이미 `isAccessToken()`으로 refresh 토큰의 인증 사용을 막고 있다.** 확인 완료 — 이 검사를 제거하면 refresh 토큰으로 API 호출이 뚫린다
