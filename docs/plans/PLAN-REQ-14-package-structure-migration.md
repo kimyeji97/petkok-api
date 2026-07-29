@@ -68,7 +68,7 @@
 - [x] **Phase 3** — CI 게이트 재현
       완료 기준 충족: spotlessApply / build -x test / checkstyleMain -PciStrict / spotlessCheck 전부 통과, Checkstyle 경고 0건
 
-- [ ] ~~**Phase 4** — 기동 확인~~ — **생략(보류)**. 완료 기준을 정하지 못했고(미결 3번), 컴포넌트 스캔이 패키지 재배치의 영향을 받지 않아 리스크가 낮다고 판단했다. **빈 등록이 실제로 뜨는지는 확인되지 않은 채로 남아 있다** — REQ-07에서 로컬 Postgres를 세울 때 확인한다
+- [x] **Phase 4** — 기동 확인 — **2026-07-29 해소.** 이행 시점에는 완료 기준을 정하지 못해 보류했으나(미결 3번), 로컬 DB(PostgreSQL 17.10) 구축과 함께 실제로 확인했다. Flyway `V1__init.sql` 적용 → 테이블 9개 + `flyway_schema_history`, `Started PetKokApplication`, `GET /actuator/health` 200, `GET /api/v1/users/me` 401. 신구조에서 컴포넌트 스캔·빈 등록·시큐리티 필터 체인이 모두 정상 동작한다
 
 - [x] **Phase 5** — PR 생성 + CI 통과
       완료 기준 충족: PR #10, CI `pass`(42s, `86a1cfd` 기준), diff 전량 rename + import 4줄임을 기계적으로 확인
