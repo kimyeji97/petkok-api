@@ -42,6 +42,21 @@ jwt:
   access-token-validity-ms: ${JWT_ACCESS_TTL:1800000}       # 30분
   refresh-token-validity-ms: ${JWT_REFRESH_TTL:1209600000}  # 14일
 
+# Kakao OAuth2 — 커스텀 플로우다. 클라이언트가 받은 인가코드를 서버가 넘겨받아
+# kauth.kakao.com/oauth/token 으로 교환한다 (spring-security-oauth2-client 의 리다이렉트
+# 로그인이 아니다). 따라서 서버가 필요한 값은 아래 3개뿐이다.
+# R2 와 같이 더미 기본값을 둔다 — auth 구현(REQ-07 Phase 4) 전까지 기동을 막지 않기 위해서다.
+kakao:
+  # 콘솔의 4개 앱 키 중 REST API 키. 네이티브/JavaScript/Admin 키가 아니다.
+  client-id: ${KAKAO_CLIENT_ID:dummy}
+  # 콘솔 → 카카오 로그인 → 보안 에서 "사용함"일 때만 필수.
+  # 비어 있으면 토큰 교환 요청에서 파라미터 자체를 생략한다 (빈 값을 실어 보내면 거부된다).
+  client-secret: ${KAKAO_CLIENT_SECRET:}
+  # ⚠️ 서버는 리다이렉트를 받지 않지만 토큰 교환에는 이 값이 필요하다.
+  #    콘솔 등록값 · 클라이언트가 인가 요청에 쓴 값과 문자 단위로 같아야 한다.
+  #    다르면 KOE006 / invalid_grant 로 떨어진다.
+  redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:3000/oauth/kakao/callback}
+
 r2:
   account-id: ${R2_ACCOUNT_ID:dummy}
   access-key: ${R2_ACCESS_KEY:dummy}
