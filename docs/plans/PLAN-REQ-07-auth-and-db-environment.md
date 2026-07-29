@@ -1,6 +1,6 @@
 # PLAN-REQ-07 · auth 도메인 + DB 환경 구성
 
-> 출처: 2026-07-27 · 2026-07-29 세션 · 작성: 2026-07-27 · 최종 갱신: 2026-07-29 · 상태: 🟡 진행 (Phase 1~2 완료)
+> 출처: 2026-07-27 · 2026-07-29 세션 · 작성: 2026-07-27 · 최종 갱신: 2026-07-29 · 상태: 🟡 진행 (Phase 1~3 완료)
 
 ## 배경
 
@@ -95,11 +95,22 @@
       *(dev/prod 인스턴스 실제 구축은 인프라가 생긴 뒤 — 여기서는 설정 구조와 로컬 검증까지)*
       ⚠️ **Hibernate가 같은 스키마를 보는지는 아직 검증되지 않았다.** `@Entity` 0개라 `validate`가 아무것도 안 한다 — Phase 3에서 처음 실증된다
 
-- [ ] **Phase 3 — V2 마이그레이션 + 엔티티** ← **다음 작업**
-      `refresh_tokens` 테이블, `User`/`UserSocialAccount`/`RefreshToken`.
-      완료 기준: V2 적용 후 `validate` 통과 (엔티티 매핑과 DDL 불일치가 여기서 잡힌다)
+- [x] **Phase 3 — V2 마이그레이션 + 엔티티** — **완료 (2026-07-29)**
+      `V2__refresh_tokens.sql` + `User`/`UserSocialAccount`/`RefreshToken` + `SocialProvider` enum.
+      완료 기준 충족: `Successfully applied 1 migration ... now at version v2` → `Started PetKokApplication`. 재기동 시 `up to date`로 멱등.
+      **`validate`가 실제로 무는지 프로브로 확인했다** — 존재하지 않는 컬럼을 엔티티에 심었더니 `Schema-validation: missing column [probe_column_does_not_exist] in table [users]`로 기동이 막혔다. Phase 1·2에서 두 번 "아무것도 검증하지 않는다"고 적어 둔 항목이라 통과만 보고 넘기지 않았다.
+      **Phase 2의 미검증 항목도 여기서 해소됐다** — Hibernate가 Flyway와 같은 스키마(`petkok_local`)를 본다. 다른 스키마를 봤다면 `missing table`로 떨어졌을 것이다.
+      **도메인 경계 결정 (2026-07-29)** — 엔티티 배치로 ArchUnit 예외를 0건으로 유지했다.
+      | 클래스 | 위치 | 근거 |
+      |---|---|---|
+      | `User` | `data/user/entity` | users 테이블 소유는 user 도메인 |
+      | `UserSocialAccount` | `data/user/entity` | `User`를 `@ManyToOne`으로 참조한다. `data/auth`에 두면 `data/auth → data/user` 위반. 쓰는 쪽이 auth인 것과 별개다 |
+      | `RefreshToken` | `data/auth/entity` | `user_id`를 **연관관계 없이 생 `UUID` 컬럼**으로 매핑. 토큰 행에서 User로 탐색할 일이 없어 잃는 것이 없다 |
+      ⚠️ **미룬 결정 — `business/auth` → `data/user` 허용 여부.** 자동가입이 `users` 행을 만들므로 **Phase 4에서 반드시 부딪힌다.** 선택지는 ① `DomainBoundaryTest`에 예외 1건 추가(timeline 선례와 같은 방식) ② auth·user 도메인 병합. 검증할 코드가 없는 상태에서 규칙을 먼저 헐겁게 만들지 않으려고 미뤘다.
+      ⚠️ **엔티티에 Lombok `@Getter`·`@NoArgsConstructor(PROTECTED)`를 썼다.** `data/common/entity`의 베이스 3종은 수동 getter라 선례가 갈린다. `build.gradle.kts`가 Lombok을 "보일러플레이트 제거"용으로 명시하고 있어 따랐으나, 되돌리려면 지금이 가장 싸다.
+      *(Repository는 만들지 않았다 — 이 Phase 범위가 아니고 쓰는 쪽이 없다. Phase 4에서 추가한다)*
 
-- [ ] **Phase 4 — Kakao 로그인** *(앱 등록 완료 — 선행 조건 해제됨)*
+- [ ] **Phase 4 — Kakao 로그인** *(앱 등록 완료 — 선행 조건 해제됨)* ← **다음 작업**
       인가코드 → 토큰 교환 → 사용자 정보 → 조회/자동가입 → access+refresh 발급.
       `KakaoOAuthClient extends RestClientBase` (`business/auth/service/oauth/`).
       설정 3개(`kakao.client-id`/`client-secret`/`redirect-uri`)는 2026-07-29에 선배치됐다 — 바인딩 클래스(`KakaoProperties`)는 이 Phase에서 만든다.
