@@ -17,7 +17,7 @@
 | REQ-05 | RestTemplate 설정 + 요청·응답 로깅 인터셉터 | — | 2026-07-23 | ✅ |
 | REQ-06 | API 설계 초안 + 설계 결정 3건 확정 | [api-list.md](specs/api-list.md) | 2026-07-23 | ✅ |
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
-| REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | — | 🟡 |
+| REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ⏸ |
 | REQ-08 | user 도메인 (프로필 · 소셜 계정 연결) | [api-list §2](specs/api-list.md) | — | ⏸ |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
@@ -70,9 +70,33 @@
 
 > ⚠️ `business/{도메인}`과 `data/{도메인}`의 이름이 어긋나면 ArchUnit 규칙이 **에러 없이 조용히 무력화**된다 — 서로 다른 슬라이스로 잡혀 규칙은 통과하는데 경계는 안 지켜진다. AGENTS.md §3에 계약으로 등재했다.
 
-### 이행은 아직 안 했다
+### 이행 완료 (PR #10)
 
-`com.petkok.global.*` 55개 파일이 구 위치 그대로다. 문서(노션 §2·§5, AGENTS.md §3)는 목표 구조를 기술하고 있어 **코드와 어긋난 상태**이며, 그 사실을 양쪽에 명시로 적어 뒀다(조용한 drift 방지). 이행은 auth 착수 전에 별도 PR로 간다 — 계획서 [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md).
+54개 파일을 옮겼다(`PetKokApplication`은 제자리). **`package`·`import` 외 변경 라인 0건**을 기계적으로 확인했다 — `git diff --find-renames -M -U0 | grep -vE '^[+-](package |import |$)'` 출력이 비어야 정상이고, 실제로 비었다. 게이트 4종(spotlessApply / build -x test / checkstyleMain -PciStrict / spotlessCheck) 통과.
+
+**컴파일 에러 5건이 났고, 원인은 자리를 바꾼 3개였다.** `RestTemplateLoggingInterceptor`(config→processor/interceptor) · `GlobalExceptionHandler`(exception→processor/handler) · `JwtAuthenticationFilter`(security/jwt→processor/filter). 셋 다 **이전에는 의존 대상과 같은 패키지라 `import` 문이 아예 없었고**, 패키지를 벗어나면서 각각 `RestTemplateLoggingInterceptor`·`BusinessException`/`ErrorCode`·`JwtTokenProvider` import가 필요해졌다. 추가한 import 4줄이 이번 이행의 유일한 내용 변경이다.
+
+> 같은 패키지 안에서 이동하면 안 나던 에러다. **패키지를 가로지르는 이동은 "옮기면 끝"이 아니라 암묵적 동일 패키지 참조가 드러나는 지점**이라고 보는 게 맞다.
+
+빈 패키지(`framework/constant`, `processor/aspect`, `processor/converter`)는 만들지 않았다 — 넣을 클래스가 없고 git이 빈 디렉터리를 추적하지 못한다. 설계는 노션 §2에 남겨 뒀다. `business/`와 `data/{도메인}`도 도메인 코드가 들어올 때 생긴다. 현재 실재하는 것은 `data/common/entity`뿐이다.
+
+### 사고 — PR #8이 낡은 SHA 기준으로 머지돼 커밋 3개가 누락됐다
+
+푸시는 원격 브랜치(`aef47db`)까지 정상 도달했는데 **GitHub이 5분 넘게 PR head를 갱신하지 않았고**(`1f4297d` 고정, `mergeable: null`), 그 상태에서 머지가 실행되면서 그날 커밋 3개(07-27 기록 · 구조 확정 · 07-28 기록)가 `main`에 들어가지 못했다. `git ls-remote`와 `GET /repos/.../branches/...`는 `aef47db`를 반환하는데 `GET /pulls/8`만 `1f4297d`을 반환하는 상태였다.
+
+내 쪽 원인은 **stale한 체크 결과를 통과로 읽은 것**이다. `gh pr checks`가 반환한 초록불은 전날(07-27) 실행분이었는데 SHA를 대조하지 않고 "CI 통과"로 판단했다. 같은 브랜치로 PR #9를 새로 열어 복구했고, 이후 PR #9·#10은 **머지 직전에 PR head와 로컬 HEAD를 대조**한 뒤 진행했다.
+
+→ 이 대조 절차는 AGENTS.md §4에 계약으로 올렸다.
+
+### 함정 — `| tail`이 gradle 종료코드를 가려 실패를 통과로 오보고했다
+
+`./gradlew build -q 2>&1 | tail -15 && echo OK` 형태로 묶어 돌렸더니 파이프라인 종료코드가 `tail`의 것이 되어, **컴파일이 깨졌는데도 `=== build OK ===`가 출력됐다.** 위의 컴파일 에러 5건을 한 번 놓친 원인이다. 게이트는 파이프 없이 `set -e`로 각각 돌려야 한다.
+
+→ CLAUDE.md 로컬 검증 절에 등재했다.
+
+### 함정 — Notion이 인라인 코드 주변 굵게를 `****`로 재정규화한다
+
+`**\`data\`**`를 쓰면 저장 시 `**** \`data\` ****` 형태로 바뀌어, 다음번 `update_content`의 `old_str`이 매칭되지 않는다. 변형을 추측으로 반복하다 결국 `fetch`로 실제 저장 형태를 확인하고서야 고쳤다 — 오늘 CLAUDE.md에 올린 함정("부분 치환이 계속 no-match면 저장 형태를 의심")과 정확히 같은 사례를 스스로 반복한 것이다. **인라인 코드와 굵게를 붙여 쓰지 않는 편이 안전하다.**
 
 ## 2026-07-27
 
