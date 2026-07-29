@@ -1,6 +1,6 @@
 # PLAN-REQ-07 · auth 도메인 + DB 환경 구성
 
-> 출처: 2026-07-27 세션 · 작성: 2026-07-27 · 상태: 📝 초안
+> 출처: 2026-07-27 세션 · 작성: 2026-07-27 · 최종 갱신: 2026-07-29 · 상태: 🟡 진행 (Phase 1 완료)
 
 ## 배경
 
@@ -9,6 +9,8 @@
 **① 실행 가능한 DB가 없다.** `application-local.yml`은 `jdbc:postgresql://localhost:5432/petkok`를 기본값으로 두고 있지만, 이 값으로 실제 기동이 되는지 확인된 적이 없다. dev/prod는 인프라 자체가 없다. auth는 `users`·`user_social_accounts`·`refresh_tokens`를 모두 건드리므로 DB 없이는 한 줄도 검증할 수 없다.
 
 **② 검증 수단이 없다.** `src/test`가 없어 현재 실질 게이트는 컴파일 + Spotless + Checkstyle뿐이다. auth의 핵심 로직(토큰 만료, 로테이션, 재사용 감지)은 눈으로 확인하기 어렵고 조용히 깨지는 종류다.
+
+> **①②의 현재 상태 (2026-07-29 갱신)** — ①은 해소됐다(Phase 1 완료). ②는 절반만 해소됐다: `src/test`가 생기고 ArchUnit 구조 규칙 8개가 CI에서 돌지만 **도메인 로직 테스트는 여전히 0개**다. 위 문단은 작성 시점의 문제 인식으로 남겨 둔다.
 
 세션 도중 DB 엔진을 MySQL로 바꾸는 안이 검토됐다가 기각됐다. 아래 "결정" 참조.
 
@@ -46,8 +48,8 @@
 > 2026-07-27 Notion 대조에서 나온 항목 중 **공개 경로**와 **`condition_tag`** 는 해소됐다. 아래 "해소된 질문" 참고.
 
 - [ ] **HTTP 클라이언트.** Notion 소스 구조 §7은 `KakaoOAuthClient`가 **RestClient**를 쓴다고 명시한다. 레포는 REQ-05에서 **RestTemplate** + 로깅 인터셉터를 만들어 뒀다. RestTemplate으로 가고 Notion을 고칠지, RestClient로 갈아탈지(그러면 REQ-05 인터셉터를 다시 만들어야 한다) 결정 필요
-- [ ] **로컬 PostgreSQL 접속 정보.** 세션에서 받은 `localhost:3306` / `root`는 MySQL 것이었다. 실제 PostgreSQL 인스턴스가 로컬에 있는가? 없다면 준비 방법(Docker / Postgres.app / Supabase 무료 티어 직결) 중 무엇으로 갈지
-- [ ] **PostgreSQL 버전.** `gen_random_uuid()`는 13+ 내장이고 그 미만은 `pgcrypto` 확장이 필요하다. README는 15+를 요구하지만 실제 로컬 버전은 확인되지 않았다
+- [x] **로컬 PostgreSQL 접속 정보** — **Postgres.app으로 확정(2026-07-29).** `localhost:5433` / DB `petkok` / 롤 `root`(비슈퍼유저, DB 소유자). Docker는 쓰지 않는다. `public` 스키마 소유자가 `pg_database_owner`라 **DB 소유권만 넘기면** Flyway의 `CREATE` 권한이 따라온다
+- [x] **PostgreSQL 버전** — **17로 확정.** 로컬 17.10, 운영 Supabase 17.6. `gen_random_uuid()`는 13+ 코어 제공이라 `pgcrypto` 불필요하고 `V1__init.sql`에도 `CREATE EXTENSION`이 없다. **Supabase는 18을 아직 지원하지 않는다**(2026-01 목표를 넘겼고 "eventually in 2026") — 로컬을 18로 두면 운영보다 앞서므로 선택지가 아니었다
 - [ ] **dev/prod 분리 방식.** "스키마로 분리"라고만 정해져 있다. 같은 데이터베이스 안의 schema로 나눌지, 데이터베이스 자체를 나눌지 미확정. Supabase 무료 티어는 DB가 하나뿐이라 이 선택이 인프라 형태에 묶인다
 - [ ] **동시 refresh 요청 처리.** 앱 재시작·병렬 요청으로 같은 refresh가 거의 동시에 두 번 오면, 정상 사용자인데도 재사용 감지에 걸려 전 기기 로그아웃된다. 짧은 유예 윈도우를 둘지 감수할지 정해지지 않았다
 - [ ] **Testcontainers 도입 여부.** 로컬 DB 상태에 의존하지 않고 마이그레이션·리포지토리를 검증할 수 있으나, 빌드 시간과 Docker 의존이 따라온다
@@ -60,9 +62,11 @@
 
 ## 작업 단계
 
-- [ ] **Phase 1 — 로컬 DB 기동**
-      `V1__init.sql` 9개 테이블이 Flyway로 생성되고 `ddl-auto: validate`가 통과.
-      완료 기준: `./gradlew bootRun`이 예외 없이 뜨고 `flyway_schema_history`에 V1 성공 행이 남는다
+- [x] **Phase 1 — 로컬 DB 기동** — **완료 (2026-07-29)**
+      완료 기준 충족: `bootRun` 정상 기동, `flyway_schema_history`에 `v1/init/success=true`, 테이블 9개 생성.
+      실제 구성은 **PostgreSQL 17.10 / 포트 5433**(Postgres.app). 운영 Supabase가 17.6이라 메이저를 맞췄다.
+      **계획에 없던 작업 2건** — ① `pg_hba`가 전부 `trust`라 비밀번호가 검증되지 않아 `host` 라인을 `scram-sha-256`으로 전환했다 ② Flyway가 PostgreSQL 16까지만 검증돼 경고를 내서 10.10.0 → 10.22.0으로 상향했다(Spring Boot BOM 고정값 덮어쓰기).
+      ⚠️ **`ddl-auto: validate`는 사실상 아무것도 검증하지 않았다** — `@Entity` 클래스가 0개다. 실효는 Phase 3에서 생긴다
 
 - [ ] **Phase 2 — 환경 분리와 시크릿**
       local/dev/prod 프로파일별 접속 분리, `.gitignore`에 로컬 override 패턴 추가.
@@ -80,8 +84,8 @@
 - [ ] **Phase 5 — 로테이션 / 로그아웃**
       완료 기준: refresh 재발급 시 이전 토큰이 즉시 무효 · revoke된 토큰 재제시 시 해당 사용자 전체 revoke + `INVALID_TOKEN`
 
-- [ ] **Phase 6 — 검증 체계**
-      `src/test` 신설, ArchUnit 활성화(AGENTS §6이 "feature 도메인 도입 시점까지 보류"라 한 그 시점).
+- [ ] **Phase 6 — 검증 체계** *(선행 절반은 2026-07-29에 이미 끝났다)*
+      ~~`src/test` 신설, ArchUnit 활성화~~ → **REQ-14에서 완료.** `src/test/java/com/petkok/architecture/`에 구조 규칙 8개가 CI 게이트로 동작한다. 따라서 이 Phase에 남은 것은 **auth 로직 테스트뿐**이다.
       완료 기준: 토큰 만료·로테이션·재사용 감지 테스트 통과 + CI green
 
 Phase 1~2와 3~6은 PR을 나눈다.

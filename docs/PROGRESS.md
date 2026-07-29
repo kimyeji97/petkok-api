@@ -18,7 +18,7 @@
 | REQ-06 | API 설계 초안 + 설계 결정 3건 확정 | [api-list.md](specs/api-list.md) | 2026-07-23 | ✅ |
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
-| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ⏸ |
+| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | 🟡 |
 | REQ-08 | user 도메인 (프로필 · 소셜 계정 연결) | [api-list §2](specs/api-list.md) | — | ⏸ |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
@@ -122,6 +122,18 @@ Checkstyle이 테스트 소스에서 10건 걸렸다(한글 상수명 `ConstantN
 ### `local` 소켓 scram 전환은 아직 불가
 
 `postgres`에는 비밀번호가 설정됐지만 **`yjkim`은 여전히 없다.** 소켓까지 scram으로 바꾸면 Postgres.app이 쓰는 관리 계정이 잠긴다. `host`(TCP)만 scram인 현재 상태가 실용적 균형이며, 앱이 쓰는 경로는 TCP라 실질 보호는 이미 걸려 있다.
+
+### 계획-실제 이탈 — REQ-07의 절반이 REQ-14 중에 끝나 있었다
+
+작업이 끝난 뒤 `PLAN-REQ-07`을 대조하니 **계획서가 이미 낡아 있었다.** REQ-14(패키지 구조)를 하다가 필요해서 처리한 것들이 실은 REQ-07의 범위였다.
+
+- **Phase 1(로컬 DB 기동) 완료** — 완료 기준(`bootRun` 정상 기동 + `flyway_schema_history` V1 성공 행)을 그대로 충족한다. 계획서는 이걸 auth 착수의 선행 조건으로 잡아 뒀는데, 패키지 이행 검증(PLAN-REQ-14 Phase 4)을 하려다 먼저 끝냈다
+- **Phase 6(검증 체계)의 절반 완료** — "`src/test` 신설 + ArchUnit 활성화"가 REQ-14 미결을 닫으면서 처리됐다. 남은 것은 auth 로직 테스트뿐이다
+- **미결 2건 해소** — 로컬 PostgreSQL 접속 정보(Postgres.app / 5433 / `root`), PostgreSQL 버전(17)
+
+계획서 배경의 "② 검증 수단이 없다"도 절반만 맞는 상태가 됐다 — `src/test`는 생겼지만 **도메인 로직 테스트는 여전히 0개**다. 작성 시점의 문제 인식이라 문단은 남기고 현재 상태를 주석으로 덧붙였다.
+
+REQ-07 상태를 ⏸ → 🟡로 올렸다. **auth는 이제 "착수 전"이 아니라 "진행 중"이다.**
 
 ### PLAN-REQ-14 Phase 4가 닫혔다
 
