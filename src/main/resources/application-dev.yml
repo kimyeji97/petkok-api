@@ -1,0 +1,16 @@
+# 개발 서버 — 시크릿은 전부 환경변수 주입 (기본값 없음)
+# dev 와 prod 는 같은 Supabase 프로젝트를 쓰고 스키마로만 갈라진다.
+db:
+  schema: ${DB_SCHEMA:petkok_dev}
+
+spring:
+  jpa:
+    properties:
+      hibernate:
+        format_sql: false
+
+logging:
+  level:
+    root: info
+    org.hibernate.SQL: debug
+    org.springframework.security: info

@@ -12,6 +12,9 @@
 	- `timeout 180 ./gradlew bootRun | grep ...` → **macOS에 `timeout`이 없어**(coreutils의 `gtimeout`) 즉시 죽었는데 종료코드 0으로 보였다. 시간 제한이 필요하면 백그라운드 실행 + 로그 파일 확인으로 대체한다
 - **`src/test`에는 ArchUnit 구조 규칙 8개뿐이다** (`src/test/java/com/petkok/architecture/`). 도메인 로직 테스트는 아직 하나도 없다 — `./gradlew test` 통과를 "기능이 검증됐다"로 보고하지 말 것. 구조 규칙 대부분은 도메인 코드가 없어 **빈 집합을 대상으로 통과**한다(`allowEmptyShould(true)`)
 - ⚠️ **구조 규칙을 고치면 일부러 위반을 심어 잡히는지 확인할 것.** 규칙이 조용히 공허해지는 일이 실제로 있었다 — 슬라이스 패턴에 괄호를 잘못 쳐(`(business|data)`) 트리 이름이 슬라이스 키에 섞이는 바람에 같은 도메인 참조까지 위반으로 잡혔다. 통과/실패만 봐서는 알 수 없다
+- **앱을 띄우려면 `.env`가 필요하다** — `set -a && . ./.env && set +a && ./gradlew bootRun`. `DB_PASSWORD`에는 기본값이 없어 주입하지 않으면 기동이 막힌다(의도적)
+	- ⚠️ **`.env`의 `KEY=`(빈 값)은 "미설정"이 아니다.** 빈 문자열이 환경변수로 들어가고 Spring의 `${VAR:기본값}`은 **미정의일 때만** 기본값을 쓴다 — 빈 값이면 기본값이 무력화된다. 기본값을 쓰려면 그 줄을 주석 처리할 것
+- ⚠️ **문서에 실제 시크릿을 쓰지 말 것.** 함정·재현 로그를 `PROGRESS.md`에 적다가 실제 로컬 DB 비밀번호가 public 레포에 커밋된 적이 있다(2026-07-29 `5c7313b`). 재현 상황을 설명할 때는 값을 더미로 바꾼 뒤 적는다
 - `docs/specs/`의 두 문서 — [`api-list.md`](docs/specs/api-list.md)(Notion API I/F 파생), [`db-schema.md`](docs/specs/db-schema.md)(Notion 테이블 정의서 파생) — 는 **둘 다 파생 요약이다.** 원본이 아니다. `docs/adr/`는 비어 있고 **ADR-001·ADR-002의 원본은 Notion에 있다.** 설계 판단 전에 AGENTS.md §0(출처 우선순위)을 먼저 볼 것
 
 ## Notion 편집 함정 (AGENTS.md §0 보완)

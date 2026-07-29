@@ -18,7 +18,7 @@
 | REQ-06 | API 설계 초안 + 설계 결정 3건 확정 | [api-list.md](specs/api-list.md) | 2026-07-23 | ✅ |
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
-| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ⏸ |
+| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | 🟡 |
 | REQ-08 | user 도메인 (프로필 · 소셜 계정 연결) | [api-list §2](specs/api-list.md) | — | ⏸ |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
@@ -34,6 +34,47 @@
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
 
 ## 2026-07-29
+
+### Kakao 설정 골격을 Phase 4보다 먼저 놓았다
+
+**서버가 필요한 값은 3개뿐이다** — `client-id`(REST API 키) · `client-secret` · `redirect-uri`. 커스텀 플로우이기 때문이다: 클라이언트가 인가코드를 받아 서버에 넘기고 서버는 `kauth.kakao.com/oauth/token`으로 교환만 한다. **`spring-security-oauth2-client`의 리다이렉트 로그인이 아니라서** 그쪽 설정 트리(`registration`/`provider`)가 통째로 필요 없다.
+
+콘솔의 앱 키 4종 중 **REST API 키**다. 네이티브·JavaScript 키와 헷갈리기 쉽고, **Admin 키는 전권이라 서버에도 두지 않는다.**
+
+R2와 같은 방침으로 더미 기본값을 뒀다 — Phase 4 전까지 기동을 막지 않기 위해서다. 기동 확인했고, `petkok_local`은 "up to date"로 재적용도 멱등이었다.
+
+**`client-secret`만 기본값이 빈 문자열이다.** 콘솔에서 "사용함"으로 켠 경우에만 필요한 값인데, **빈 값을 실어 보내면 카카오가 거부한다** — 구현 시 비어 있으면 파라미터 자체를 생략해야 한다. Phase 4 계약이라 계획서 "제약·함정"에 올렸다.
+
+`.env.example`의 Kakao 항목은 **주석 처리**로 넣었다. 바로 위에서 승격한 "`KEY=`(빈 값)은 기본값을 무력화한다" 계약을 그대로 적용한 첫 사례다 — 빈 값으로 뒀다면 더미 기본값이 죽어 기동이 막혔을 것이다.
+
+**미결 해소 — Kakao 앱 등록 완료, 키 보유.** Phase 4 착수 조건이 충족됐다(콘솔 설정 검증은 별도 진행 중).
+
+### 프로파일별 스키마 분리 (REQ-07 Phase 2) — 값의 출처를 한 곳으로 모았다
+
+`local`/`dev`/`prod`가 각각 `petkok_local`/`petkok_dev`/`petkok_prod`를 쓴다. 계획서가 이 Phase의 **최대 리스크**로 꼽은 것은 "Flyway와 Hibernate 중 한쪽만 스키마를 지정하는" 사고였다 — 테이블이 생긴 곳과 조회하는 곳이 갈리는데 **에러 없이 "테이블이 없다"로만 나타난다.**
+
+**두 곳에 같은 값을 적는 대신 `db.schema` 한 곳을 만들고 양쪽이 그것을 참조하게 했다.** 프로파일 파일이 값을 정하고 `application.yml`이 Flyway·Hibernate 양쪽에 배선한다. 한쪽만 바뀌는 상태가 구조적으로 불가능해진다. `application.yml`에는 기본값을 두지 않아 프로파일이 값을 빠뜨리면 **기동 즉시** 실패한다.
+
+**세 프로파일을 전부 실제로 띄워 확인했다.** 같은 로컬 DB에 프로파일만 바꿔 붙였더니 스키마 3개가 각각 생성되고 V1이 적용됐다(dev·prod는 확인 후 삭제). **prod까지 띄운 이유는 `application-prod.yml`의 오타가 배포 시점에야 드러나기 때문**이다 — 지금 1분이면 끝나는 확인이다.
+
+`petkok_local`은 통째로 지우고 새 설정 경로로 재생성했다. 기존 스키마는 소유자가 `pg_database_owner`였는데(새로 만든 것은 `root`) — `public`을 **rename**한 흔적이다. 설정을 거치지 않고 만들어진 상태라 완료 기준 ②의 "V1이 **새로** 적용된다"를 충족하지 못한다고 보고 다시 만들었다. 행 0건이라 잃을 것이 없었고 덤프는 미리 떠 뒀다.
+
+> Flyway가 만든 스키마는 `flyway_schema_history`에 version이 빈 행(`"petkok_local"`)으로 기록된다. `clean` 시 스키마 자체를 지울지 판단하는 표식이다.
+
+### ⚠️ 로컬 DB 비밀번호가 public 레포에 커밋돼 있었다
+
+`5c7313b`(오늘 16:25, 이미 push됨)의 "URI에서 `@`가 잘린다" 함정 설명에 **실제 로컬 비밀번호를 예시로 그대로 썼다.** 문서는 더미 값으로 교체했지만 **git 이력에는 남아 있고 레포는 public이다.**
+
+Phase 2 완료 기준 ④가 "레포에 실제 비밀번호가 없다"였는데, 검증하려고 찾다가 나왔다. **기준을 형식적으로 체크했으면 놓쳤을 것이다** — `.gitignore`와 `.env.example`만 보면 통과로 보인다.
+
+> **함정 사례를 적을 때 실제 값을 쓰지 말 것.** 재현 로그를 붙여넣는 흐름에서 자연스럽게 섞여 들어간다. 여기서도 "왜"를 남기려다 값까지 함께 남았다.
+
+**결론: 이력은 그대로 둔다(2026-07-29 결정).** localhost 전용 개발 DB라 외부에서 닿지 않고, `main`을 force push 하는 비용이 얻는 것보다 크다. 다만 **같은 비밀번호를 다른 곳에 재사용했다면 그쪽이 실제 위험**이다 — 노출된 값은 이미 공개돼 있고 이 결정으로 회수되지 않는다.
+
+### 잘못된 기본값 2건 — 둘 다 "조용히 틀리는" 종류였다
+
+- **`application-local.yml`이 Phase 1 실측과 어긋나 있었다.** `5432`/`postgres`/`postgres`로 남아 있어 **다른 버전의 빈 DB에 조용히 붙을** 값이었다. `5433`/`root`로 맞추고 **`DB_PASSWORD`는 기본값을 없앴다** — `pg_hba`의 `host` 라인이 이제 scram이라 어떤 더미 값도 통하지 않는데, 기본값이 있으면 "비밀번호 틀림"으로만 보여 원인 파악이 늦어진다. 값이 없어 기동이 막히는 편이 낫다
+- **`.env`의 `KEY=`(빈 값)은 "미설정"이 아니다.** `set -a && . ./.env`로 주입하면 **빈 문자열**이 환경변수로 들어가고 Spring의 `${VAR:기본값}`은 미정의일 때만 기본값을 쓴다. README가 권하는 실행 경로에서 그대로 밟는 함정인데, `.env.example`은 `R2_*`를 포함해 여러 키를 빈 값으로 두고 있었다(= 더미 기본값이 무력화된다). 두 문서에 경고를 넣었다
 
 ### 로컬 DB 구축 — 운영과 메이저 버전을 맞췄다
 
@@ -67,13 +108,13 @@ Spring Boot 3.3.5 BOM이 고정하는 **Flyway 10.10.0이 16까지만 검증**�
 
 ### 함정 — 비밀번호의 `@`가 URI에서 잘려 "비밀번호 틀림"으로 오진된다
 
-`qhdks@00`처럼 `@`가 든 비밀번호를 연결 URI에 그대로 넣으면 `@`가 호스트 구분자로 파싱된다.
+`ab@00`처럼 `@`가 든 비밀번호를 연결 URI에 그대로 넣으면 `@`가 호스트 구분자로 파싱된다.
 
 | 방식 | 결과 |
 | --- | --- |
 | `PGPASSWORD=...` + `-U root` | ✅ |
-| `postgresql://root:qhdks@00@localhost:5433/petkok` | ❌ `could not translate host name "00@localhost"` |
-| `postgresql://root:qhdks%4000@localhost:5433/petkok` | ✅ |
+| `postgresql://root:ab@00@localhost:5433/petkok` | ❌ `could not translate host name "00@localhost"` |
+| `postgresql://root:ab%4000@localhost:5433/petkok` | ✅ |
 
 클라이언트가 `@`에서 잘라 앞부분만 보내면 **인증 실패로 나타나** 비밀번호가 틀린 것으로 오인한다. 서버 쪽 해시는 멀쩡한데도 그렇다. URI를 쓸 땐 `%40`으로 인코딩하거나, 비밀번호에 `@`를 쓰지 않는 편이 낫다.
 
@@ -122,6 +163,18 @@ Checkstyle이 테스트 소스에서 10건 걸렸다(한글 상수명 `ConstantN
 ### `local` 소켓 scram 전환은 아직 불가
 
 `postgres`에는 비밀번호가 설정됐지만 **`yjkim`은 여전히 없다.** 소켓까지 scram으로 바꾸면 Postgres.app이 쓰는 관리 계정이 잠긴다. `host`(TCP)만 scram인 현재 상태가 실용적 균형이며, 앱이 쓰는 경로는 TCP라 실질 보호는 이미 걸려 있다.
+
+### 계획-실제 이탈 — REQ-07의 절반이 REQ-14 중에 끝나 있었다
+
+작업이 끝난 뒤 `PLAN-REQ-07`을 대조하니 **계획서가 이미 낡아 있었다.** REQ-14(패키지 구조)를 하다가 필요해서 처리한 것들이 실은 REQ-07의 범위였다.
+
+- **Phase 1(로컬 DB 기동) 완료** — 완료 기준(`bootRun` 정상 기동 + `flyway_schema_history` V1 성공 행)을 그대로 충족한다. 계획서는 이걸 auth 착수의 선행 조건으로 잡아 뒀는데, 패키지 이행 검증(PLAN-REQ-14 Phase 4)을 하려다 먼저 끝냈다
+- **Phase 6(검증 체계)의 절반 완료** — "`src/test` 신설 + ArchUnit 활성화"가 REQ-14 미결을 닫으면서 처리됐다. 남은 것은 auth 로직 테스트뿐이다
+- **미결 2건 해소** — 로컬 PostgreSQL 접속 정보(Postgres.app / 5433 / `root`), PostgreSQL 버전(17)
+
+계획서 배경의 "② 검증 수단이 없다"도 절반만 맞는 상태가 됐다 — `src/test`는 생겼지만 **도메인 로직 테스트는 여전히 0개**다. 작성 시점의 문제 인식이라 문단은 남기고 현재 상태를 주석으로 덧붙였다.
+
+REQ-07 상태를 ⏸ → 🟡로 올렸다. **auth는 이제 "착수 전"이 아니라 "진행 중"이다.**
 
 ### PLAN-REQ-14 Phase 4가 닫혔다
 
