@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-07-29
+> 최종 갱신: 2026-07-30
 
 ## 요구사항 인덱스
 
@@ -18,7 +18,7 @@
 | REQ-06 | API 설계 초안 + 설계 결정 3건 확정 | [api-list.md](specs/api-list.md) | 2026-07-23 | ✅ |
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
-| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | 🟡 |
+| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | 🟡 Phase 1~4 완료 |
 | REQ-08 | user 도메인 (프로필 · 소셜 계정 연결) | [api-list §2](specs/api-list.md) | — | ⏸ |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
@@ -32,6 +32,54 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-07-30
+
+> 07-29 저녁부터 이어진 한 세션이 자정을 넘겼다. Phase 3은 커밋 날짜대로 07-29 절에 있다.
+
+### 로그를 열어 보지 않았으면 못 잡았을 것 — `client_id` 평문 노출 (Phase 4)
+
+Phase 4 완료 기준이 "로그에 토큰 원문이 남지 않는다(실제 로그를 눈으로 확인)"였다. **유효한 인가코드 없이도 이걸 검증할 방법이 있었다** — 잘못된 코드로 실제 카카오 왕복을 태우면(`KOE320` 수신) 요청 본문은 그대로 로깅 경로를 탄다.
+
+그렇게 찍힌 로그를 보다가 **`client_id`(카카오 REST API 키)가 통째로 평문으로 남는 것**을 발견했다. `client_secret`은 마스킹 대상에 넣어 뒀는데 `client_id`는 "식별자니까 괜찮다"고 무의식적으로 넘긴 것이다. 마스킹 대상에 추가했다.
+
+**교훈은 마스킹 목록이 아니라 검증 방식 쪽이다.** 마스킹 코드를 짜고 테스트를 통과시킨 상태에서도 이 누락은 남아 있었다. 실제 출력 한 줄을 눈으로 본 것이 유일한 발견 경로였다.
+
+> ⚠️ **그 직후 같은 실수를 반복할 뻔했다.** 테스트 픽스처를 쓰면서 **로그에서 실제 키를 복사해 붙여 넣었다.** 2026-07-29 비밀번호 커밋과 정확히 같은 경로다(값을 설명하려다 실물이 따라온다). 더미로 교체하고 `.env` 값 기준 전수 스캔으로 레포에 실값이 없음을 확인했다. **재현 로그를 문서·테스트에 옮길 때는 붙여넣기 자체를 하지 말 것.**
+
+### 마스킹 범위는 키 단위로 확정했다
+
+전체 본문을 끄는 안을 기각했다. 카카오 오류 응답(`invalid_grant` / `KOE320` / `ip mismatched!`)이 **진단 정보의 거의 전부**인데 그걸 같이 잃는다. URL별 예외도 기각 — 대상이 늘 때마다 빠뜨린다.
+
+키 **이름**으로 판단하므로 `{"code":-401,"msg":"ip mismatched!"}` 같은 숫자 진단값은 그대로 남는다. JSON의 `code`는 마스킹 대상에서 뺐고 form의 `code`(인가코드)만 넣었다 — 같은 이름이 한쪽에선 비밀이고 한쪽에선 진단값이다.
+
+성공 응답의 `access_token`·`refresh_token` 경로는 **유효한 1회용 인가코드가 있어야** 재현되므로 실물로 못 태운다. 테스트로 고정했다(REQ-07-09).
+
+### ArchUnit 규칙이 `business` 첫 클래스에서 무너졌다
+
+`business/auth` → `framework/config`가 **도메인 간 참조 위반**으로 떨어졌다. 슬라이스 패턴 `com.petkok.*.(*)..`가 *의존 대상*에도 적용돼 `framework.config`가 "config" 슬라이스로 잡히기 때문이다.
+
+**`@AnalyzeClasses` 범위를 좁히는 것으로는 못 막는다** — 그건 분석 *대상*을 줄일 뿐이고 문제는 **의존 방향의 끝**이다. 기존 주석이 "framework가 섞이면 규칙이 엉뚱해진다"며 범위 축소를 해법으로 적어 뒀는데, 절반만 맞았다.
+
+이대로면 `ApiResponse`를 쓰는 **컨트롤러가 전부 위반**이라 규칙을 아예 못 쓴다. AGENTS §5가 `business`·`data` → `framework`를 허용하므로(금지 방향은 `ArchitectureTest`가 따로 잡는다) `framework`를 대상에서 제외했고, **프로브를 심어 교차 도메인은 여전히 잡히는 것을 확인**했다.
+
+> 도메인 코드가 0개라 그동안 **빈 집합을 대상으로 통과**하고 있었다. 2026-07-29에 "구조 규칙은 일부러 위반을 심어 확인하라"를 계약으로 올려 뒀는데, 그 프로브도 *당시 존재하던* 코드 기준이었다. **첫 실사용자가 들어오는 시점에 규칙을 다시 의심해야 한다.**
+
+### `PUBLIC_PATHS` 와일드카드 제거 — 계획보다 앞당겼다
+
+원래 Phase 5 항목이지만 Phase 4가 `/auth/kakao`·`/auth/refresh`를 실제로 만드는 시점이라 함께 처리했다. AGENTS §5와 Notion §5·§7은 **이미 개별 나열을 계약으로 적고 있었고 코드만 뒤처져 있던** 상태다 — 문서가 계약을 현재 상태처럼 서술해 놓아서, 코드를 열어 보기 전에는 이미 지켜지는 줄 알았다.
+
+사용자가 `/testgen`으로 넣어 둔 REQ-07-01·02·03이 이 항목을 정확히 빨간불로 잡고 있었고, 이 변경으로 초록불이 됐다.
+
+### Phase 4에서 정한 것
+
+- **`profile_image_url`은 저장 전 `https`로 정규화한다.** 카카오가 `http`로 내려주는데 그대로 두면 iOS ATS·Android cleartext에 막힌다. 정규화 지점을 OAuth 클라이언트에 둔 것은 provider별 차이를 그 계층에서 흡수하기 위해서다
+- **`refresh_tokens.expires_at`은 JWT의 `exp`를 그대로 읽어 채운다.** 저장 쪽에서 TTL을 다시 계산하면 두 값이 어긋날 수 있다
+- ⚠️ **`business/auth` → `data/user` ArchUnit 예외는 임시다.** 자동가입이 `users` 행을 만들어 생긴 참조이고, `data.common`·`timeline`·`framework` 세 예외와 달리 **"설계상 옳다"고 확정된 것이 아니다.** 계획서 「미결 질문」에 개선 방향 논의 건으로 등록했다
+
+### 완료 기준 ①은 아직 못 채웠다
+
+"로그인 왕복 성공"은 **유효한 인가코드가 필요하고 그건 사람이 브라우저로 로그인해야** 나온다. 자동화 대상이 아니라 수동 확인 항목으로 남겼다. 코드 경로는 전부 배선됐고 카카오까지 실제 요청이 나가는 것까지 확인했으므로 Phase 4를 완료로 표시했지만, **자동가입이 실제로 행을 만드는 것은 아직 아무도 보지 않았다.**
 
 ## 2026-07-29
 
@@ -224,6 +272,32 @@ REQ-07 상태를 ⏸ → 🟡로 올렸다. **auth는 이제 "착수 전"이 아
 ### PLAN-REQ-14 Phase 4가 닫혔다
 
 어제 "완료 기준 미정"으로 보류했던 기동 확인이 여기서 해소됐다. 신구조(`business`/`data`/`framework`)에서 컴포넌트 스캔·빈 등록·시큐리티 필터 체인이 모두 정상 동작한다.
+
+### Notion 역반영 3건 — 하나는 반영할 것이 없었다
+
+계획서·문서에 흩어져 있던 역반영 대기 건을 처리했다.
+
+| 건 | 결과 |
+| --- | --- |
+| 테이블 정의서 개요 `PostgreSQL 15+` | → `PostgreSQL 17`(운영 17.6 / 로컬 17.10) |
+| 「소스 구조」 §7 RestClient → RestTemplate | **이미 RestTemplate 기준이었다.** 페이지 전체에 `RestClient` 표기가 없다 — PLAN-REQ-07 「결정」 표의 기술이 낡아 있었던 것이고, 그 칸을 정정했다 |
+| 테이블 정의서 `refresh_tokens` | §10 신설(V2 DDL 확정 후) |
+
+덤으로 「소스 구조」의 실제 drift도 정리했다 — §13 ArchUnit "아직 컴파일해 보지 않았다" → 도입 완료 + 괄호 캡처 함정, §12 프로파일 3분리 + `db.schema` 배선, 「구현 노트」에 2026-07-29 절 신설.
+
+> **함정 — `old_str`과 `new_str`이 같은 no-op 프로브는 무용하다.** CLAUDE.md에 "다른 문자열로 프로브를 걸라"고 적혀 있는데 같은 문자열로 걸었더니 **매칭이 없는데도 성공을 반환**했다. 즉 이 방식으로는 반영 여부를 전혀 알 수 없다. 옛 문자열을 **다른 값으로** 걸어 `No matches found`를 받는 방식만 실제 증거가 된다.
+
+### 엔티티 배치로 ArchUnit 예외를 0건으로 막았다 (Phase 3)
+
+`V2__refresh_tokens.sql` + `User`/`UserSocialAccount`/`RefreshToken`.
+
+`auth`가 `users`를 건드리는 구조라 배치를 잘못하면 도메인 간 참조 금지에 걸린다. **`UserSocialAccount`는 쓰는 쪽이 auth지만 `data/user`에 뒀다** — `User`를 `@ManyToOne`으로 참조하므로 `data/auth`에 두면 그 자체가 위반이다. `RefreshToken.user_id`는 **연관관계 없이 생 `UUID` 컬럼**으로 매핑했다. 토큰 행에서 User로 탐색할 일이 없어 잃는 것이 없고, DB의 FK 제약은 그대로 있다.
+
+**`validate`가 실제로 무는지 프로브로 확인했다.** 계획서가 Phase 1·2에서 두 번 "`@Entity`가 0개라 아무것도 검증하지 않는다"고 적어 둔 항목이라 통과만 보고 넘기지 않았다. 없는 컬럼을 심으니 `Schema-validation: missing column ... in table [users]`로 기동이 막혔다.
+
+**Phase 2의 미검증 항목도 여기서 닫혔다** — Hibernate가 Flyway와 같은 스키마(`petkok_local`)를 본다. 달랐다면 `missing column`이 아니라 `missing table`로 떨어졌을 것이다.
+
+> **적용이 끝난 마이그레이션은 주석 한 글자도 못 고친다.** Flyway가 체크섬을 대조하므로(`validateOnMigrate` 기본 `true`) `V1__init.sql`을 수정하면 이미 V1을 적용한 DB에서 기동이 막힌다. '다음 단계'에 등재된 `condition_tag` 주석 4→7종 정정이 정확히 여기 걸린다 — **"주석이니까 안전하다"고 판단하면 안 된다.** 선택지를 db-schema.md에 적어 뒀다.
 
 ## 2026-07-28
 

@@ -142,17 +142,17 @@ Phase 1~2와 3~6은 PR을 나눈다.
 
 | ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
 |----|------|--------|:----:|------|:----:|:----:|
-| REQ-07-01 | `SecurityConfig.PUBLIC_PATHS` | 정확히 3경로만 허용 | 불변식 | api-list § 공개 경로 — "와일드카드 `/api/v1/auth/**`를 쓰지 않고 **개별 경로로 나열한다**" | 5 | — |
-| REQ-07-02 | `SecurityConfig.PUBLIC_PATHS` | `/auth/logout`이 어떤 공개 경로에도 매칭되지 않는다 | 예외 | 제약·함정 — "`/api/v1/auth/**`로 두면 `DELETE /auth/logout`이 무인증 노출된다" | 5 | — |
-| REQ-07-03 | `SecurityConfig.PUBLIC_PATHS` | 와일드카드 문자 미사용 | 불변식 | 제약·함정 — "Phase 5에서 반드시 개별 경로로 좁힐 것" | 5 | — |
-| REQ-07-04 | `JwtTokenProvider.isAccessToken` | refresh 토큰 → `false` | 회귀 | 제약·함정 — "이 검사를 제거하면 refresh 토큰으로 API 호출이 뚫린다" | 6 | — |
-| REQ-07-05 | `JwtTokenProvider.isAccessToken` | access 토큰 → `true` | 정상 | 제약·함정 — "`isAccessToken()`으로 refresh 토큰의 인증 사용을 막고 있다" | 6 | — |
-| REQ-07-06 | `JwtTokenProvider.validate` | 만료 토큰 → `false` | 경계 | Phase 6 완료 기준 — "토큰 만료·로테이션·재사용 감지 테스트 통과" | 6 | — |
-| REQ-07-07 | `SHA256Util.encrypt` | hex 64자 고정 | 경계 | api-list § refresh 토큰 저장소 — "SHA256Util 해시 (hex 64자 고정)" | 5 | — |
-| REQ-07-08 | `RefreshToken.tokenHash` | 컬럼 길이 64 | 회귀 | 제약·함정 — "`refresh_tokens.token_hash`는 `varchar(64)`면 충분하다" | 3 | — |
-| REQ-07-09 | `MaskingUtil.maskingCredentialsInBody` | 토큰 응답 본문의 access/refresh 원문 미노출 | 예외 | Phase 4 완료 기준 — "로그에 토큰 원문이 남지 않는다" | 4 | — |
-| REQ-07-10 | 〃 | 토큰 교환 form 본문의 `client_secret`·`client_id`·`code` 마스킹 | 예외 | 〃 + 2026-07-29 실측(아래) | 4 | — |
-| REQ-07-11 | 〃 | 카카오 오류 응답의 진단 정보는 보존 | 경계 | 제약·함정 — "토큰이 발급됐다면 키 3개는 정상"(IP 오진 방지) | 4 | — |
+| REQ-07-01 | `SecurityConfig.PUBLIC_PATHS` | 정확히 3경로만 허용 | 불변식 | api-list § 공개 경로 — "와일드카드 `/api/v1/auth/**`를 쓰지 않고 **개별 경로로 나열한다**" | 5 | ✅ |
+| REQ-07-02 | `SecurityConfig.PUBLIC_PATHS` | `/auth/logout`이 어떤 공개 경로에도 매칭되지 않는다 | 예외 | 제약·함정 — "`/api/v1/auth/**`로 두면 `DELETE /auth/logout`이 무인증 노출된다" | 5 | ✅ |
+| REQ-07-03 | `SecurityConfig.PUBLIC_PATHS` | 와일드카드 문자 미사용 | 불변식 | 제약·함정 — "Phase 5에서 반드시 개별 경로로 좁힐 것" | 5 | ✅ |
+| REQ-07-04 | `JwtTokenProvider.isAccessToken` | refresh 토큰 → `false` | 회귀 | 제약·함정 — "이 검사를 제거하면 refresh 토큰으로 API 호출이 뚫린다" | 6 | ✅ |
+| REQ-07-05 | `JwtTokenProvider.isAccessToken` | access 토큰 → `true` | 정상 | 제약·함정 — "`isAccessToken()`으로 refresh 토큰의 인증 사용을 막고 있다" | 6 | ✅ |
+| REQ-07-06 | `JwtTokenProvider.validate` | 만료 토큰 → `false` | 경계 | Phase 6 완료 기준 — "토큰 만료·로테이션·재사용 감지 테스트 통과" | 6 | ✅ |
+| REQ-07-07 | `SHA256Util.encrypt` | hex 64자 고정 | 경계 | api-list § refresh 토큰 저장소 — "SHA256Util 해시 (hex 64자 고정)" | 5 | ✅ |
+| REQ-07-08 | `RefreshToken.tokenHash` | 컬럼 길이 64 | 회귀 | 제약·함정 — "`refresh_tokens.token_hash`는 `varchar(64)`면 충분하다" | 3 | ✅ |
+| REQ-07-09 | `MaskingUtil.maskingCredentialsInBody` | 토큰 응답 본문의 access/refresh 원문 미노출 | 예외 | Phase 4 완료 기준 — "로그에 토큰 원문이 남지 않는다" | 4 | ✅ |
+| REQ-07-10 | 〃 | 토큰 교환 form 본문의 `client_secret`·`client_id`·`code` 마스킹 | 예외 | 〃 + 2026-07-29 실측(아래) | 4 | ✅ |
+| REQ-07-11 | 〃 | 카카오 오류 응답의 진단 정보는 보존 | 경계 | 제약·함정 — "토큰이 발급됐다면 키 3개는 정상"(IP 오진 방지) | 4 | ✅ |
 
 ~~**REQ-07-01·02·03은 Phase 5까지 실패한다.**~~ → **2026-07-29 해소.** Phase 4가 `/auth/kakao`·`/auth/refresh`를
 실제로 만드는 시점이라 그때 `PUBLIC_PATHS`를 개별 3경로로 좁혔다. 상수 한 줄이고, AGENTS §5·Notion §5·§7이 이미 개별 나열을
