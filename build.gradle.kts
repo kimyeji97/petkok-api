@@ -63,6 +63,9 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
+
+    // 구조 강제 — business/data/framework 3분할과 레이어 방향을 테스트로 고정 (AGENTS.md §3·§6)
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
 }
 
 // ─── Spotless (google-java-format) ──────────────────────────

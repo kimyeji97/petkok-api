@@ -48,9 +48,9 @@
 - [x] **현재 브랜치(`docs/progress-and-mysql-plan`) 처리 순서** — 구조 확정(`AGENTS.md` §3 + `CLAUDE.md` 함정)을 현재 브랜치에 커밋해 PR #8에 포함시키고, 머지 후 `main`에서 분기하기로 확정(2026-07-28). 이렇게 해야 이행 PR의 diff가 순수 이동만 담는다
 - [x] **빈 패키지를 미리 만들 것인가** — 만들지 않기로 확정. 넣을 클래스가 없고 git이 빈 디렉터리를 추적하지 못한다. 설계는 Notion §2에 남긴다
 - [x] **이행 검증 범위 — `bootRun`까지 할 것인가** — 생략하기로 확정. 컴포넌트 스캔이 `@SpringBootApplication` + `@ConfigurationPropertiesScan("com.petkok")` 기준이라 하위 패키지 재배치의 영향을 받지 않고, 순수 이동이라 기동 리스크가 낮다고 판단. **다만 빈 등록이 실제로 뜨는지는 여전히 확인되지 않았다** — REQ-07에서 로컬 Postgres를 세울 때 함께 확인할 것
-- [ ] **ArchUnit §13 규칙이 실제로 동작하는지 미검증.** 특히 Slices 패턴 `com.petkok.*.(*)..`이 `business`/`data`를 건너뛰고 도메인명만 슬라이스 키로 잡는지 확인 안 됐다. `timeline` 예외 처리 방식도 스케치 수준
-- [ ] `data/timeline`을 만들 것인가. timeline은 자체 테이블이 없어 `business/timeline`만 두기로 했으나, DTO가 필요하면 `data/timeline/dto`가 생긴다 — 조건부로만 합의됨
-- [ ] `ApiUri`(엔드포인트 경로 상수 클래스) 도입 여부. `framework/constant`에 "둘 경우 여기"까지만 정했고 도입 자체는 미정
+- [x] **ArchUnit §13 규칙 검증 완료 (2026-07-29).** `src/test` 신설 + `archunit-junit5:1.4.2` 도입, 규칙 8개가 실제로 실행된다. **검증 과정에서 스케치의 함정이 드러났다** — 구현 시 패턴을 `com.petkok.(business|data).(*)..`로 바꿨더니 트리 이름까지 슬라이스 키에 포함돼 `business/feeding`과 `data/feeding`이 다른 슬라이스가 됐고 **같은 도메인 참조까지 위반으로 잡혔다.** 일부러 위반을 심는 프로브 테스트로 발견했다. 올바른 패턴은 `com.petkok.*.(*)..`(첫 세그먼트 캡처 안 함)이며, 이때는 `framework.config`가 "config" 슬라이스로 섞이므로 `@AnalyzeClasses` 범위를 `business`·`data`로 좁힌 **별도 테스트 클래스**가 필요하다
+- [x] **`data/timeline`을 만들 것인가** — 만들지 않는다. `business/timeline`만 두고, DTO가 실제로 필요해지는 시점(REQ-12)에 `data/timeline/dto`를 추가한다. 지금 만들면 빈 패키지가 되고 git이 추적하지 못한다
+- [x] **`ApiUri` 도입 여부** — 지금은 도입하지 않는다. 컨트롤러가 0개라 상수화할 경로가 없고, 근거 없이 만들면 실제 사용처와 어긋난 채 굳는다. auth 컨트롤러가 생기는 REQ-07에서 "경로 문자열이 2곳 이상에서 반복되는가"를 보고 판단한다. 자리는 `framework/constant`로 이미 정해져 있다
 
 ## 작업 단계
 
@@ -68,7 +68,7 @@
 - [x] **Phase 3** — CI 게이트 재현
       완료 기준 충족: spotlessApply / build -x test / checkstyleMain -PciStrict / spotlessCheck 전부 통과, Checkstyle 경고 0건
 
-- [ ] ~~**Phase 4** — 기동 확인~~ — **생략(보류)**. 완료 기준을 정하지 못했고(미결 3번), 컴포넌트 스캔이 패키지 재배치의 영향을 받지 않아 리스크가 낮다고 판단했다. **빈 등록이 실제로 뜨는지는 확인되지 않은 채로 남아 있다** — REQ-07에서 로컬 Postgres를 세울 때 확인한다
+- [x] **Phase 4** — 기동 확인 — **2026-07-29 해소.** 이행 시점에는 완료 기준을 정하지 못해 보류했으나(미결 3번), 로컬 DB(PostgreSQL 17.10) 구축과 함께 실제로 확인했다. Flyway `V1__init.sql` 적용 → 테이블 9개 + `flyway_schema_history`, `Started PetKokApplication`, `GET /actuator/health` 200, `GET /api/v1/users/me` 401. 신구조에서 컴포넌트 스캔·빈 등록·시큐리티 필터 체인이 모두 정상 동작한다
 
 - [x] **Phase 5** — PR 생성 + CI 통과
       완료 기준 충족: PR #10, CI `pass`(42s, `86a1cfd` 기준), diff 전량 rename + import 4줄임을 기계적으로 확인

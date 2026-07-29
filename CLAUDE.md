@@ -7,8 +7,11 @@
 ## 로컬 검증 (AGENTS.md §6 보완)
 - lefthook 훅이 설치되어 있다면(`.git/hooks/pre-commit` 존재) 커밋 시 `spotlessApply`가 자동 적용되고 Checkstyle 경고가 출력된다. 새 클론·새 워크트리에서는 `lefthook install`을 먼저 실행할 것 — 미설치 상태면 아무 검증도 걸리지 않아 CI `spotlessCheck`에서 터진다
 - 커밋 전 CI 게이트 재현: `./gradlew spotlessApply && ./gradlew build -x test && ./gradlew checkstyleMain -PciStrict`
-- ⚠️ **게이트를 `| tail`·`| head` 같은 파이프에 물리지 말 것.** 파이프라인 종료코드가 마지막 명령의 것이 되어 gradle 실패가 가려진다. 실측: `./gradlew build -q 2>&1 | tail -15 && echo OK` → **컴파일 에러 5건인데 `OK`가 출력됐다.** 출력을 줄이려면 파이프 대신 `-q`만 쓰고 `set -e`로 각각 실행한다
-- **`src/test`가 아직 없다.** `./gradlew test`는 통과해도 검증된 것이 없다 — "테스트 통과"로 보고하지 말 것. 현재 실질 게이트는 컴파일 + Spotless + Checkstyle뿐
+- ⚠️ **게이트를 `| tail`·`| head`·`| grep` 같은 파이프에 물리지 말 것.** 파이프라인 종료코드가 마지막 명령의 것이 되어 앞쪽 실패가 통째로 가려진다. 출력을 줄이려면 파이프 대신 `-q`만 쓰고 `set -e`로 각각 실행한다. 실측 2건 —
+	- `./gradlew build -q 2>&1 | tail -15 && echo OK` → **컴파일 에러 5건인데 `OK`가 출력됐다**
+	- `timeout 180 ./gradlew bootRun | grep ...` → **macOS에 `timeout`이 없어**(coreutils의 `gtimeout`) 즉시 죽었는데 종료코드 0으로 보였다. 시간 제한이 필요하면 백그라운드 실행 + 로그 파일 확인으로 대체한다
+- **`src/test`에는 ArchUnit 구조 규칙 8개뿐이다** (`src/test/java/com/petkok/architecture/`). 도메인 로직 테스트는 아직 하나도 없다 — `./gradlew test` 통과를 "기능이 검증됐다"로 보고하지 말 것. 구조 규칙 대부분은 도메인 코드가 없어 **빈 집합을 대상으로 통과**한다(`allowEmptyShould(true)`)
+- ⚠️ **구조 규칙을 고치면 일부러 위반을 심어 잡히는지 확인할 것.** 규칙이 조용히 공허해지는 일이 실제로 있었다 — 슬라이스 패턴에 괄호를 잘못 쳐(`(business|data)`) 트리 이름이 슬라이스 키에 섞이는 바람에 같은 도메인 참조까지 위반으로 잡혔다. 통과/실패만 봐서는 알 수 없다
 - `docs/specs/`의 두 문서 — [`api-list.md`](docs/specs/api-list.md)(Notion API I/F 파생), [`db-schema.md`](docs/specs/db-schema.md)(Notion 테이블 정의서 파생) — 는 **둘 다 파생 요약이다.** 원본이 아니다. `docs/adr/`는 비어 있고 **ADR-001·ADR-002의 원본은 Notion에 있다.** 설계 판단 전에 AGENTS.md §0(출처 우선순위)을 먼저 볼 것
 
 ## Notion 편집 함정 (AGENTS.md §0 보완)
