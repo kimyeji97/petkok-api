@@ -16,37 +16,72 @@
 
 ## 요구사항
 - JDK 21
-- PostgreSQL 15+ (Supabase 무료 티어 가능)
+- **PostgreSQL 17** — 운영(Supabase)이 17.x 이므로 로컬도 메이저를 맞춥니다.
+  마이너까지 같을 필요는 없지만 **메이저가 다르면 로컬에서만 통과하는 마이그레이션이 나올 수 있습니다.**
 
 ## 실행
 > `gradle-wrapper.jar`(8.10.2) 는 저장소에 포함되어 있습니다. 별도 준비 없이 `./gradlew` 를 바로 쓰세요.
 
-### 1) 환경변수
-로컬은 `application-local.yml` 에 기본값이 있어 DB만 있으면 바로 뜹니다.
-필수(운영): `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`(32바이트+),
-그리고 gallery 사용 시 `R2_*`.
+### 1) 로컬 DB 준비
+```sql
+-- 슈퍼유저로 1회
+CREATE ROLE root LOGIN PASSWORD '<로컬용 비밀번호>';
+CREATE DATABASE petkok OWNER root;
+```
+`public` 스키마 소유자는 `pg_database_owner` 이므로 **DB 소유권만 넘기면** Flyway 가 테이블을 만들 `CREATE` 권한을 자동으로 갖습니다.
 
-### 2) 기동
+> ⚠️ **포트를 확인하세요.** Postgres.app 처럼 여러 메이저 버전을 병행 설치하면 버전마다 포트가 달라집니다(예: 17 → `5433`). 포트를 잘못 짚으면 **다른 버전의 빈 DB 에 조용히 붙어** "테이블이 없다" 로 오인하기 쉽습니다.
+> ```sql
+> SHOW port; SELECT version();
+> ```
+
+인증을 `trust` 로 두면 비밀번호가 검증되지 않습니다. 운영과 같은 방식으로 맞추려면 `pg_hba.conf` 의 **`host` 라인**을 `scram-sha-256` 으로 바꾸고 `SELECT pg_reload_conf();` 하세요. `local`(유닉스 소켓) 라인까지 바꾸면 비밀번호 없는 관리자 롤이 잠기니 주의합니다.
+
+### 2) 환경변수
+`cp .env.example .env` 후 값을 채웁니다. `.env` 는 `.gitignore` 로 제외됩니다 — **이 저장소는 public 이므로 실제 값은 절대 커밋하지 마세요.**
+
+로컬은 `application-local.yml` 에 기본값이 있어 DB만 있으면 뜹니다(기본 `localhost:5432`).
+필수(운영): `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`(32바이트+), 그리고 gallery 사용 시 `R2_*`.
+
+> Spring 이 `.env` 를 자동으로 읽지는 않습니다. 셸에서 주입하거나 IDE Run Configuration 에 지정하세요.
+> ```bash
+> set -a && . ./.env && set +a && ./gradlew bootRun
+> ```
+
+### 3) 기동
 ```bash
 ./gradlew bootRun            # 기본 프로파일 local
 # 또는 프로파일 지정
 SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
 ```
 기동 시 Flyway 가 `V1__init.sql` 로 9개 테이블을 생성합니다.
+확인: `curl localhost:8080/actuator/health` → `{"status":"UP"}`
 
 ## 패키지 구조
+`business` / `data` / `framework` 3분할. 각 트리 안은 **도메인 단위**로 묶습니다(2026-07-28 확정, 상세는 [AGENTS.md §3](AGENTS.md)).
+
 ```
 com.petkok
-├── global/
-│   ├── config/       SecurityConfig, JpaAuditingConfig, JacksonConfig, WebConfig, R2Config
-│   ├── common/
-│   │   ├── entity/   BaseCreatedEntity → BaseTimeEntity → BaseSoftDeleteEntity
-│   │   ├── response/ ApiResponse{data,error}, ErrorResponse
-│   │   └── pagination/ CursorRequest, CursorPage, CursorCodec
-│   ├── security/     AuthPrincipal, @CurrentUser, jwt/(TokenProvider, AuthFilter, Properties)
-│   └── exception/    ErrorCode, BusinessException, GlobalExceptionHandler
-└── domain/           (다음 단계: auth → user → pet → diary/feeding/activity/weight/shed/gallery/timeline)
+├── business/                   도메인별 진입 + 비즈니스 로직
+│   └── {도메인}/               controller/ · service/(+ *Calculator)
+├── data/                       영속 객체 + 전송 객체
+│   ├── common/entity/          BaseCreatedEntity → BaseTimeEntity → BaseSoftDeleteEntity
+│   └── {도메인}/               entity/ · repository/ · dto/ · enums/
+└── framework/                  도메인 무관 횡단 관심사
+    ├── config/                 Security, JpaAuditing, Jackson, Web, R2(+Properties), RestTemplate
+    ├── processor/              filter/ · handler/ · interceptor/ · aspect/ · converter/
+    ├── security/               AuthPrincipal, @CurrentUser, jwt/
+    ├── response/               ApiResponse{data,error}, ErrorResponse
+    ├── pagination/             CursorRequest, CursorPage, CursorCodec
+    ├── exception/              ErrorCode, BusinessException
+    ├── constant/               전역 상수 · ApiUri
+    └── util/                   spring-java-utility 이식 30개
 ```
+
+도메인 10개: auth · user · pet · diary · feeding · activity · weight · shed · gallery · timeline
+(현재는 뼈대만 있어 `business/`·`data/{도메인}` 은 아직 비어 있고 `data/common/entity` 만 존재합니다.)
+
+> **`business/{도메인}` 과 `data/{도메인}` 은 반드시 같은 이름을 씁니다.** ArchUnit Slices 가 이 이름을 슬라이스 키로 삼아 도메인 간 참조를 막습니다 — 이름이 어긋나면 규칙이 **에러 없이 조용히 무력화**됩니다.
 
 ## 핵심 컨벤션
 - **레이어**: Controller → Service → Repository → Entity/DTO (단방향). Entity 는 Service 밖으로 안 나감.

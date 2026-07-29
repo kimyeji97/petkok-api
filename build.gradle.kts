@@ -10,6 +10,10 @@ plugins {
 group = "com.petkok"
 version = "0.0.1-SNAPSHOT"
 
+// Spring Boot 3.3.5 BOM 이 고정하는 Flyway 10.10.0 은 PostgreSQL 16 까지만 검증돼 있어
+// 로컬·운영(Supabase PostgreSQL 17) 에서 "upgrade recommended" 경고를 낸다. 상향 고정.
+extra["flyway.version"] = "10.22.0"
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
