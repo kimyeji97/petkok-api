@@ -18,7 +18,16 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
 
-  private static final String[] PUBLIC_PATHS = {"/api/v1/auth/**", "/actuator/health"};
+  /**
+   * access 토큰 없이 호출되는 엔드포인트만 <b>개별 경로로</b> 나열한다.
+   *
+   * <p>⚠️ <b>{@code /api/v1/auth/**} 같은 와일드카드를 쓰지 않는다.</b> {@code /auth/} 아래에도 인증이 필요한 엔드포인트가 있다 —
+   * {@code DELETE /auth/logout} 은 Request Body 가 없어 <b>access 토큰이 유일한 사용자 식별 수단</b>이라 무인증으로 열리면 안
+   * 된다. (AGENTS.md §5 · REQ-07-01~03)
+   */
+  private static final String[] PUBLIC_PATHS = {
+    "/api/v1/auth/kakao", "/api/v1/auth/refresh", "/actuator/health"
+  };
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
   private final ObjectMapper objectMapper;
