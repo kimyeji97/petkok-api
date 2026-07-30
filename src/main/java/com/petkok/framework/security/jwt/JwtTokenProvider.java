@@ -34,23 +34,35 @@ public class JwtTokenProvider {
   }
 
   public String createAccessToken(UUID userId) {
-    return create(userId, TokenType.ACCESS, accessValidityMs);
+    return create(userId, TokenType.ACCESS, accessValidityMs, null);
   }
 
+  /**
+   * refresh 토큰을 발급한다. <b>매번 다른 문자열임이 보장된다</b> — {@code jti} 에 랜덤 UUID 가 들어가기 때문이다.
+   *
+   * <p>⚠️ <b>{@code jti} 가 없으면 로테이션이 깨진다.</b> {@code iat}/{@code exp} 는 초 단위라 같은 초에 재발급하면 subject ·
+   * type 이 같아 <b>이전 토큰과 완전히 같은 문자열</b>이 나온다. 그러면 새 토큰의 해시가 방금 revoke 한 행과 겹쳐 {@code
+   * uq_refresh_tokens_token_hash} 를 위반하거나, 발급 즉시 revoke 된 토큰을 클라이언트에 주게 된다 (검증 계약 REQ-07-13).
+   *
+   * <p>access 토큰에는 넣지 않았다 — 저장·조회 대상이 아니라 충돌이 문제가 되지 않는다.
+   */
   public String createRefreshToken(UUID userId) {
-    return create(userId, TokenType.REFRESH, refreshValidityMs);
+    return create(userId, TokenType.REFRESH, refreshValidityMs, UUID.randomUUID().toString());
   }
 
-  private String create(UUID userId, TokenType type, long validityMs) {
+  private String create(UUID userId, TokenType type, long validityMs, String jwtId) {
     Date now = new Date();
     Date expiry = new Date(now.getTime() + validityMs);
-    return Jwts.builder()
-        .subject(userId.toString())
-        .claim(CLAIM_TYPE, type.name())
-        .issuedAt(now)
-        .expiration(expiry)
-        .signWith(key)
-        .compact();
+    var builder =
+        Jwts.builder()
+            .subject(userId.toString())
+            .claim(CLAIM_TYPE, type.name())
+            .issuedAt(now)
+            .expiration(expiry);
+    if (jwtId != null) {
+      builder.id(jwtId);
+    }
+    return builder.signWith(key).compact();
   }
 
   public UUID getUserId(String token) {
