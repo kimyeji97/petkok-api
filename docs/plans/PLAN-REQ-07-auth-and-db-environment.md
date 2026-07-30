@@ -1,6 +1,6 @@
 # PLAN-REQ-07 · auth 도메인 + DB 환경 구성
 
-> 출처: 2026-07-27 · 2026-07-29 세션 · 작성: 2026-07-27 · 최종 갱신: 2026-07-30 · 상태: 🟡 진행 (Phase 1~4 완료, Phase 5 검증 계약 작성)
+> 출처: 2026-07-27 · 2026-07-29 세션 · 작성: 2026-07-27 · 최종 갱신: 2026-07-30 · 상태: 🟡 진행 (Phase 1~6 완료 — **카카오 로그인 왕복 수동 확인만 남음**)
 
 ## 배경
 
@@ -63,7 +63,8 @@
 - [x] **로컬 PostgreSQL 접속 정보** — **Postgres.app으로 확정(2026-07-29).** `localhost:5433` / DB `petkok` / 롤 `root`(비슈퍼유저, DB 소유자). Docker는 쓰지 않는다. `public` 스키마 소유자가 `pg_database_owner`라 **DB 소유권만 넘기면** Flyway의 `CREATE` 권한이 따라온다
 - [x] **PostgreSQL 버전** — **17로 확정.** 로컬 17.10, 운영 Supabase 17.6. `gen_random_uuid()`는 13+ 코어 제공이라 `pgcrypto` 불필요하고 `V1__init.sql`에도 `CREATE EXTENSION`이 없다. **Supabase는 18을 아직 지원하지 않는다**(2026-01 목표를 넘겼고 "eventually in 2026") — 로컬을 18로 두면 운영보다 앞서므로 선택지가 아니었다
 - [x] **스키마 이름과 적용 범위** — **`petkok_local` / `petkok_dev` / `petkok_prod` 확정(2026-07-29).** 로컬까지 이름 있는 스키마를 쓴다. 기존 로컬 `public` 테이블은 버린다(행 0건이라 잃을 게 없다)
-- [ ] **동시 refresh 요청 처리.** 앱 재시작·병렬 요청으로 같은 refresh가 거의 동시에 두 번 오면, 정상 사용자인데도 재사용 감지에 걸려 전 기기 로그아웃된다. 짧은 유예 윈도우를 둘지 감수할지 정해지지 않았다 *(Phase 5에서 결정해도 늦지 않다)*
+- [ ] **동시 refresh 요청 처리.** 앱 재시작·병렬 요청으로 같은 refresh가 거의 동시에 두 번 오면, 정상 사용자인데도 재사용 감지에 걸려 전 기기 로그아웃된다. 짧은 유예 윈도우를 둘지 감수할지 정해지지 않았다 ~~*(Phase 5에서 결정해도 늦지 않다)*~~
+      → **Phase 5가 끝났는데도 미결이다 (2026-07-30).** 판단 근거가 될 실사용 데이터가 없어 미뤘다 — 유예 윈도우는 "탈취 감지를 얼마나 늦출 것인가"와 맞바꾸는 값이라 추측으로 정하면 보안 쪽이 조용히 깎인다. **현재 구현은 유예 없음**이고, 클라이언트가 재발급 응답의 새 토큰으로 교체하지 못하면 즉시 전 기기 로그아웃이다. 실제 로그인 트래픽이 생긴 뒤 재사용 감지 로그(`Revoked refresh token reused`) 빈도를 보고 정한다
 - [x] **Kakao 앱 등록 여부** — **등록·왕복 검증 완료(2026-07-29).** 설정 골격(`kakao.client-id`/`client-secret`/`redirect-uri`)을 선배치하고 `.env`에 실값을 채운 뒤, **인가코드 → 토큰 교환 → `/v2/user/me` 왕복을 실제로 성공**시켰다. Client Secret은 콘솔에서 "사용함" 상태이고 그대로 동작한다. Phase 4 착수 조건이 풀렸다
       *(검증 스크립트는 `.env`를 읽어 실키를 다루므로 레포에 두지 않았다 — 필요하면 재작성한다)*
 - [x] **응답 본문 마스킹 범위** — **키 단위 마스킹으로 확정 (2026-07-29).** 전체 본문을 끄는 안은 기각했다: 카카오 오류 응답(`invalid_grant`/`KOE320`/`ip mismatched!`)이 진단의 거의 전부인데 그걸 같이 잃는다. URL별 예외도 기각 — 대상이 늘 때마다 빠뜨린다. `MaskingUtil.maskingCredentialsInBody`가 **키 이름으로** 판단하며 JSON·form 양쪽을 처리한다(REQ-07-09~11).
@@ -124,7 +125,7 @@
       ② **`SecurityConfig.PUBLIC_PATHS` 와일드카드 제거** — 원래 Phase 5 항목인데 이 Phase가 해당 엔드포인트를 만드는 시점이라 함께 처리했다(위 「검증 계약」)
       **결정** — `profile_image_url`은 **저장 전 `https`로 정규화**한다(`KakaoOAuthClient.toHttps`). 클라이언트가 그대로 쓰면 iOS ATS·Android cleartext에 막히고, 같은 경로가 `https`로 200인 것은 2026-07-29에 확인했다. 정규화 지점을 클라이언트로 둔 이유는 provider별 차이를 그 계층에서 흡수하기 위해서다.
 
-- [ ] **Phase 5 — 로테이션 / 로그아웃** ← **다음 작업**
+- [x] **Phase 5 — 로테이션 / 로그아웃** — **완료 (2026-07-30)**
       `POST /auth/refresh`(로테이션) · `DELETE /auth/logout`.
       Phase 4에서 깔린 것 — `RefreshTokenRepository.findByTokenHash`(revoke된 행도 반환해야 재사용 감지가 성립한다) · `revokeAllByUserId` · `RefreshToken.revoke()`(이미 revoke면 최초 시각 유지). **호출부만 없다.**
       `PUBLIC_PATHS`에 `/auth/refresh`는 이미 들어가 있고 `/auth/logout`은 **의도적으로 빠져 있다** — Request Body가 없어 access 토큰이 유일한 식별 수단이다.
@@ -141,18 +142,20 @@
       ⚠️ **②는 처음에 실패했다 — 401 은 정상인데 다른 토큰이 살아 있었다.** `@Transactional` 기본 설정에서 예외가 `revokeAllByUserId` 를 **함께 롤백**했기 때문이다. **응답만 보면 완전히 정상으로 보이고, 저장소를 목으로 대체하는 단위 테스트로는 원리적으로 잡히지 않는다**(목은 롤백되지 않는다). `noRollbackFor = BusinessException.class` 로 고쳤고 REQ-07-23 이 애노테이션을 고정한다.
       *(검증 데이터는 확인 후 삭제했다 — `users` 0행)*
 
-- [ ] **Phase 6 — 검증 체계** *(선행 절반은 2026-07-29에 이미 끝났다)*
+- [x] **Phase 6 — 검증 체계** — **완료 (2026-07-30). 단, 별도 단계로 수행하지 않았다** *(선행 절반은 2026-07-29)*
+      ⚠️ **계획-실제 이탈.** 남아 있던 "auth 로직 테스트"는 `/testgen` 이 REQ-07-12~23 을 **Phase 5 착수 전에** 작성하면서 처리됐다. 완료 기준("토큰 만료·로테이션·재사용 감지 테스트 통과 + CI green")은 그대로 충족한다 — 만료 REQ-07-06·21, 로테이션 12~15, 재사용 감지 16·17, CI green. **단계를 쪼갠 전제(구현 후 테스트)가 `/testgen` 도입으로 뒤집힌 것**이지 건너뛴 것이 아니다.
       ~~`src/test` 신설, ArchUnit 활성화~~ → **REQ-14에서 완료.** `src/test/java/com/petkok/architecture/`에 구조 규칙 8개가 CI 게이트로 동작한다. 따라서 이 Phase에 남은 것은 **auth 로직 테스트뿐**이다.
       Testcontainers는 쓰지 않는다 — 순수 로직은 단위테스트, 리포지토리·마이그레이션은 로컬 DB로 확인.
       완료 기준: 토큰 만료·로테이션·재사용 감지 테스트 통과 + CI green
       ※ **`business/auth`·`data/auth`가 생기는 순간 ArchUnit 규칙이 처음으로 실제 검사를 시작한다.** 두 패키지는 반드시 같은 이름이어야 한다(AGENTS §3)
 
-Phase 1~2와 3~6은 PR을 나눈다.
+~~Phase 1~2와 3~6은 PR을 나눈다.~~ → **실제로는 Phase 3·4·5를 각각 나눴다**(PR #18 · #19 · #20). Phase 마다 검증 가능한 단위가 나와 묶을 이유가 없었다.
 
 ## 검증 계약
 
-> 작성: 2026-07-29 · 보강: 2026-07-30 (REQ-07-12~20, Phase 5) · 근거: 이 계획서 + [api-list.md](../specs/api-list.md) · 검증: `/testrun REQ-07`
+> 작성: 2026-07-29 · 보강: 2026-07-30 (REQ-07-12~23, Phase 5) · 근거: 이 계획서 + [api-list.md](../specs/api-list.md) · 검증: `/testrun REQ-07`
 > `결과` 열은 `/checkpoint`가 채운다. 케이스 ID는 테스트명에 `[REQ-07-01]` 형태로 박혀 있다.
+> **결과 갱신: 2026-07-30 — 23건 전부 `✅`** (`./gradlew test` 전체 통과, CI green @ `efde1f5`).
 
 | ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
 |----|------|--------|:----:|------|:----:|:----:|
@@ -167,18 +170,18 @@ Phase 1~2와 3~6은 PR을 나눈다.
 | REQ-07-09 | `MaskingUtil.maskingCredentialsInBody` | 토큰 응답 본문의 access/refresh 원문 미노출 | 예외 | Phase 4 완료 기준 — "로그에 토큰 원문이 남지 않는다" | 4 | ✅ |
 | REQ-07-10 | 〃 | 토큰 교환 form 본문의 `client_secret`·`client_id`·`code` 마스킹 | 예외 | 〃 + 2026-07-29 실측(아래) | 4 | ✅ |
 | REQ-07-11 | 〃 | 카카오 오류 응답의 진단 정보는 보존 | 경계 | 제약·함정 — "토큰이 발급됐다면 키 3개는 정상"(IP 오진 방지) | 4 | ✅ |
-| REQ-07-12 | `AuthService.refresh` | 제시된 refresh 토큰이 즉시 revoke된다 | 정상 | Phase 5 완료 기준 — "refresh 재발급 시 이전 토큰이 즉시 무효" | 5 | — |
-| REQ-07-13 | 〃 | 응답의 refresh 토큰은 제시된 것과 다르다 | 정상 | api-list § 1. Auth — "`access_token` + **새 `refresh_token`** 을 함께 반환한다" | 5 | — |
-| REQ-07-14 | 〃 | 응답의 access 토큰은 access 타입이다 | 정상 | 〃 | 5 | — |
-| REQ-07-15 | 〃 | 새 refresh 토큰은 해시로 저장된다(원문 미저장) | 불변식 | api-list § refresh 토큰 저장소 — "토큰 원문은 저장하지 않는다" | 5 | — |
-| REQ-07-16 | 〃 | revoke된 토큰 재제시 → 해당 사용자 전체 revoke | 예외 | Phase 5 완료 기준 — "revoke된 토큰 재제시 시 해당 사용자 전체 revoke" | 5 | — |
-| REQ-07-17 | 〃 | revoke된 토큰 재제시 → `INVALID_TOKEN` | 예외 | api-list § refresh 토큰 저장소 — "`INVALID_TOKEN`(401)을 반환한다" | 5 | — |
-| REQ-07-18 | `AuthService.logout` | 해당 사용자의 유효 refresh 전체 revoke | 정상 | api-list § 1. Auth — "access 토큰으로 사용자를 식별해 refresh revoke" | 5 | — |
-| REQ-07-19 | `RefreshToken.revoke` | revoke 시 `revoked_at` 설정 | 정상 | api-list § refresh 토큰 저장소 — "`DELETE /auth/logout` → 해당 토큰 `revoked_at` 설정" | 5 | — |
-| REQ-07-20 | 〃 | 이미 revoke된 토큰 재revoke 시 최초 시각 유지 | 불변식 | Phase 5 — "`RefreshToken.revoke()`(이미 revoke면 최초 시각 유지)" | 5 | — |
-| REQ-07-21 | `AuthService.refresh` | 만료된 refresh 토큰 → `INVALID_TOKEN` | 경계 | Phase 5 결정 (2026-07-30, 아래 미결 해소) | 5 | — |
-| REQ-07-22 | 〃 | 저장소에 없는 refresh 토큰 → `INVALID_TOKEN` | 예외 | 〃 | 5 | — |
-| REQ-07-23 | 〃 | `BusinessException` 에 롤백하지 않는다(`noRollbackFor`) | 회귀 | 2026-07-30 실측 — 재사용 감지의 전체 revoke 가 예외와 함께 롤백됐다 | 5 | — |
+| REQ-07-12 | `AuthService.refresh` | 제시된 refresh 토큰이 즉시 revoke된다 | 정상 | Phase 5 완료 기준 — "refresh 재발급 시 이전 토큰이 즉시 무효" | 5 | ✅ |
+| REQ-07-13 | 〃 | 응답의 refresh 토큰은 제시된 것과 다르다 | 정상 | api-list § 1. Auth — "`access_token` + **새 `refresh_token`** 을 함께 반환한다" | 5 | ✅ |
+| REQ-07-14 | 〃 | 응답의 access 토큰은 access 타입이다 | 정상 | 〃 | 5 | ✅ |
+| REQ-07-15 | 〃 | 새 refresh 토큰은 해시로 저장된다(원문 미저장) | 불변식 | api-list § refresh 토큰 저장소 — "토큰 원문은 저장하지 않는다" | 5 | ✅ |
+| REQ-07-16 | 〃 | revoke된 토큰 재제시 → 해당 사용자 전체 revoke | 예외 | Phase 5 완료 기준 — "revoke된 토큰 재제시 시 해당 사용자 전체 revoke" | 5 | ✅ |
+| REQ-07-17 | 〃 | revoke된 토큰 재제시 → `INVALID_TOKEN` | 예외 | api-list § refresh 토큰 저장소 — "`INVALID_TOKEN`(401)을 반환한다" | 5 | ✅ |
+| REQ-07-18 | `AuthService.logout` | 해당 사용자의 유효 refresh 전체 revoke | 정상 | api-list § 1. Auth — "access 토큰으로 사용자를 식별해 refresh revoke" | 5 | ✅ |
+| REQ-07-19 | `RefreshToken.revoke` | revoke 시 `revoked_at` 설정 | 정상 | api-list § refresh 토큰 저장소 — "`DELETE /auth/logout` → 해당 토큰 `revoked_at` 설정" | 5 | ✅ |
+| REQ-07-20 | 〃 | 이미 revoke된 토큰 재revoke 시 최초 시각 유지 | 불변식 | Phase 5 — "`RefreshToken.revoke()`(이미 revoke면 최초 시각 유지)" | 5 | ✅ |
+| REQ-07-21 | `AuthService.refresh` | 만료된 refresh 토큰 → `INVALID_TOKEN` | 경계 | Phase 5 결정 (2026-07-30, 아래 미결 해소) | 5 | ✅ |
+| REQ-07-22 | 〃 | 저장소에 없는 refresh 토큰 → `INVALID_TOKEN` | 예외 | 〃 | 5 | ✅ |
+| REQ-07-23 | 〃 | `BusinessException` 에 롤백하지 않는다(`noRollbackFor`) | 회귀 | 2026-07-30 실측 — 재사용 감지의 전체 revoke 가 예외와 함께 롤백됐다 | 5 | ✅ |
 
 ⚠️ **REQ-07-13이 잡은 것은 "다른 토큰인가"가 아니라 실제 결함이었다 (2026-07-30).** JWT `iat`/`exp`는 초 단위라
 같은 초에 재발급하면 subject·type 이 같아 **이전 토큰과 바이트 단위로 동일한 문자열**이 나온다. 그러면 새 토큰의 해시가

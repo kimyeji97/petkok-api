@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-07-30
+> 최종 갱신: 2026-07-30 (REQ-07 Phase 5 · 검증 계약 REQ-07-12~23)
 
 ## 요구사항 인덱스
 
@@ -18,7 +18,7 @@
 | REQ-06 | API 설계 초안 + 설계 결정 3건 확정 | [api-list.md](specs/api-list.md) | 2026-07-23 | ✅ |
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
-| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | 🟡 Phase 1~4 완료 |
+| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | 🟡 Phase 1~6 완료 · 로그인 왕복 수동 확인 남음 |
 | REQ-08 | user 도메인 (프로필 · 소셜 계정 연결) | [api-list §2](specs/api-list.md) | — | ⏸ |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
@@ -80,6 +80,67 @@ Phase 4 완료 기준이 "로그에 토큰 원문이 남지 않는다(실제 로
 ### 완료 기준 ①은 아직 못 채웠다
 
 "로그인 왕복 성공"은 **유효한 인가코드가 필요하고 그건 사람이 브라우저로 로그인해야** 나온다. 자동화 대상이 아니라 수동 확인 항목으로 남겼다. 코드 경로는 전부 배선됐고 카카오까지 실제 요청이 나가는 것까지 확인했으므로 Phase 4를 완료로 표시했지만, **자동가입이 실제로 행을 만드는 것은 아직 아무도 보지 않았다.**
+
+### 검증 계약을 구현보다 먼저 쓴 것이 결함 2건을 잡았다 (Phase 5)
+
+`/testgen`으로 REQ-07-12~20을 먼저 쓰고 Phase 5를 구현했다. **그 순서 덕분에 나온 결함이 두 건이고, 둘 다 "겉보기엔 정상"인 종류였다.**
+
+#### ① 로테이션이 이전 토큰과 **같은 문자열**을 발급하고 있었다
+
+REQ-07-13("응답의 refresh 토큰은 제시된 것과 다르다")이 **바이트 단위로 동일한 토큰**을 잡았다. JWT `iat`/`exp`는 초 단위라 subject·type이 같으면 같은 초의 재발급 결과가 겹친다.
+
+겹치면 새 토큰의 해시가 방금 revoke한 행과 충돌해 `uq_refresh_tokens_token_hash`를 위반하거나, **발급 즉시 revoke된 토큰을 클라이언트에 주게 된다.** `createRefreshToken`에 `jti`(랜덤 UUID)를 넣어 해소했다.
+
+> **`jti`를 도로 빼는 프로브로 REQ-07-13이 실제로 잡는 것을 확인했다.** 안 그랬으면 "원래 잘 되던 것"과 구분이 안 된다 — 2026-07-29 ArchUnit 때 세운 계약을 테스트에도 그대로 적용했다.
+
+#### ② 재사용 감지의 전체 revoke가 **롤백되고 있었다**
+
+로컬 왕복에서 revoke된 토큰을 재제시하니 **401은 정상인데 다른 토큰이 살아 있었다.** `@Transactional` 기본 설정이라 뒤이어 던지는 `BusinessException`이 `revokeAllByUserId`까지 되돌린 것이다.
+
+- **응답만 보면 완전히 정상이다.** 401 `INVALID_TOKEN`이 규격대로 나가므로 API 레벨 확인으로는 통과한다
+- **목 기반 단위 테스트로는 원리적으로 잡히지 않는다.** 목은 롤백되지 않아 `verify(revokeAllByUserId)`가 초록불이다. REQ-07-16이 통과하는 상태에서 실제로는 무효화가 안 되고 있었다
+- 남는 결과는 **공격자가 쥔 나머지 토큰만 조용히 살아남는 것**이다
+
+`noRollbackFor = BusinessException.class`로 고쳤고, 애노테이션이 지워지는 것을 막으려고 REQ-07-23(애노테이션 고정)을 추가했다. 동작 자체는 테스트로 못 잡으니 **애노테이션을 고정하고 실제 롤백 여부는 DB 왕복으로 확인**하는 이중 구성이다.
+
+> **교훈은 "예외를 던지는 트랜잭션에서 남겨야 하는 쓰기"라는 패턴 자체다.** "무효화하고 거절한다"는 모양이 Spring 기본값과 정면으로 충돌하는데, 충돌 결과가 **조용하다.** 앞으로 pet 소유권·회원 탈퇴에서 같은 모양이 또 나온다.
+
+### 로컬 왕복으로 확인한 것 — 단위 테스트가 못 보던 자리
+
+사용자 1명 + refresh 행을 `petkok_local`에 심고 실제 HTTP로 태웠다(확인 후 삭제).
+
+| 확인 | 결과 |
+| --- | --- |
+| `POST /auth/refresh` 유효 토큰 | 200 · 옛 행 `revoked_at` 설정(**더티체킹 실증**) · 새 행 INSERT · 저장 해시 = 응답 토큰의 SHA-256 |
+| revoke된 토큰 재제시 | 401 `INVALID_TOKEN` + 사용자 전체 revoke (위 ② 수정 후) |
+| `DELETE /auth/logout` 무토큰 | 401 `UNAUTHORIZED` — **`PUBLIC_PATHS` 개별 나열이 실효**임을 확인 |
+| 〃 유효 access 토큰 | 204, 본문 0바이트 |
+| 〃 refresh 토큰을 access 자리에 | 401 — `isAccessToken` 방어 실효 |
+| 로그에 토큰 원문 | 0건 |
+
+**Phase 3에서 "아직 검증되지 않았다"고 적어 둔 항목들이 여기서 닫혔다** — JPA 더티체킹으로 `revoked_at`이 실제 UPDATE 되는 것, `findByTokenHash`가 revoke된 행도 반환하는 것(재사용 감지가 동작했으므로 간접 확인).
+
+### 함정 — 같은 컬럼에 9시간 어긋난 값이 섞인다
+
+검증 데이터를 SQL로 심다가 발견했다. 앱이 쓴 행은 `14:39`, `now()`로 심은 행은 `23:38`이었다.
+
+`application.yml`의 `hibernate.jdbc.time_zone: UTC` 때문에 **앱은 UTC로 저장하고 DB 기본값 `now()`는 세션 타임존(KST)으로 저장한다.** 앱끼리는 일관적이라 버그는 아니지만, **SQL로 직접 심은 행은 앱 기준으로 9시간 미래**다. 만료 검증 픽스처를 이렇게 만들면 "만료됐어야 하는데 안 됐다"로 나타난다. 픽스처는 `now() at time zone 'UTC'`를 쓴다.
+
+### logout의 revoke 범위 — 스펙 두 줄이 어긋나 한쪽을 골랐다
+
+`api-list.md` §1은 "access 토큰으로 사용자를 식별해 refresh revoke", § refresh 토큰 저장소는 "해당 토큰 `revoked_at` 설정"이다. **Request Body가 없어 특정 토큰을 지목할 수단이 없으므로** 사용자 전체 revoke로 고정했다 — 대가는 **기기별 로그아웃 불가**다. Notion API I/F 원본 확인이 필요한 건으로 계획서 미결에 올렸다.
+
+### 거부 경로 2건은 `INVALID_TOKEN`으로 통일했다
+
+만료된 토큰 / 저장소에 없는 해시. `/testgen` 시점엔 근거가 없어 미결로 뒀다가 Phase 5 구현에서 정했다. **거부 사유를 구분해 알려 주면 공격자에게 "이 토큰은 존재하기는 한다"는 정보가 샌다.** REQ-07-21·22로 승격.
+
+> 만료 판정은 **저장된 행의 `expires_at`**으로 한다. 만료된 JWT는 파싱 자체가 `ExpiredJwtException`으로 터져서 `getExpiresAt`을 부를 수 없다 — 테스트 픽스처가 여기서 한 번 걸렸다.
+
+### Phase 6이 Phase 5 안에서 끝났다 (계획-실제 이탈)
+
+계획서는 Phase 6(검증 체계)을 별도 단계로 뒀는데, `/testgen`이 REQ-07-12~23을 Phase 5 착수 **전에** 작성하면서 완료 기준("토큰 만료·로테이션·재사용 감지 테스트 통과 + CI green")이 그대로 충족됐다. 2026-07-29에 "Phase 6의 절반이 REQ-14 중에 끝나 있었다"고 적었던 것의 나머지 절반이다.
+
+**단계를 쪼갠 전제가 바뀐 것이다** — 계획 당시엔 "구현 후 테스트"였는데 `/testgen`을 도입하면서 순서가 뒤집혔다. 남은 Phase가 없어 REQ-07은 **Phase 1~6 완료**지만, **Phase 4 완료 기준 ①(카카오 로그인 왕복)이 수동 확인으로 남아 있어** 상태는 🟡로 둔다.
 
 ## 2026-07-29
 
