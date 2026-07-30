@@ -124,6 +124,9 @@ com.petkok
 	- `application.yml`의 `${db.schema}`에는 기본값이 없다. 프로파일이 값을 빠뜨리면 기동 즉시 실패한다(조용히 `public`으로 새는 것보다 낫다)
 - **감사(auditing)**: `created_at = @CreatedDate`, `updated_at = @LastModifiedDate` (JPA Auditing, DB 트리거 없음). 베이스 엔티티 상속으로 처리
 - **소프트 딜리트**: `users`, `pets`만 `deleted_at` (`BaseSoftDeleteEntity`)
+- ⚠️ **`@Transactional` 안에서 예외를 던지면 그 트랜잭션의 쓰기가 전부 사라진다.** "무효화하고 거절한다"는 모양(재사용 감지, 소유권 위반 기록, 실패 카운트 증가 등)이 이 기본값과 정면으로 충돌한다. **남겨야 하는 쓰기가 있으면 `noRollbackFor`(또는 별도 트랜잭션)를 반드시 명시한다**
+	- **충돌 결과가 조용하다.** 거절 응답은 규격대로 나가므로 API 레벨 확인으로는 통과하고, **저장소를 목으로 대체한 단위 테스트도 통과한다**(목은 롤백되지 않는다). 2026-07-30 실측 — `AuthService.refresh`의 재사용 감지가 401을 정상 반환하면서 `revokeAllByUserId`만 되돌아가, 탈취범이 쥔 나머지 토큰이 그대로 살아 있었다
+	- 따라서 **DB를 실제로 태워 확인**해야 하고, 확인 후에는 애노테이션 자체를 테스트로 고정한다(`AuthServiceRefreshTest` REQ-07-23이 그 예다). 동작은 목으로 검증할 수 없으므로 애노테이션 고정 + DB 왕복 두 겹으로 간다
 - **Enum**: Java Enum + `@Enumerated(STRING)`, DB는 varchar
 - **페이지네이션**: 커서 기반 (opaque base64 `next_cursor`)
 - **수정 메서드**: 리소스 수정은 `PATCH`(부분 수정)로 통일. `PUT`(전체 교체)은 쓰지 않는다 — 누락 필드와 `null` 의도를 구분할 수 없기 때문
