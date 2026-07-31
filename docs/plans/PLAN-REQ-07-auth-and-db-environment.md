@@ -72,7 +72,7 @@
 - [x] **거부 경로 2건의 기대값 — `INVALID_TOKEN` 으로 확정 (2026-07-30).** ① 만료된 refresh 토큰 ② 저장소에 없는 해시. 스펙이 `INVALID_TOKEN`(401)을 명시한 것은 재사용 감지 한 건뿐이라 미결로 두었던 항목이고, Phase 5 구현 시점에 같은 코드로 통일했다 — **거부 사유를 구분해 알려 주면 공격자에게 "이 토큰은 존재하긴 한다"는 정보가 새기 때문**이다. REQ-07-21·22 로 승격
       *(만료 판정은 **저장된 행의 `expires_at`** 으로 한다. JWT 의 `exp` 를 다시 파싱하지 않는 이유는 두 값이 같고 — Phase 4 결정 — 만료 토큰은 파싱 자체가 `ExpiredJwtException` 으로 터지기 때문이다)*
 - [ ] **`DELETE /auth/logout` 의 revoke 범위 — api-list 두 줄이 어긋난다 (2026-07-30 등록).** § 1. Auth 는 "access 토큰으로 사용자를 식별해 refresh revoke", § refresh 토큰 저장소는 "해당 토큰 `revoked_at` 설정"이다. **Request Body 가 없어 특정 토큰을 지목할 수단이 없으므로** 검증 계약(REQ-07-18)은 **사용자 전체 revoke** 로 고정했다 — 기기별 로그아웃이 불가능해지는 것이 이 선택의 대가다. Notion API I/F 원본으로 확인이 필요하고, 다르면 § 저장소 문장을 고쳐야 한다
-- [ ] **`business/auth` → `data/user` ArchUnit 예외 — 임시. 개선 방향 논의 필요 (2026-07-29 등록).** 자동가입이 `users` 행을 만들어 생긴 참조다. 지금은 `DomainBoundaryTest`에 예외 1건으로 열어 두고 Phase 4를 완주했으나, `data.common`·`timeline`·`framework` 세 예외와 달리 **"설계상 옳다"고 확정된 것이 아니다.** 선택지: 예외 유지 / auth·user 도메인 병합 / user 쪽에 프로비저닝 진입점을 두고 참조 방향만 바꾸기(예외 개수는 그대로)
+- [x] **`business/auth` → `data/user` ArchUnit 예외 — 설계 결정으로 승격 (2026-07-31 해소).** 소셜 자동가입은 본질적으로 user 프로비저닝이다. 이 참조를 없애려면 `business/user`에 진입점을 두어야 하는데 그러면 `business/auth → business/user` 예외가 대신 생겨 **개수는 그대로인 채 간접층만 는다.** 대안 셋(예외 유지 / 패키지 축소 / 진입점 신설)을 비교한 뒤 유지를 택했고, `DomainBoundaryTest`의 "임시" 주석을 승격 근거로 교체했다 — PLAN-REQ-08 「결정」 D4
 
 ### 해소된 질문 (2026-07-27)
 
