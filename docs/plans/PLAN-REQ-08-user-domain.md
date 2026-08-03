@@ -42,11 +42,14 @@
 | **D3** `PATCH /users/me`의 `null` 의미 | **누락·`null` 모두 "변경 없음"**. 보낸 필드만 덮어쓴다 | Notion 원본이 "변경할 필드만 포함"만 규정하고 `null` 규약이 없다(2026-07-31 `API I/F` 직접 확인). 원본에 없는 의미를 만들지 않는다 | **`null` = 제거**(JsonNullable 또는 `Optional` 래핑) — 의존성·패턴이 늘고 무엇보다 원본에 근거가 없다. AGENTS §5가 PATCH를 고른 이유(누락과 `null` 구분)와는 어긋나므로 **의도적 예외임을 명시**한다 |
 | **D4** `business/auth → data/user` 예외 | **설계 결정으로 승격**(2026-07-31). "임시" 딱지를 떼고 나머지 3건과 같은 지위로 올렸다 | 소셜 자동가입은 본질적으로 user 프로비저닝이다. 이 참조를 없애려면 `business/user`에 진입점을 두어야 하는데 그러면 `business/auth → business/user` 예외가 대신 생겨 **개수는 그대로인 채 간접층만 는다** | **프로비저닝 진입점 신설** — 위 이유로 기각. **패키지 축소**(`business.auth.service`로 한정) — 지금도 `AuthService` 하나만 쓰므로 실효 차이가 없다 |
 | **D5** 탈퇴 시 refresh revoke | **하지 않는다.** 필터 차단(D2)을 신뢰한다. **왜 revoke하지 않는지 코드 주석 필수** | revoke하면 `business/user → data/auth` 참조가 생겨 예외가 4→5로 는다. D2로 탈퇴 계정은 어떤 access 토큰을 들고 와도 막히므로, refresh로 새 토큰을 받아도 결국 차단된다 | **예외 1건 추가** · **`AuthService.logout(userId)` 재사용** — 둘 다 예외가 늘어난다. 셋 중 무엇을 골라도 차단 자체는 되므로 예외를 안 늘리는 쪽을 택했다 |
+| **D6** PATCH 부분 반영을 어디서 병합할까 | **`UserService`에서 병합한 뒤 엔티티에 넘긴다.** 기존 `User.updateProfile(nickname, profileImageUrl)`의 "두 필드를 통째로 덮어쓴다"는 계약은 그대로 두고, 서비스가 `req.nickname() != null ? req.nickname() : user.getNickname()` 꼴로 채워서 호출한다 | 엔티티가 `null`을 "변경 없음"으로 해석하기 시작하면 **`null`에 도메인 의미가 붙어** D3(원본에 없는 규약을 만들지 않는다)와 정면으로 어긋난다. 부분 반영은 HTTP PATCH의 관심사이지 엔티티의 관심사가 아니다. 병합을 서비스에 두면 엔티티는 "받은 값으로 바꾼다"는 한 가지 뜻만 갖는다 | **엔티티가 `null`이면 유지** — 위 이유로 기각. 호출부마다 `null` 의미가 달라질 여지도 생긴다. **`updateNickname`/`updateProfileImage` 분리** — 필드가 늘 때마다 메서드가 늘고, 한 요청이 두 번의 상태 변경이 된다 |
+| **D7** 닉네임 검증 최소선 | **`@NotBlank` + `@Size(max = 100)`를 지금 박는다.** 최소 길이·트림·중복 허용 여부는 미결로 남긴다 | `varchar(100) NOT NULL`은 원본 근거가 필요 없는 **스키마에서 확정된 사실**이다(`V1__init.sql`). 검증이 없으면 101자 요청이 `DataIntegrityViolationException`으로 올라와 **400이 아니라 500**이 된다 — 클라이언트 입력 오류가 서버 오류로 보고되는 건 명백한 결함이다 | **전부 미결로 미룸**(2026-07-31 초안) — 미결의 근거는 "원본에 없다"인데 이 둘은 스키마에 있다. 근거 없는 규약을 만드는 것과 이미 확정된 제약을 표현하는 것은 다르다 |
 
 ## 미결 질문
 
 - [ ] **프로필 이미지 제거를 어떻게 표현할 것인가.** D3으로 지금은 제거 수단이 없다. 요구가 확인되면 **Notion `API I/F`의 `PATCH /users/me` 행을 먼저 고친 뒤** 구현한다
-- [ ] **닉네임 검증 규칙.** 확실한 것은 `varchar(100)` NOT NULL 하나뿐이다. 최소 길이·공백 트림·앞뒤 공백만으로 된 값·중복 허용 여부에 원본 근거가 없다. (스키마에 UNIQUE가 없으므로 **중복은 허용이 기본값**)
+- [ ] **닉네임 검증 규칙 중 스키마에 없는 것들.** 최소 길이·공백 트림·중복 허용 여부에 원본 근거가 없다. (스키마에 UNIQUE가 없으므로 **중복은 허용이 기본값**) — `@NotBlank`·`@Size(max = 100)`는 스키마에서 나오므로 **D7로 미결에서 빠졌다**
+- [ ] **`DELETE /users/me`의 refresh revoke 여부가 문서 두 곳에서 어긋난다.** `docs/specs/api-list.md`(§refresh 토큰 저장소)는 "탈퇴 → 해당 사용자 토큰 전체 revoke"라고 적고 있는데 **D5는 정반대**다. api-list는 Notion 파생 요약이므로(AGENTS §0) **Phase 2 착수 전에 Notion `API I/F` 원본을 확인**해야 한다. 원본에도 revoke가 있으면 D5를 재검토하고, 없으면 api-list를 고치면서 Notion 역반영을 제안한다
 - [ ] **필터의 사용자 조회 비용.** 모든 인증 요청에 DB 왕복 1회가 붙는다. 캐시 도입 여부는 실사용 트래픽을 보고 정한다 — 지금 정하면 근거 없는 수치가 굳는다
 - [ ] **탈퇴 계정의 `/auth/refresh` 응답.** D5로 revoke를 안 하므로 탈퇴한 사용자도 `/auth/refresh`가 **200과 새 토큰을 반환**한다(그 토큰으로 API를 부르면 401). 클라이언트 입장에서 혼란스러울 수 있다 — `AuthService.refresh`에 활성 검사를 넣을지는 실제 클라이언트 동작을 보고 정한다
 
@@ -69,20 +72,25 @@
       > **Phase 3 의 근거가 하나 늘었다.** 필터가 `data..repository..` 를 직참조하면 규칙 #4 뿐 아니라 `LAYER_DIRECTION` 에도 걸린다 — 필터는 정의된 세 레이어 어디에도 속하지 않는데 `Repository` 레이어는 `mayOnlyBeAccessedByLayers("Service")` 이기 때문이다. 즉 **규칙 #4 를 열어도 직참조는 여전히 통과하지 못한다.** D2 가 검토했던 "규칙 #4 를 연다" 안은 애초에 성립하지 않았던 셈이고, 포트 방식은 두 규칙을 동시에 만족시키는 유일한 길이다.
 
 - [ ] **Phase 1 — 조회·수정**
-      `UserController` + `UserService` + DTO 2종. `GET`은 `findByIdAndDeletedAtIsNull`로 조회하고 없으면 `USER_NOT_FOUND`. `PATCH`는 보낸 필드만 반영(D3).
-      완료 기준: 응답 필드가 Notion `GET /users/me` 5개와 정확히 일치(`updated_at` 없음, 전역 snake_case) · `PATCH`에 닉네임만 보내면 `profile_image_url`이 유지됨 · ArchUnit 8건 통과
+      `UserController`(`@RequestMapping("/api/v1/users")`) + `UserService` + DTO 2종. `GET`은 `findByIdAndDeletedAtIsNull`로 조회하고 없으면 `USER_NOT_FOUND`. `PATCH`는 보낸 필드만 반영(D3), 병합은 **서비스에서**(D6). 요청 DTO에 `@NotBlank` + `@Size(max = 100)`(D7).
+      ⚠️ **`User.updateProfile`이 이미 있고, 두 필드를 무조건 덮어쓴다.** 닉네임만 담긴 PATCH에 `updateProfile(nick, null)`로 호출하면 **`profile_image_url`이 지워진다** — 에러 없이 DB에 반영되는 데이터 손실이라 응답만 봐서는 모른다. 아래 완료 기준이 정확히 이걸 막는다. 현재 이 메서드의 호출처는 0곳이다(REQ-07에서 선반영만 됨).
+      완료 기준: 응답 필드가 Notion `GET /users/me` 5개와 정확히 일치(`updated_at` 없음, 전역 snake_case) · **`PATCH`에 닉네임만 보내면 `profile_image_url`이 유지됨** · 101자 닉네임이 500이 아니라 400 · ArchUnit 8건 통과
 
 - [ ] **Phase 2 — 탈퇴**
-      `users.deleted_at` 기록 + `user_social_accounts` 하드 삭제. 204 반환. refresh는 revoke하지 않으며(D5) **그 이유를 주석으로 남긴다** — 근거가 없으면 다음 사람이 "빠뜨렸다"고 보고 채워 넣어 예외를 늘린다.
+      **선행: Notion `API I/F` 원본에서 revoke 서술 확인**(미결 참고 — api-list와 D5가 어긋난다). 그다음 `users.deleted_at` 기록(`BaseSoftDeleteEntity.softDelete()`) + `user_social_accounts` 하드 삭제. 204 반환(본문 없음 — `AuthController.logout` 선례대로 `ApiResponse`를 씌우지 않는다). refresh는 revoke하지 않으며(D5) **그 이유를 주석으로 남긴다** — 근거가 없으면 다음 사람이 "빠뜨렸다"고 보고 채워 넣어 예외를 늘린다.
+      `UserSocialAccountRepository`에 **삭제 메서드가 없다**(현재 `findByProviderAndProviderUserId` 하나뿐) — `deleteByUserId(UUID)` 추가가 필요하다.
       완료 기준: 탈퇴 → 같은 카카오 계정으로 재로그인 시 **새 `users.id`가 발급됨**(로컬 DB 왕복으로 실제 확인 — 목으로는 D1이 검증되지 않는다) · ArchUnit 8건 통과(예외가 늘지 않았음의 확인)
 
 - [ ] **Phase 3 — 필터 활성 검사 (포트)**
       `framework/security/UserStatusChecker` 인터페이스 정의 → `UserService`가 구현 → `JwtAuthenticationFilter`가 인터페이스를 주입받아 검사. AGENTS.md §3에 이 패턴을 기록한다(framework가 인터페이스를 정의하고 business가 구현하는 첫 사례).
-      완료 기준: 탈퇴 직후 기존 access 토큰으로 `GET /users/me` 호출 시 401 · **규칙 #4가 여전히 살아 있는지 프로브로 확인**(필터에 `UserRepository` 직참조를 일부러 심어 빨간불이 되는지 — CLAUDE.md 계약) · `spotlessApply` + `build -x test` + `checkstyleMain -PciStrict` 통과
+      **비활성 사용자일 때는 예외를 던지지 않고 `SecurityContext`를 세팅하지 않은 채 통과시킨다.** 그러면 `SecurityConfig`의 `authenticationEntryPoint`가 기존 규격대로 `ApiResponse.error(UNAUTHORIZED)` + 401을 내려준다 — 필터에서 던지면 `GlobalExceptionHandler`에 닿지 않아(필터는 DispatcherServlet 앞이다) 응답 형태가 갈린다.
+      완료 기준: 탈퇴 직후 기존 access 토큰으로 `GET /users/me` 호출 시 **401 + 기존 에러 본문 형태** · **규칙이 살아 있는지 프로브로 확인**(필터에 `UserRepository` 직참조를 일부러 심어 빨간불이 되는지 — CLAUDE.md 계약. 2026-08-03 실측상 `FRAMEWORK_MUST_NOT_KNOW_DOMAIN`과 `LAYER_DIRECTION` **둘 다** 발화한다) · `spotlessApply` + `build -x test` + `checkstyleMain -PciStrict` 통과
 
 ## 제약·함정
 
 - **`@Transactional` 롤백** (AGENTS §5) — 탈퇴는 소셜 행 삭제·revoke·`deleted_at`을 한 트랜잭션에서 쓴다. 여기서 예외를 던지면 **셋 다 사라진다.** 남겨야 하는 쓰기가 생기면 `noRollbackFor`를 명시할 것. 2026-07-30 `AuthService.refresh`에서 같은 함정이 실제로 터졌고 **목 기반 테스트는 통과했다**
+- **`User.updateProfile`은 부분 반영용이 아니다** (D6) — 두 필드를 무조건 덮어쓴다. 서비스가 병합하지 않고 그대로 부르면 PATCH가 다른 필드를 지운다. **응답은 200으로 정상이고 DB만 조용히 손상된다** — 07-31에 잡은 함정 2건(유령 계정·잔존 토큰)과 같은 종류다
+- **`api-list.md`와 D5가 정반대다** — api-list는 탈퇴 시 토큰 전체 revoke라고 적고 있다. Notion 원본 확인 전에는 어느 쪽도 구현 근거가 아니다(AGENTS §0). Phase 2 선행 과제
 - **D1은 목으로 검증되지 않는다.** 유령 계정 경로는 `UNIQUE (provider, provider_user_id)`와 실제 조회 결과가 만드는 현상이라 **로컬 DB 왕복이 유일한 확인 수단**이다
 - **ArchUnit 규칙을 고치면 프로브를 심는다** (CLAUDE.md) — 규칙이 조용히 공허해진 전례가 있다. 통과/실패만 봐서는 알 수 없다
 - **`allowEmptyShould`를 다시 `true`로 되돌리지 말 것** (Phase 0) — 새 규칙을 추가했는데 대상이 0개라 실패하면, 완화가 아니라 **규칙이 시기상조라는 신호**다
