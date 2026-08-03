@@ -54,12 +54,19 @@
 
 ## 작업 단계
 
-- [x] **Phase 0 — ArchUnit 정리 (2026-07-31 완료)**
+- [x] **Phase 0 — ArchUnit 정리 (2026-07-31 결정 · 2026-08-03 코드 반영)**
+      ⚠️ **07-31 에는 결정과 검증만 하고 코드가 커밋되지 않았다.** 계획서·PROGRESS 에는 "완료 ✅" 로 적혀 있었지만 `57f5ca1` 이 바꾼 것은 문서 3개뿐이었고, ArchUnit 파일의 마지막 변경은 `efef567`(07-29) 이었다. 08-03 에 재실행해 실제로 반영했다.
       REQ-08 착수 전에 구조 규칙의 완화 지점을 전부 확정했다.
       ① **`allowEmptyShould`를 8개 규칙 전부 `false`로** — REQ-07로 controller·service·repository·entity·dto가 모두 들어와 더 이상 빈 집합이 아니다. 껐는데도 통과하는 것을 확인했다(`tests=7`+`tests=1`, failures 0). `LAYER_DIRECTION`의 `withOptionalLayers`도 같이 껐다.
       ② **예외 #4 `business/auth → data/user` 승격** — "임시" 주석을 근거 주석으로 교체. REQ-07 미결 1건이 닫혔다.
       ③ **예외 #1~#3은 유지** — `data.common`(도메인 공용) · `framework`(슬라이스 오발 방지) · `business.timeline`(§3 명시). #3은 대상 코드가 아직 0개라 REQ-12까지 공허하다.
-      완료 기준: 규칙 8건 통과 ✅
+      ④ **프로브 3건으로 규칙이 공허하지 않음을 확인** (2026-08-03, CLAUDE.md 계약). 심은 위반이 전부 빨간불이 됐다 —
+       · `JwtAuthenticationFilter` 에 `UserRepository` 직참조 → `FRAMEWORK_MUST_NOT_KNOW_DOMAIN` 발화
+       · **같은 위반에 `LAYER_DIRECTION` 도 함께 발화** — 예상 밖 수확이다(아래)
+       · 대상 0개짜리 임시 규칙 → `PROBE_EMPTY` 발화, `allowEmptyShould(false)` 가 실제로 동작함
+      완료 기준: 규칙 8건 통과 ✅ (`tests=7` + `tests=1`, failures 0) · 프로브 3건 발화 확인 ✅
+
+      > **Phase 3 의 근거가 하나 늘었다.** 필터가 `data..repository..` 를 직참조하면 규칙 #4 뿐 아니라 `LAYER_DIRECTION` 에도 걸린다 — 필터는 정의된 세 레이어 어디에도 속하지 않는데 `Repository` 레이어는 `mayOnlyBeAccessedByLayers("Service")` 이기 때문이다. 즉 **규칙 #4 를 열어도 직참조는 여전히 통과하지 못한다.** D2 가 검토했던 "규칙 #4 를 연다" 안은 애초에 성립하지 않았던 셈이고, 포트 방식은 두 규칙을 동시에 만족시키는 유일한 길이다.
 
 - [ ] **Phase 1 — 조회·수정**
       `UserController` + `UserService` + DTO 2종. `GET`은 `findByIdAndDeletedAtIsNull`로 조회하고 없으면 `USER_NOT_FOUND`. `PATCH`는 보낸 필드만 반영(D3).

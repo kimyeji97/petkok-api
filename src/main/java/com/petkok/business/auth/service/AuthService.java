@@ -27,9 +27,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 소셜 로그인 · 자동가입 · 토큰 발급.
  *
- * <p>⚠️ <b>{@code data/user} 를 참조한다.</b> 자동가입이 {@code users} 행을 만들기 때문에 피할 수 없다. ArchUnit {@code
- * DomainBoundaryTest} 에 이 참조를 허용하는 예외가 <b>임시로</b> 들어가 있으며, 좁히거나 없애는 방향은 별도 논의 대상이다 (PLAN-REQ-07 「미결
- * 질문」).
+ * <p><b>{@code data/user} 를 참조한다 — 설계상 옳다.</b> 소셜 자동가입은 본질적으로 user 프로비저닝이므로 {@code users} 행을 만드는 것이
+ * 이 서비스의 제 일이다. ArchUnit {@code DomainBoundaryTest} 의 예외도 2026-07-31 에 <b>임시에서 설계 결정으로 승격</b>됐다
+ * (PLAN-REQ-08 D4). 없애려면 {@code business/user} 에 프로비저닝 진입점을 두어야 하는데, 그러면 {@code business/auth →
+ * business/user} 예외가 대신 생겨 <b>개수는 그대로인 채 간접층만 는다.</b>
  */
 @Slf4j
 @Service
