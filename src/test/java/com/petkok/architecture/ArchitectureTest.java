@@ -3,6 +3,7 @@ package com.petkok.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
@@ -22,10 +23,18 @@ import jakarta.persistence.Entity;
  * 괄호 사고, {@link DomainBoundaryTest} 참고)는 여전히 잡지 못한다. 규칙을 고쳤으면 <b>일부러 위반을 심어</b> 빨간불이 되는지 확인해야 한다
  * (CLAUDE.md).
  *
+ * <p><b>분석 대상은 프로덕션 코드뿐이다</b>({@code DoNotIncludeTests}, 2026-08-04). 이 규칙들은 전부 프로덕션 구조에 대한 것인데, 기본
+ * 설정은 테스트 클래스까지 끌어와 <b>미러 패키지에 테스트를 두는 순간 이름 규칙이 오발한다.</b> 실제로 {@code
+ * com.petkok.data.user.dto.UserUpdateRequestTest} 가 {@link #DTO_NAMING} 에 걸렸다 — {@code ..dto..} ·
+ * {@code ..controller..} 에 테스트가 처음 들어온 시점이라 그전까지는 드러나지 않았다. 완화가 아니라 <b>범위 정정</b>이며, 프로덕션 커버리지는
+ * 그대로다.
+ *
  * <p>필드명은 Checkstyle {@code ConstantName} 을 따르고, 사람이 읽을 설명은 {@code .as(...)} 가 담당한다 — 위반 메시지에 그대로
  * 출력된다.
  */
-@AnalyzeClasses(packages = ArchitectureTest.ROOT)
+@AnalyzeClasses(
+    packages = ArchitectureTest.ROOT,
+    importOptions = ImportOption.DoNotIncludeTests.class)
 final class ArchitectureTest {
 
   static final String ROOT = "com.petkok";
