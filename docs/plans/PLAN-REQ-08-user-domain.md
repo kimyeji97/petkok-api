@@ -1,6 +1,6 @@
 # PLAN-REQ-08 · user 도메인 (내 프로필 조회·수정·탈퇴)
 
-> 출처: 2026-07-31 세션 · 작성: 2026-07-31 · 상태: 🟡 진행 (Phase 0 완료)
+> 출처: 2026-07-31 세션 · 작성: 2026-07-31 · 상태: 🟡 진행 (Phase 0~1 완료 · Phase 2·3 남음)
 
 ## 배경
 
@@ -31,6 +31,7 @@
 - **탈퇴 유예기간·계정 복구** — 하드 삭제 결정(D1)이 재가입을 새 계정으로 못박으므로 복구는 성립하지 않는다. 요구가 생기면 별도 REQ
 - **탈퇴 시 refresh 토큰 revoke** — 필터가 탈퇴 계정을 차단하므로 생략한다(D5). 대가는 `refresh_tokens`에 `revoked_at IS NULL` 행이 남는 것이다
 - **ArchUnit 규칙·예외 변경** — 2026-07-31 정리에서 규칙 8건·예외 4건이 확정됐다(아래 「선행 정리」). **REQ-08은 예외를 하나도 늘리지 않는다** — 포트 방식을 고른 이유가 이것이다
+	- ⚠️ **이 제외를 한 번 넘었다** (2026-08-04, 승인 후). `@AnalyzeClasses` 에 `DoNotIncludeTests` 를 추가해 **분석 범위를 프로덕션 코드로 한정**했다. Phase 1 의 `UserUpdateRequestTest` 가 `DTO_NAMING` 에 걸려 진행이 막혔고, 원인이 구현이 아니라 **규칙이 테스트 파일까지 보고 있던 것**이었다. **예외는 여전히 4건이고 규칙도 8건 그대로다** — 늘어난 것은 없다. 프로브로 프로덕션 위반 3종에 규칙 4개가 발화하는 것을 확인했다
 - **`updated_at` 응답 노출** — 원본 `GET /users/me` 응답이 `id`·`nickname`·`email`·`profile_image_url`·`created_at` 5개다. 엔티티는 갖고 있지만 DTO에 넣지 않는다
 
 ## 결정
@@ -43,13 +44,14 @@
 | **D4** `business/auth → data/user` 예외 | **설계 결정으로 승격**(2026-07-31). "임시" 딱지를 떼고 나머지 3건과 같은 지위로 올렸다 | 소셜 자동가입은 본질적으로 user 프로비저닝이다. 이 참조를 없애려면 `business/user`에 진입점을 두어야 하는데 그러면 `business/auth → business/user` 예외가 대신 생겨 **개수는 그대로인 채 간접층만 는다** | **프로비저닝 진입점 신설** — 위 이유로 기각. **패키지 축소**(`business.auth.service`로 한정) — 지금도 `AuthService` 하나만 쓰므로 실효 차이가 없다 |
 | **D5** 탈퇴 시 refresh revoke | **하지 않는다.** 필터 차단(D2)을 신뢰한다. **왜 revoke하지 않는지 코드 주석 필수** | revoke하면 `business/user → data/auth` 참조가 생겨 예외가 4→5로 는다. D2로 탈퇴 계정은 어떤 access 토큰을 들고 와도 막히므로, refresh로 새 토큰을 받아도 결국 차단된다 | **예외 1건 추가** · **`AuthService.logout(userId)` 재사용** — 둘 다 예외가 늘어난다. 셋 중 무엇을 골라도 차단 자체는 되므로 예외를 안 늘리는 쪽을 택했다 |
 | **D6** PATCH 부분 반영을 어디서 병합할까 | **`UserService`에서 병합한 뒤 엔티티에 넘긴다.** 기존 `User.updateProfile(nickname, profileImageUrl)`의 "두 필드를 통째로 덮어쓴다"는 계약은 그대로 두고, 서비스가 `req.nickname() != null ? req.nickname() : user.getNickname()` 꼴로 채워서 호출한다 | 엔티티가 `null`을 "변경 없음"으로 해석하기 시작하면 **`null`에 도메인 의미가 붙어** D3(원본에 없는 규약을 만들지 않는다)와 정면으로 어긋난다. 부분 반영은 HTTP PATCH의 관심사이지 엔티티의 관심사가 아니다. 병합을 서비스에 두면 엔티티는 "받은 값으로 바꾼다"는 한 가지 뜻만 갖는다 | **엔티티가 `null`이면 유지** — 위 이유로 기각. 호출부마다 `null` 의미가 달라질 여지도 생긴다. **`updateNickname`/`updateProfileImage` 분리** — 필드가 늘 때마다 메서드가 늘고, 한 요청이 두 번의 상태 변경이 된다 |
-| **D7** 닉네임 검증 최소선 | **`@NotBlank` + `@Size(max = 100)`를 지금 박는다.** 최소 길이·트림·중복 허용 여부는 미결로 남긴다 | `varchar(100) NOT NULL`은 원본 근거가 필요 없는 **스키마에서 확정된 사실**이다(`V1__init.sql`). 검증이 없으면 101자 요청이 `DataIntegrityViolationException`으로 올라와 **400이 아니라 500**이 된다 — 클라이언트 입력 오류가 서버 오류로 보고되는 건 명백한 결함이다 | **전부 미결로 미룸**(2026-07-31 초안) — 미결의 근거는 "원본에 없다"인데 이 둘은 스키마에 있다. 근거 없는 규약을 만드는 것과 이미 확정된 제약을 표현하는 것은 다르다 |
+| **D7** 닉네임 검증 최소선 | **`@Size(max = 100)` 하나만 박는다.** 최소 길이·트림·빈 문자열·중복 허용 여부는 미결로 남긴다 | `varchar(100)`은 원본 근거가 필요 없는 **스키마에서 확정된 사실**이다(`V1__init.sql`). 검증이 없으면 101자 요청이 `DataIntegrityViolationException`으로 올라와 **400이 아니라 500**이 된다 — 클라이언트 입력 오류가 서버 오류로 보고되는 건 명백한 결함이다. `@Size`는 **`null`을 통과시키므로** D3(누락 = 변경 없음)과 충돌하지 않는다 | ⚠️ **`@NotBlank` 병기**(2026-08-03 초안, 즉시 철회) — `@NotBlank`는 `null`을 거부하는데 **PATCH에 닉네임을 안 보내는 것이 D3의 정상 경로**다. 그대로 두면 부분 수정이 통째로 400이 된다. `NOT NULL` 제약은 엔티티 불변식이지 PATCH 요청 DTO의 불변식이 아니다 — 두 층의 제약을 같은 것으로 착각한 실수다. **전부 미결로 미룸**(2026-07-31 초안) — 미결의 근거는 "원본에 없다"인데 길이 제한은 스키마에 있다 |
 
 ## 미결 질문
 
 - [ ] **프로필 이미지 제거를 어떻게 표현할 것인가.** D3으로 지금은 제거 수단이 없다. 요구가 확인되면 **Notion `API I/F`의 `PATCH /users/me` 행을 먼저 고친 뒤** 구현한다
-- [ ] **닉네임 검증 규칙 중 스키마에 없는 것들.** 최소 길이·공백 트림·중복 허용 여부에 원본 근거가 없다. (스키마에 UNIQUE가 없으므로 **중복은 허용이 기본값**) — `@NotBlank`·`@Size(max = 100)`는 스키마에서 나오므로 **D7로 미결에서 빠졌다**
-- [ ] **`DELETE /users/me`의 refresh revoke 여부가 문서 두 곳에서 어긋난다.** `docs/specs/api-list.md`(§refresh 토큰 저장소)는 "탈퇴 → 해당 사용자 토큰 전체 revoke"라고 적고 있는데 **D5는 정반대**다. api-list는 Notion 파생 요약이므로(AGENTS §0) **Phase 2 착수 전에 Notion `API I/F` 원본을 확인**해야 한다. 원본에도 revoke가 있으면 D5를 재검토하고, 없으면 api-list를 고치면서 Notion 역반영을 제안한다
+- [ ] **닉네임 검증 규칙 중 스키마에 없는 것들.** 최소 길이·공백 트림·중복 허용 여부에 원본 근거가 없다. (스키마에 UNIQUE가 없으므로 **중복은 허용이 기본값**) — `@Size(max = 100)`만 스키마에서 나오므로 D7로 미결에서 빠졌다
+- [ ] **빈 문자열 닉네임(`""`)을 어떻게 볼 것인가.** D7이 `@Size(max = 100)`만 두므로 `""`는 지금 **그대로 저장된다**(`NOT NULL`은 만족한다). "변경 없음"(`null`)과 "빈 값으로 변경"(`""`)이 구분은 되지만, 후자를 허용할 근거도 거부할 근거도 원본에 없다. 최소 길이 규칙이 정해지면 `@Size(min = 1, ...)`로 함께 닫힌다
+- [ ] **Notion 테이블 정의서 §10의 저장소 선택 근거 문장을 고칠 것** (역반영 대기). "Redis는 기각했다(로그아웃·**탈퇴** 시 즉시 무효화가 필요하고…)"가 남아 있어 D5와 어긋나 보인다. Redis 기각 논거이지 탈퇴 동작 명세가 아니므로 **문장을 다듬거나 D5 링크를 붙이는 정도**면 된다 — 사람이 Notion에서 수정해야 한다
 - [ ] **필터의 사용자 조회 비용.** 모든 인증 요청에 DB 왕복 1회가 붙는다. 캐시 도입 여부는 실사용 트래픽을 보고 정한다 — 지금 정하면 근거 없는 수치가 굳는다
 - [ ] **탈퇴 계정의 `/auth/refresh` 응답.** D5로 revoke를 안 하므로 탈퇴한 사용자도 `/auth/refresh`가 **200과 새 토큰을 반환**한다(그 토큰으로 API를 부르면 401). 클라이언트 입장에서 혼란스러울 수 있다 — `AuthService.refresh`에 활성 검사를 넣을지는 실제 클라이언트 동작을 보고 정한다
 
@@ -71,13 +73,17 @@
 
       > **Phase 3 의 근거가 하나 늘었다.** 필터가 `data..repository..` 를 직참조하면 규칙 #4 뿐 아니라 `LAYER_DIRECTION` 에도 걸린다 — 필터는 정의된 세 레이어 어디에도 속하지 않는데 `Repository` 레이어는 `mayOnlyBeAccessedByLayers("Service")` 이기 때문이다. 즉 **규칙 #4 를 열어도 직참조는 여전히 통과하지 못한다.** D2 가 검토했던 "규칙 #4 를 연다" 안은 애초에 성립하지 않았던 셈이고, 포트 방식은 두 규칙을 동시에 만족시키는 유일한 길이다.
 
-- [ ] **Phase 1 — 조회·수정**
-      `UserController`(`@RequestMapping("/api/v1/users")`) + `UserService` + DTO 2종. `GET`은 `findByIdAndDeletedAtIsNull`로 조회하고 없으면 `USER_NOT_FOUND`. `PATCH`는 보낸 필드만 반영(D3), 병합은 **서비스에서**(D6). 요청 DTO에 `@NotBlank` + `@Size(max = 100)`(D7).
+- [x] **Phase 1 — 조회·수정 (2026-08-04 구현 · 2026-08-07 검증)**
+      `UserController`(`@RequestMapping("/api/v1/users")`) + `UserService` + DTO 2종. `GET`은 `findByIdAndDeletedAtIsNull`로 조회하고 없으면 `USER_NOT_FOUND`. `PATCH`는 보낸 필드만 반영(D3), 병합은 **서비스에서**(D6). 요청 DTO에 `@Size(max = 100)`(D7 — `@NotBlank`는 쓰지 않는다. `null` = 변경 없음).
       ⚠️ **`User.updateProfile`이 이미 있고, 두 필드를 무조건 덮어쓴다.** 닉네임만 담긴 PATCH에 `updateProfile(nick, null)`로 호출하면 **`profile_image_url`이 지워진다** — 에러 없이 DB에 반영되는 데이터 손실이라 응답만 봐서는 모른다. 아래 완료 기준이 정확히 이걸 막는다. 현재 이 메서드의 호출처는 0곳이다(REQ-07에서 선반영만 됨).
       완료 기준: 응답 필드가 Notion `GET /users/me` 5개와 정확히 일치(`updated_at` 없음, 전역 snake_case) · **`PATCH`에 닉네임만 보내면 `profile_image_url`이 유지됨** · 101자 닉네임이 500이 아니라 400 · ArchUnit 8건 통과
+      → **케이스 8건 전부 `✅`** (2026-08-07 `/testrun`). 다만 **완료 기준 2건이 케이스보다 넓다** — 아래를 알고 체크한 것이다.
+      · **"전역 snake_case"는 검증되지 않는다.** `REQ-08-01`은 record 컴포넌트 이름(camelCase)만 본다. 직렬화된 JSON이 `profile_image_url`로 나가는지는 아무도 확인하지 않으며, `JacksonConfig`가 사라져도 초록불을 유지한다
+      · **"101자 → 400"의 마지막 한 칸이 비어 있다.** `REQ-08-06`은 Bean Validation이 위반을 만드는 것까지다. 400으로 이어지는 것은 `GlobalExceptionHandler`의 `MethodArgumentNotValidException` → `INVALID_INPUT` 매핑을 **코드로 읽어 확인**했을 뿐 테스트가 보증하지 않는다
+      → 둘 다 `@WebMvcTest` 한 건이면 닫힌다. Phase 2의 `REQ-08-15`(컨트롤러 204)와 함께 다루는 것이 자연스럽다.
 
 - [ ] **Phase 2 — 탈퇴**
-      **선행: Notion `API I/F` 원본에서 revoke 서술 확인**(미결 참고 — api-list와 D5가 어긋난다). 그다음 `users.deleted_at` 기록(`BaseSoftDeleteEntity.softDelete()`) + `user_social_accounts` 하드 삭제. 204 반환(본문 없음 — `AuthController.logout` 선례대로 `ApiResponse`를 씌우지 않는다). refresh는 revoke하지 않으며(D5) **그 이유를 주석으로 남긴다** — 근거가 없으면 다음 사람이 "빠뜨렸다"고 보고 채워 넣어 예외를 늘린다.
+      `users.deleted_at` 기록(`BaseSoftDeleteEntity.softDelete()`) + `user_social_accounts` 하드 삭제. 204 반환(본문 없음 — `AuthController.logout` 선례대로 `ApiResponse`를 씌우지 않는다). refresh는 revoke하지 않으며(D5) **그 이유를 주석으로 남긴다** — 근거가 없으면 다음 사람이 "빠뜨렸다"고 보고 채워 넣어 예외를 늘린다.
       `UserSocialAccountRepository`에 **삭제 메서드가 없다**(현재 `findByProviderAndProviderUserId` 하나뿐) — `deleteByUserId(UUID)` 추가가 필요하다.
       완료 기준: 탈퇴 → 같은 카카오 계정으로 재로그인 시 **새 `users.id`가 발급됨**(로컬 DB 왕복으로 실제 확인 — 목으로는 D1이 검증되지 않는다) · ArchUnit 8건 통과(예외가 늘지 않았음의 확인)
 
@@ -86,11 +92,43 @@
       **비활성 사용자일 때는 예외를 던지지 않고 `SecurityContext`를 세팅하지 않은 채 통과시킨다.** 그러면 `SecurityConfig`의 `authenticationEntryPoint`가 기존 규격대로 `ApiResponse.error(UNAUTHORIZED)` + 401을 내려준다 — 필터에서 던지면 `GlobalExceptionHandler`에 닿지 않아(필터는 DispatcherServlet 앞이다) 응답 형태가 갈린다.
       완료 기준: 탈퇴 직후 기존 access 토큰으로 `GET /users/me` 호출 시 **401 + 기존 에러 본문 형태** · **규칙이 살아 있는지 프로브로 확인**(필터에 `UserRepository` 직참조를 일부러 심어 빨간불이 되는지 — CLAUDE.md 계약. 2026-08-03 실측상 `FRAMEWORK_MUST_NOT_KNOW_DOMAIN`과 `LAYER_DIRECTION` **둘 다** 발화한다) · `spotlessApply` + `build -x test` + `checkstyleMain -PciStrict` 통과
 
+## 검증 계약
+
+> 작성: 2026-08-03 · 근거: 이 계획서 (스펙 원본은 Notion `API I/F`) · 검증: `/testrun REQ-08`
+> `결과` 열은 `/checkpoint`가 채운다. 케이스 ID는 테스트명에 `[REQ-08-01]` 형태로 박는다.
+> **결과 갱신: 2026-08-07 — Phase 1(`01~08`) 8건 `✅`** (`/testrun REQ-08`, 18건 실행 · 실패 0 · 근거 인용 8건 전부 유효 · 고아 ID 없음). `09~20`은 해당 Phase 미착수라 `—`.
+> **테스트 코드는 Phase별로 들어온다** — Java는 대상 클래스가 없으면 테스트 소스가 컴파일되지 않아 `./gradlew test`가 통째로 죽는다(ArchUnit 8건까지 같이 못 돈다). 그래서 "실패하는 테스트를 미리 남긴다"를 여기서는 쓰지 않고, **표가 미검증 상태를 대신 드러낸다.** 오늘 작성한 것은 대상이 이미 있는 `REQ-08-08` 하나뿐이다.
+
+| ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
+|----|------|--------|:--:|------|:--:|:--:|
+| REQ-08-01 | 응답 DTO | 필드가 정확히 5개 (`updated_at` 없음) | 불변식 | 범위—제외 — "원본 `GET /users/me` 응답이 `id`·`nickname`·`email`·`profile_image_url`·`created_at` 5개다" | 1 | ✅ |
+| REQ-08-02 | `UserService` 조회 | 소프트 딜리트된 사용자 → `USER_NOT_FOUND` | 예외 | Phase 1 — "`findByIdAndDeletedAtIsNull`로 조회하고 없으면 `USER_NOT_FOUND`" | 1 | ✅ |
+| REQ-08-03 | `UserService` 수정 | 닉네임만 보내면 `profile_image_url` 유지 | 회귀 | Phase 1 완료 기준 — "`PATCH`에 닉네임만 보내면 `profile_image_url`이 유지됨" | 1 | ✅ |
+| REQ-08-04 | 〃 | 이미지만 보내면 `nickname` 유지 | 회귀 | D3 — "보낸 필드만 덮어쓴다" | 1 | ✅ |
+| REQ-08-05 | 〃 | 둘 다 `null` → 아무것도 안 바뀐다 | 경계 | D3 — "누락·`null` 모두 "변경 없음"" | 1 | ✅ |
+| REQ-08-06 | 수정 요청 DTO | 101자 닉네임 → 검증 위반 | 경계 | D7 — "101자 요청이 `DataIntegrityViolationException`으로 올라와 **400이 아니라 500**이 된다" | 1 | ✅ |
+| REQ-08-07 | 〃 | 100자 통과 · `null` 통과 | 경계 | D7 — "`@Size`는 **`null`을 통과시키므로**" | 1 | ✅ |
+| REQ-08-08 | `User.updateProfile` | 두 필드를 통째로 덮어쓴다(엔티티가 `null`을 "유지"로 읽지 않는다) | 불변식 | D6 — "엔티티가 `null`을 "변경 없음"으로 해석하기 시작하면" | 1 | ✅ |
+| REQ-08-09 | `UserService` 탈퇴 | `users.deleted_at`이 채워진다 | 정상 | Phase 2 — "`users.deleted_at` 기록" | 2 | — |
+| REQ-08-10 | 〃 | 소셜 행이 하드 삭제된다 | 정상 | D1 — "탈퇴 시 `user_social_accounts` 행을 **하드 삭제**" | 2 | — |
+| REQ-08-11 | 탈퇴 → 재로그인 | 새 `users.id`가 발급된다 | 회귀 | Phase 2 완료 기준 — "새 `users.id`가 발급됨" | 2 | ⚠️ 수동 |
+| REQ-08-12 | `business.user` | `data.auth`를 참조하지 않는다 | 불변식 | D5 — "revoke하면 `business/user → data/auth` 참조가 생겨 예외가 4→5로 는다" | 2 | — |
+| REQ-08-13 | `UserService` 탈퇴 | `@Transactional`이 붙어 있다 | 불변식 | 제약·함정 — "탈퇴는 소셜 행 삭제·revoke·`deleted_at`을 한 트랜잭션에서 쓴다" | 2 | — |
+| REQ-08-14 | 〃 | 소셜 행을 먼저 지운다 | 불변식 | 제약·함정 — "소셜 행을 먼저 지우므로 제약 위반은 없지만, 순서를 뒤집을 이유도 없다" | 2 | — |
+| REQ-08-15 | `UserController` | `DELETE`는 204 · 본문 없음 | 정상 | Phase 2 — "204 반환(본문 없음" | 2 | — |
+| REQ-08-16 | `JwtAuthenticationFilter` | 탈퇴 사용자 토큰 → 인증이 설정되지 않는다 | 예외 | Phase 3 — "`SecurityContext`를 세팅하지 않은 채 통과시킨다" | 3 | — |
+| REQ-08-17 | 〃 | 활성 사용자 토큰 → 인증이 설정된다 | 정상 | Phase 3 완료 기준 (REQ-08-16의 대조군) | 3 | — |
+| REQ-08-18 | 〃 | 비활성이어도 예외를 던지지 않는다 | 회귀 | Phase 3 — "필터에서 던지면 `GlobalExceptionHandler`에 닿지 않아 응답 형태가 갈린다" | 3 | — |
+| REQ-08-19 | 〃 | 토큰이 없으면 `UserStatusChecker`를 호출하지 않는다 | 경계 | 제약·함정 — "공개 경로에는 DB 조회가 붙지 않는다" | 3 | — |
+| REQ-08-20 | `UserStatusChecker` | `framework.security` 패키지에 있다 | 불변식 | 제약·함정 — "포트 인터페이스는 `framework`에 둔다" | 3 | — |
+
+**REQ-08-11은 자동화하지 않는다.** 계획서가 "목으로는 D1이 검증되지 않는다"고 못 박았다 — 유령 계정 경로는 `UNIQUE (provider, provider_user_id)`와 실제 조회 결과가 만드는 현상이다. **로컬 DB 왕복으로 사람이 확인**하고 결과 열에 근거(날짜·관찰한 `users.id`)를 남긴다. `/testrun`의 REQ 필터에는 잡히지 않으므로 **"19건 통과"를 "20건 검증됨"으로 읽지 말 것.**
+
 ## 제약·함정
 
 - **`@Transactional` 롤백** (AGENTS §5) — 탈퇴는 소셜 행 삭제·revoke·`deleted_at`을 한 트랜잭션에서 쓴다. 여기서 예외를 던지면 **셋 다 사라진다.** 남겨야 하는 쓰기가 생기면 `noRollbackFor`를 명시할 것. 2026-07-30 `AuthService.refresh`에서 같은 함정이 실제로 터졌고 **목 기반 테스트는 통과했다**
 - **`User.updateProfile`은 부분 반영용이 아니다** (D6) — 두 필드를 무조건 덮어쓴다. 서비스가 병합하지 않고 그대로 부르면 PATCH가 다른 필드를 지운다. **응답은 200으로 정상이고 DB만 조용히 손상된다** — 07-31에 잡은 함정 2건(유령 계정·잔존 토큰)과 같은 종류다
-- **`api-list.md`와 D5가 정반대다** — api-list는 탈퇴 시 토큰 전체 revoke라고 적고 있다. Notion 원본 확인 전에는 어느 쪽도 구현 근거가 아니다(AGENTS §0). Phase 2 선행 과제
+- ✅ **`api-list.md`와 D5의 충돌은 해소됐다** (2026-08-04 Notion 대조) — `API I/F` → 회원 탈퇴 원본은 "소프트 딜리트 / 204"만 규정하고 revoke를 말하지 않는다. 테이블 정의서 §10의 `revoked_at`도 "로테이션·로그아웃·재사용 감지로 찍힌다"로 **탈퇴를 빼고** 있다(2026-07-29 역반영, 최신). api-list의 revoke 서술은 **어느 원본에서도 나오지 않은 파생 문서의 자체 생성**이었고 D5에 맞춰 고쳤다. Notion 쪽 잔여 문장 1건은 미결로 이관
 - **D1은 목으로 검증되지 않는다.** 유령 계정 경로는 `UNIQUE (provider, provider_user_id)`와 실제 조회 결과가 만드는 현상이라 **로컬 DB 왕복이 유일한 확인 수단**이다
 - **ArchUnit 규칙을 고치면 프로브를 심는다** (CLAUDE.md) — 규칙이 조용히 공허해진 전례가 있다. 통과/실패만 봐서는 알 수 없다
 - **`allowEmptyShould`를 다시 `true`로 되돌리지 말 것** (Phase 0) — 새 규칙을 추가했는데 대상이 0개라 실패하면, 완화가 아니라 **규칙이 시기상조라는 신호**다
