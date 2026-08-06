@@ -109,6 +109,8 @@ com.petkok
 - **PR**: PR 필수, 템플릿([`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)) 작성. CI 통과가 머지 조건
 - ⚠️ **머지 직전에 PR head SHA와 로컬 HEAD를 반드시 대조한다.** GitHub이 푸시를 PR에 반영하지 못하는 경우가 실제로 있었다 — 원격 브랜치와 `GET /branches/…`는 새 SHA인데 `GET /pulls/{n}`만 낡은 SHA를 5분 넘게 반환했고, 그대로 머지되어 **커밋 3건이 `main`에 누락**됐다(2026-07-27→28, PR #8 → #9로 복구)
 - ⚠️ **CI 초록불은 SHA와 함께 확인한다.** `gh pr checks`는 이전 실행분 결과를 그대로 보여줄 수 있다. `gh run list --branch <브랜치> --json headSha,conclusion`으로 **어느 커밋 기준인지** 확인할 것 — 위 사고에서 통과로 읽은 체크는 전날 실행분이었다
+- ⚠️ **`git log -- <경로>`로 "커밋 안 됐다"고 단정하지 말 것.** 이 명령은 **HEAD에서 도달 가능한 커밋만** 본다. 다른 브랜치의 작업은 안 보이는데 출력은 "이 파일의 전체 이력"처럼 보이고, **에러도 경고도 없다.** 2026-08-03에 이 한 줄로 "REQ-08 Phase 0가 유실됐다"고 판단해 **같은 변경을 통째로 중복 재구현**했다 — 실제로는 미푸시 로컬 브랜치(`chore/archunit-tighten-empty-allowance`의 `f6f66c7`)에 그대로 있었다. 확인은 `git log --all -- <경로>` 또는 `git branch --all --contains <sha>`로 한다
+	- 같은 이유로 **작업을 끝냈으면 브랜치를 푸시한다.** 로컬에만 있는 브랜치는 `git status`·`git log`·워킹 트리 어디에도 나타나지 않아 **다음 세션에서 없는 것과 구별되지 않는다.** 위 사고의 뿌리는 "커밋을 안 한 것"이 아니라 "푸시·PR을 안 한 것"이었다
 
 ---
 
@@ -130,6 +132,9 @@ com.petkok
 - **Enum**: Java Enum + `@Enumerated(STRING)`, DB는 varchar
 - **페이지네이션**: 커서 기반 (opaque base64 `next_cursor`)
 - **수정 메서드**: 리소스 수정은 `PATCH`(부분 수정)로 통일. `PUT`(전체 교체)은 쓰지 않는다 — 누락 필드와 `null` 의도를 구분할 수 없기 때문
+- ⚠️ **PATCH 요청 DTO 필드에 `@NotBlank`·`@NotNull`을 붙이지 않는다.** 둘 다 `null`을 거부하는데, PATCH는 **필드를 안 보내는 것이 정상 경로**다(누락·`null` = "변경 없음"). 붙이면 **부분 수정 요청이 통째로 400**이 된다. `NOT NULL`은 **엔티티의 불변식이지 요청 DTO의 불변식이 아니다** — 두 층의 제약을 같은 것으로 착각하기 쉽다. 길이 등 스키마 제약은 `@Size`로만 표현한다(`@Size`는 `null`을 통과시킨다). 2026-08-03 `UserUpdateRequest` 초안에서 실제로 밟았다
+	- **길이 제약은 생략하지 말 것.** `@Size(max = N)`이 없으면 초과 입력이 `DataIntegrityViolationException`으로 올라와 **400이 아니라 500**이 된다 — 클라이언트 입력 오류가 서버 오류로 보고된다
+	- **부분 반영 병합은 서비스에서 한다.** 엔티티의 `updateXxx(...)`는 받은 값을 그대로 쓰며 `null`에 도메인 의미를 두지 않는다. 엔티티가 `null`을 "변경 없음"으로 해석하기 시작하면 호출부마다 뜻이 갈린다. **서비스가 병합을 빠뜨리면 에러 없이 다른 필드가 지워지고 응답은 200으로 정상이다** — API 레벨 확인으로는 잡히지 않으므로 "일부 필드만 보냈을 때 나머지가 유지되는가"를 테스트로 고정한다(`UserServiceTest` REQ-08-03·04, `UserTest` REQ-08-08)
 - **공개 경로**: `SecurityConfig.PUBLIC_PATHS`에는 **access 토큰 없이 호출되는 엔드포인트만 개별 경로로** 나열한다. **`/api/v1/auth/**` 같은 와일드카드를 쓰지 않는다** — `/auth/` 아래에도 인증이 필요한 엔드포인트가 있어(`DELETE /auth/logout`) 무인증 노출된다. 현재 공개 대상: `/api/v1/auth/kakao`, `/api/v1/auth/refresh`, `/actuator/health`
 - **네이밍/상수**: 클래스 UpperCamelCase, 상수 `UPPER_SNAKE_CASE`, DTO는 `XxxRequest`/`XxxResponse`
 - **로깅**: Lombok `@Slf4j` (필드 `log`). 민감정보(전화번호·토큰 등)는 마스킹
