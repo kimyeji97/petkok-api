@@ -28,13 +28,19 @@ final class DomainBoundaryTest {
   private DomainBoundaryTest() {}
 
   /**
-   * 예외 3건.
+   * 예외 4건. <b>전부 "설계상 옳다"로 확정된 것이며 임시 완화가 아니다</b> (2026-07-31 정리, REQ-08 Phase 0).
    *
    * <ul>
    *   <li>{@code data.common} — 베이스 엔티티 등 도메인 공용. 누구나 참조할 수 있다
-   *   <li>{@code business.timeline} — 여러 도메인 Repository 를 조합하는 read 전용 모델. 유일한 cross-domain 허용처
+   *   <li>{@code business.timeline} — 여러 도메인 Repository 를 조합하는 read 전용 모델. 유일한 cross-domain 허용처. 다만
+   *       <b>대상 코드가 아직 0개라 REQ-12 까지는 공허하다</b> — 알고 두는 것과 모르고 두는 것은 다르므로 남긴다
    *   <li>{@code framework} — <b>도메인이 아니다.</b> 아래 참고
+   *   <li>{@code business.auth → data.user} — 소셜 자동가입. 아래 참고
    * </ul>
+   *
+   * <p><b>REQ-08 은 이 목록을 늘리지 않는다.</b> 탈퇴 시 refresh revoke 를 생략한 것(D5)도, 필터의 활성 검사를 직참조가 아닌 {@code
+   * UserStatusChecker} 포트로 만든 것(D2)도 예외를 늘리지 않기 위한 선택이다. 여기에 5번째 줄이 생기면 그 선택들의 근거가 무너진 것이므로, 추가 전에
+   * PLAN-REQ-08 「결정」을 다시 볼 것.
    *
    * <p><b>⚠️ framework 예외는 "허용 범위를 넓힌 것"이 아니라 규칙의 오발을 막는 것이다.</b> 슬라이스 패턴 {@code
    * com.petkok.*.(*)..} 는 <em>의존 대상</em>에도 그대로 적용되므로 {@code com.petkok.framework.config} 가 "config"
@@ -57,12 +63,14 @@ final class DomainBoundaryTest {
           .ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.data.common.."))
           .ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.framework.."))
           .ignoreDependency(resideInAPackage("com.petkok.business.timeline.."), alwaysTrue())
-          // ⬇️ 임시 — 개선 방향 논의 대상 (2026-07-29 결정, PLAN-REQ-07 「미결 질문」 참고).
-          //    auth 자동가입이 users 행을 만들기 때문에 생긴 참조다. 위 셋과 달리 "설계상 옳다"고
-          //    확정된 예외가 아니다. 좁히거나 없애는 방향을 따로 논의한다.
+          // ⬇️ 설계 결정 (2026-07-31 승격, PLAN-REQ-08 D4). 원래 "임시" 딱지가 붙어 있었다.
+          //    소셜 자동가입은 본질적으로 user 프로비저닝이므로 auth 가 users 행을 만드는 것은
+          //    우회가 아니라 제 일이다. 이 참조를 없애려면 business/user 에 프로비저닝 진입점을
+          //    두어야 하는데, 그러면 business/auth → business/user 예외가 대신 생겨
+          //    개수는 그대로인 채 간접층만 는다. 그래서 없애지 않는다.
           .ignoreDependency(
               resideInAPackage("com.petkok.business.auth.."),
               resideInAPackage("com.petkok.data.user.."))
           .as("도메인 간 참조 금지 (business/{d} 와 data/{d} 는 같은 슬라이스)")
-          .allowEmptyShould(true);
+          .allowEmptyShould(false);
 }
