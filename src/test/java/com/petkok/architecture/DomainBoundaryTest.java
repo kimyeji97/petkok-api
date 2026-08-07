@@ -3,6 +3,7 @@ package com.petkok.architecture;
 import static com.tngtech.archunit.base.DescribedPredicate.alwaysTrue;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 
+import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
@@ -22,7 +23,9 @@ import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition;
  * <p>따라서 {@code business/{도메인}} 과 {@code data/{도메인}} 은 <b>반드시 같은 이름</b>이어야 한다. 이름이 어긋나면 이 규칙은 에러 없이
  * 조용히 무력화된다(서로 다른 슬라이스로 잡혀 규칙은 통과하는데 경계는 안 지켜진다).
  */
-@AnalyzeClasses(packages = {"com.petkok.business", "com.petkok.data"})
+@AnalyzeClasses(
+    packages = {"com.petkok.business", "com.petkok.data"},
+    importOptions = ImportOption.DoNotIncludeTests.class)
 final class DomainBoundaryTest {
 
   private DomainBoundaryTest() {}
