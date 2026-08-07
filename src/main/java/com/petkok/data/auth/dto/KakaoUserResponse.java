@@ -1,5 +1,7 @@
 package com.petkok.data.auth.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * 카카오 사용자 정보 응답 ({@code GET kapi.kakao.com/v2/user/me}).
  *
@@ -12,10 +14,15 @@ package com.petkok.data.auth.dto;
  *   <li>{@code id} 는 Long 이다. petkok 은 {@code provider_user_id varchar(255)} 에 문자열로 담는다
  * </ul>
  *
+ * <p>⚠️ <b>{@code @JsonProperty} 로 이름을 못박는다 — 전역 snake_case 설정에 기대지 않는다.</b> 이유는 {@link
+ * KakaoTokenResponse} 에 적어 두었다. 여기서 빠지면 {@code kakaoAccount} 가 {@code null} 이 되어 닉네임을 못 읽고, {@code
+ * users.nickname} 이 NOT NULL 이라 <b>자동가입이 깨진다.</b>
+ *
  * <p>⚠️ <b>이 호스트({@code kapi})에만 콘솔 「허용 IP 주소」가 걸린다.</b> 토큰 교환({@code kauth})은 성공하는데 여기서만 {@code
  * {"code":-401,"msg":"ip mismatched!"}} 로 거부되면 키가 아니라 IP 문제다 — 토큰이 발급됐다면 키 3개는 정상이다.
  */
-public record KakaoUserResponse(Long id, KakaoAccountResponse kakaoAccount) {
+public record KakaoUserResponse(
+    @JsonProperty("id") Long id, @JsonProperty("kakao_account") KakaoAccountResponse kakaoAccount) {
 
   /**
    * {@code kakao_account}. 동의항목별로 필드가 통째로 빠질 수 있어 전부 nullable 로 다룬다.
@@ -23,9 +30,12 @@ public record KakaoUserResponse(Long id, KakaoAccountResponse kakaoAccount) {
    * <p>중첩 record 도 {@code Response} 로 끝나야 한다 — ArchUnit {@code DTO_NAMING} 이 {@code ..dto..} 의 모든
    * 클래스를 검사한다.
    */
-  public record KakaoAccountResponse(String email, ProfileResponse profile) {}
+  public record KakaoAccountResponse(
+      @JsonProperty("email") String email, @JsonProperty("profile") ProfileResponse profile) {}
 
   /** {@code kakao_account.profile}. */
   public record ProfileResponse(
-      String nickname, String profileImageUrl, String thumbnailImageUrl) {}
+      @JsonProperty("nickname") String nickname,
+      @JsonProperty("profile_image_url") String profileImageUrl,
+      @JsonProperty("thumbnail_image_url") String thumbnailImageUrl) {}
 }
