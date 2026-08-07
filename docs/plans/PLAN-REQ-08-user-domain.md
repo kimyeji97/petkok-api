@@ -1,6 +1,6 @@
 # PLAN-REQ-08 · user 도메인 (내 프로필 조회·수정·탈퇴)
 
-> 출처: 2026-07-31 세션 · 작성: 2026-07-31 · 상태: 🟡 진행 (Phase 0~1 완료 · Phase 2·3 남음)
+> 출처: 2026-07-31 세션 · 작성: 2026-07-31 · 상태: 🟡 진행 (Phase 0~2 완료 · **Phase 3(필터 활성 검사)만 남음**)
 
 ## 배경
 
@@ -53,7 +53,8 @@
 - [ ] **빈 문자열 닉네임(`""`)을 어떻게 볼 것인가.** D7이 `@Size(max = 100)`만 두므로 `""`는 지금 **그대로 저장된다**(`NOT NULL`은 만족한다). "변경 없음"(`null`)과 "빈 값으로 변경"(`""`)이 구분은 되지만, 후자를 허용할 근거도 거부할 근거도 원본에 없다. 최소 길이 규칙이 정해지면 `@Size(min = 1, ...)`로 함께 닫힌다
 - [ ] **Notion 테이블 정의서 §10의 저장소 선택 근거 문장을 고칠 것** (역반영 대기). "Redis는 기각했다(로그아웃·**탈퇴** 시 즉시 무효화가 필요하고…)"가 남아 있어 D5와 어긋나 보인다. Redis 기각 논거이지 탈퇴 동작 명세가 아니므로 **문장을 다듬거나 D5 링크를 붙이는 정도**면 된다 — 사람이 Notion에서 수정해야 한다
 - [ ] **필터의 사용자 조회 비용.** 모든 인증 요청에 DB 왕복 1회가 붙는다. 캐시 도입 여부는 실사용 트래픽을 보고 정한다 — 지금 정하면 근거 없는 수치가 굳는다
-- [ ] **탈퇴 계정의 `/auth/refresh` 응답.** D5로 revoke를 안 하므로 탈퇴한 사용자도 `/auth/refresh`가 **200과 새 토큰을 반환**한다(그 토큰으로 API를 부르면 401). 클라이언트 입장에서 혼란스러울 수 있다 — `AuthService.refresh`에 활성 검사를 넣을지는 실제 클라이언트 동작을 보고 정한다
+- [ ] **탈퇴 계정의 `/auth/refresh` 응답.** D5로 revoke를 안 하므로 탈퇴한 사용자도 `/auth/refresh`가 **200과 새 토큰을 반환**한다. 클라이언트 입장에서 혼란스러울 수 있다 — `AuthService.refresh`에 활성 검사를 넣을지는 실제 클라이언트 동작을 보고 정한다
+	- ⚠️ **정정 (2026-08-07 실측)** — 원래 "그 토큰으로 API를 부르면 401"이라 적혀 있었으나 **지금은 404 `USER_NOT_FOUND`** 다. Phase 3 필터가 없어 서비스의 `findByIdAndDeletedAtIsNull` 이 먼저 걸리기 때문이다. 즉 그 문구는 **Phase 3 완료를 전제한 서술**이었고, Phase 3 이후 필터가 앞에서 잡아 401이 된다. **Phase 3 검증 시 이 전환을 함께 확인할 것**
 
 > **해소됨** — `business/user → data/auth` 참조를 어떻게 처리할지는 D5(revoke 생략)로 닫혔다.
 
@@ -80,9 +81,9 @@
       → **케이스 8건 전부 `✅`** (2026-08-07 `/testrun`). 다만 **완료 기준 2건이 케이스보다 넓다** — 아래를 알고 체크한 것이다.
       · **"전역 snake_case"는 검증되지 않는다.** `REQ-08-01`은 record 컴포넌트 이름(camelCase)만 본다. 직렬화된 JSON이 `profile_image_url`로 나가는지는 아무도 확인하지 않으며, `JacksonConfig`가 사라져도 초록불을 유지한다
       · **"101자 → 400"의 마지막 한 칸이 비어 있다.** `REQ-08-06`은 Bean Validation이 위반을 만드는 것까지다. 400으로 이어지는 것은 `GlobalExceptionHandler`의 `MethodArgumentNotValidException` → `INVALID_INPUT` 매핑을 **코드로 읽어 확인**했을 뿐 테스트가 보증하지 않는다
-      → 둘 다 `@WebMvcTest` 한 건이면 닫힌다. Phase 2의 `REQ-08-15`(컨트롤러 204)와 함께 다루는 것이 자연스럽다.
+      → ✅ **둘 다 2026-08-07 로컬 왕복에서 실측으로 확인됐다** — `GET /users/me` 가 `profile_image_url`·`created_at` 5필드로 나갔고(`updated_at` 없음), 101자 닉네임은 **400 `INVALID_INPUT`** 이었다(500 아님). 다만 **테스트가 아니라 사람이 한 번 본 것**이라 회귀는 여전히 막지 못한다 — `@WebMvcTest` 도입 시 자동화 대상이다(AGENTS §7상 새 패턴이라 별도 판단 필요).
 
-- [ ] **Phase 2 — 탈퇴**
+- [x] **Phase 2 — 탈퇴 (2026-08-07 구현·검증)**
       `users.deleted_at` 기록(`BaseSoftDeleteEntity.softDelete()`) + `user_social_accounts` 하드 삭제. 204 반환(본문 없음 — `AuthController.logout` 선례대로 `ApiResponse`를 씌우지 않는다). refresh는 revoke하지 않으며(D5) **그 이유를 주석으로 남긴다** — 근거가 없으면 다음 사람이 "빠뜨렸다"고 보고 채워 넣어 예외를 늘린다.
       `UserSocialAccountRepository`에 **삭제 메서드가 없다**(현재 `findByProviderAndProviderUserId` 하나뿐) — `deleteByUserId(UUID)` 추가가 필요하다.
       완료 기준: 탈퇴 → 같은 카카오 계정으로 재로그인 시 **새 `users.id`가 발급됨**(로컬 DB 왕복으로 실제 확인 — 목으로는 D1이 검증되지 않는다) · ArchUnit 8건 통과(예외가 늘지 않았음의 확인)
@@ -96,7 +97,8 @@
 
 > 작성: 2026-08-03 · 근거: 이 계획서 (스펙 원본은 Notion `API I/F`) · 검증: `/testrun REQ-08`
 > `결과` 열은 `/checkpoint`가 채운다. 케이스 ID는 테스트명에 `[REQ-08-01]` 형태로 박는다.
-> **결과 갱신: 2026-08-07 — Phase 1(`01~08`) 8건 `✅`** (`/testrun REQ-08`, 18건 실행 · 실패 0 · 근거 인용 8건 전부 유효 · 고아 ID 없음). `09~20`은 해당 Phase 미착수라 `—`.
+> **결과 갱신: 2026-08-07 — Phase 1·2(`01~15`) 15건 `✅`.** `REQ-08-11` 은 자동화하지 않고 **로컬 DB 왕복으로 사람이 확인**했다(2026-08-07: 탈퇴 전 `a02016c0…` → 재로그인 후 **`94eef1f2…`**, 소셜 행은 새 `user_id` 로 재생성). `/testrun` 에는 잡히지 않으므로 **"14건 통과"를 "15건 검증됨"으로 읽지 말 것.** Phase 3(`16~20`)은 미착수라 `—`.
+> (이전) Phase 1(`01~08`) 8건 `✅` (`/testrun REQ-08`, 18건 실행 · 실패 0 · 근거 인용 8건 전부 유효 · 고아 ID 없음). `09~20`은 해당 Phase 미착수라 `—`.
 > **테스트 코드는 Phase별로 들어온다** — Java는 대상 클래스가 없으면 테스트 소스가 컴파일되지 않아 `./gradlew test`가 통째로 죽는다(ArchUnit 8건까지 같이 못 돈다). 그래서 "실패하는 테스트를 미리 남긴다"를 여기서는 쓰지 않고, **표가 미검증 상태를 대신 드러낸다.** 오늘 작성한 것은 대상이 이미 있는 `REQ-08-08` 하나뿐이다.
 
 | ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
@@ -109,13 +111,13 @@
 | REQ-08-06 | 수정 요청 DTO | 101자 닉네임 → 검증 위반 | 경계 | D7 — "101자 요청이 `DataIntegrityViolationException`으로 올라와 **400이 아니라 500**이 된다" | 1 | ✅ |
 | REQ-08-07 | 〃 | 100자 통과 · `null` 통과 | 경계 | D7 — "`@Size`는 **`null`을 통과시키므로**" | 1 | ✅ |
 | REQ-08-08 | `User.updateProfile` | 두 필드를 통째로 덮어쓴다(엔티티가 `null`을 "유지"로 읽지 않는다) | 불변식 | D6 — "엔티티가 `null`을 "변경 없음"으로 해석하기 시작하면" | 1 | ✅ |
-| REQ-08-09 | `UserService` 탈퇴 | `users.deleted_at`이 채워진다 | 정상 | Phase 2 — "`users.deleted_at` 기록" | 2 | — |
-| REQ-08-10 | 〃 | 소셜 행이 하드 삭제된다 | 정상 | D1 — "탈퇴 시 `user_social_accounts` 행을 **하드 삭제**" | 2 | — |
-| REQ-08-11 | 탈퇴 → 재로그인 | 새 `users.id`가 발급된다 | 회귀 | Phase 2 완료 기준 — "새 `users.id`가 발급됨" | 2 | ⚠️ 수동 |
-| REQ-08-12 | `business.user` | `data.auth`를 참조하지 않는다 | 불변식 | D5 — "revoke하면 `business/user → data/auth` 참조가 생겨 예외가 4→5로 는다" | 2 | — |
-| REQ-08-13 | `UserService` 탈퇴 | `@Transactional`이 붙어 있다 | 불변식 | 제약·함정 — "탈퇴는 소셜 행 삭제·revoke·`deleted_at`을 한 트랜잭션에서 쓴다" | 2 | — |
-| REQ-08-14 | 〃 | 소셜 행을 먼저 지운다 | 불변식 | 제약·함정 — "소셜 행을 먼저 지우므로 제약 위반은 없지만, 순서를 뒤집을 이유도 없다" | 2 | — |
-| REQ-08-15 | `UserController` | `DELETE`는 204 · 본문 없음 | 정상 | Phase 2 — "204 반환(본문 없음" | 2 | — |
+| REQ-08-09 | `UserService` 탈퇴 | `users.deleted_at`이 채워진다 | 정상 | Phase 2 — "`users.deleted_at` 기록" | 2 | ✅ |
+| REQ-08-10 | 〃 | 소셜 행이 하드 삭제된다 | 정상 | D1 — "탈퇴 시 `user_social_accounts` 행을 **하드 삭제**" | 2 | ✅ |
+| REQ-08-11 | 탈퇴 → 재로그인 | 새 `users.id`가 발급된다 | 회귀 | Phase 2 완료 기준 — "새 `users.id`가 발급됨" | 2 | ✅ 수동 |
+| REQ-08-12 | `business.user` | `data.auth`를 참조하지 않는다 | 불변식 | D5 — "revoke하면 `business/user → data/auth` 참조가 생겨 예외가 4→5로 는다" | 2 | ✅ |
+| REQ-08-13 | `UserService` 탈퇴 | `@Transactional`이 붙어 있다 | 불변식 | 제약·함정 — "탈퇴는 소셜 행 삭제·revoke·`deleted_at`을 한 트랜잭션에서 쓴다" | 2 | ✅ |
+| REQ-08-14 | 〃 | 소셜 행을 먼저 지운다 | 불변식 | 제약·함정 — "소셜 행을 먼저 지우므로 제약 위반은 없지만, 순서를 뒤집을 이유도 없다" | 2 | ✅ |
+| REQ-08-15 | `UserController` | `DELETE`는 204 · 본문 없음 | 정상 | Phase 2 — "204 반환(본문 없음" | 2 | ✅ |
 | REQ-08-16 | `JwtAuthenticationFilter` | 탈퇴 사용자 토큰 → 인증이 설정되지 않는다 | 예외 | Phase 3 — "`SecurityContext`를 세팅하지 않은 채 통과시킨다" | 3 | — |
 | REQ-08-17 | 〃 | 활성 사용자 토큰 → 인증이 설정된다 | 정상 | Phase 3 완료 기준 (REQ-08-16의 대조군) | 3 | — |
 | REQ-08-18 | 〃 | 비활성이어도 예외를 던지지 않는다 | 회귀 | Phase 3 — "필터에서 던지면 `GlobalExceptionHandler`에 닿지 않아 응답 형태가 갈린다" | 3 | — |

@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-07 (REQ-08 Phase 0~1 · ArchUnit 범위 정정 · Notion 대조)
+> 최종 갱신: 2026-08-07 (REQ-07 완료 · REQ-08 Phase 2 · 카카오 매핑 결함 · 스택 PR 사고)
 
 ## 요구사항 인덱스
 
@@ -18,8 +18,8 @@
 | REQ-06 | API 설계 초안 + 설계 결정 3건 확정 | [api-list.md](specs/api-list.md) | 2026-07-23 | ✅ |
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
-| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | 🟡 Phase 1~6 완료 · 로그인 왕복 수동 확인 남음 |
-| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | — | 🟡 Phase 0~1 완료 · Phase 2(탈퇴)·3(필터) 남음 |
+| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 2건 잔존) |
+| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | — | 🟡 Phase 0~2 완료 · Phase 3(필터 활성 검사) 남음 |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
@@ -32,6 +32,78 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-08-07
+
+> REQ-08 Phase 2(탈퇴) 구현과 **첫 실제 카카오 로그인 왕복**. 왕복 한 번에 **동작한 적 없던 버그 1건**과 **`main` 을 비껴간 커밋 5건**이 같이 나왔다.
+
+### 카카오 로그인은 한 번도 동작한 적이 없었다
+
+`REQ-08-11`(탈퇴 → 재로그인) 검증을 하려고 처음으로 실제 로그인을 시도했다. REQ-07 상태에 "**로그인 왕복 수동 확인 남음**"이라 적혀 있던 그 확인이다. 첫 요청에서 502 가 났다.
+
+- **카카오는 200 과 `access_token` 을 정상 반환**했는데 우리가 "no access token" 으로 판단했다. 응답 로그에는 값이 멀쩡히 찍혀 있어 **외부 API 장애로 오진하기 딱 좋은 형태**다
+- 증상이 같은 원인이 둘이라 구분이 필요했다 — ① 필드 매핑 ② AGENTS §5 가 경고하는 **응답 스트림 소비**. 인터셉터가 `BufferingClientHttpResponseWrapper` 로 감싸고 `getBody()` 가 매번 새 스트림을 돌려주는 것을 확인해 ②를 배제했다
+- 원인: **`JacksonConfig` 의 snake_case 커스터마이저는 Spring Boot 가 자동 구성하는 `ObjectMapper` 에만 적용된다.** 이 DTO 를 읽는 것은 `RestTemplateConfig` 의 `new RestTemplate()` 이고 그건 자기 컨버터 안에서 맨 `new ObjectMapper()` 를 쓴다 → `access_token → accessToken` 바인딩이 없어 전 필드 `null`
+- `KakaoTokenResponse` javadoc 이 적어 둔 "전역 snake_case 설정이 매핑한다"는 **전제 자체가 틀렸다**
+
+> **왜 지금까지 안 잡혔나 — 단위 테스트가 `KakaoOAuthClient` 를 목으로 대체해 이 경로를 한 번도 타지 않았다.** REQ-07 검증 계약 23건이 전부 초록불인 채로, 로그인이라는 기능 자체가 죽어 있었다. "테스트 통과"와 "동작함"의 거리를 이보다 잘 보여주는 사례가 없다.
+
+`@JsonProperty` 명시로 고쳤다(`bf41915`). **회귀 테스트는 설정 없는 `new ObjectMapper()` 로 역직렬화한다** — 설정된 매퍼로 검증하면 버그가 있어도 초록불이 되기 때문이다. 프로브로 확인했다(애노테이션 제거 → REQ-07-24 빨간불).
+
+`KakaoUserResponse` 도 같은 문제였다. 토큰 교환만 고쳤으면 `getProfile` 에서 다시 터졌고, `nickname` 을 못 읽어 `users.nickname` NOT NULL 때문에 **자동가입이 깨졌을 것**이다.
+
+> ⚠️ **대가 — 인가코드는 1회용이다.** 실패할 때마다 브라우저로 새로 받아야 해서 이 버그 하나에 코드를 3번 받았다.
+
+### 스택 PR 이 커밋 5건을 `main` 밖에 두고 갔다
+
+Phase 1 을 스택 PR(#22, base = Phase 0 브랜치)로 올리면서 "#21 이 머지되면 base 가 `main` 으로 자동 재지정된다"고 봤는데, **재지정 조건은 "선행 PR 머지"가 아니라 "base 브랜치 삭제"였다.** #21 머지 후에도 브랜치가 남아 있어 28분 뒤 #22 가 그 위로 머지됐다.
+
+**머지는 성공하고 PR 도 `MERGED` 가 된다.** `main` 에 `UserService` 조차 없다는 것은 따로 확인해야만 보였다. #23 으로 복구했고 AGENTS §4 에 계약으로 올렸다.
+
+> 07-27 PR #8 사고(head SHA 불일치로 커밋 3건 누락)와 **증상은 같고 원인이 다르다.** 두 번째다 — `main` 을 확인하지 않으면 누락은 조용하다.
+
+### Phase 0 "유실"은 오진이었다
+
+08-03 에 "07-31 Phase 0 가 커밋되지 않고 유실됐다"고 기록했는데 **틀렸다.** 미푸시 로컬 브랜치 `chore/archunit-tighten-empty-allowance`(`f6f66c7`)에 동일한 변경이 전부 있었다.
+
+원인은 진단에 쓴 명령이다 — **`git log -- <경로>` 는 HEAD 도달 가능 커밋만 본다.** 다른 브랜치 작업은 안 보이는데 출력은 "이 파일의 전체 이력"처럼 보이고 에러도 경고도 없다. `d9016e3` 은 결국 중복 재구현이 됐다(다만 프로브 3건은 08-03 판에만 있다).
+
+AGENTS §4 에 올리면서 **뿌리 원인도 함께 적었다 — "커밋을 안 한 것"이 아니라 "푸시·PR 을 안 한 것"이다.** 로컬 전용 브랜치는 다음 세션에서 없는 것과 구별되지 않는다.
+
+### `REQ-08-11` — D1 이 실제로 동작한다
+
+빈 DB 에서 실제 카카오 계정으로 왕복했다. **자동화하지 않기로 한 케이스**이고, 계획서가 "목으로는 검증되지 않는다"고 못박은 이유가 여기 있다.
+
+| | `users.id` | 상태 |
+|---|---|---|
+| 탈퇴 전 | `a02016c0…` | `deleted_at` 찍힘 |
+| 재로그인 후 | **`94eef1f2…`** | 활성 · 소셜 행이 새 `user_id` 로 재생성 |
+
+소셜 행을 하드 삭제하지 않았다면 조회가 옛 행을 찾아 `a02016c0…` 로 토큰을 발급했을 것이다.
+
+**같은 왕복에서 Phase 1 커버리지 공백 2건도 실측으로 닫혔다** — `GET /users/me` 가 5필드·snake_case 로 나갔고(`updated_at` 없음), 101자 닉네임은 **400 `INVALID_INPUT`**(500 아님)이었다. 다만 **사람이 한 번 본 것이라 회귀는 못 막는다.**
+
+### 계획서 미결이 틀렸던 것 — 401 이 아니라 404
+
+D5 대가로 등록해 둔 "탈퇴 계정도 `/auth/refresh` 가 200 을 반환한다"는 그대로 재현됐다. 그런데 이어지는 "**그 토큰으로 API 를 부르면 401**"이 **실제로는 404 `USER_NOT_FOUND`** 였다 — Phase 3 필터가 없어 서비스의 `findByIdAndDeletedAtIsNull` 이 먼저 걸리기 때문이다.
+
+> **그 문구는 Phase 3 완료를 전제한 서술이었다.** 미결을 쓸 때 "언제 시점의 동작인지"를 안 적으면 이렇게 어긋난다. Phase 3 에서 404 → 401 전환을 확인 대상으로 넣었다.
+
+### 계약 3건 승격 (AGENTS)
+
+전부 이번에 실제로 밟은 것이다.
+
+- §4 — `git log -- <경로>` 범위 함정 + "끝냈으면 푸시한다"
+- §4 — 스택 PR base 재지정 조건 + 머지 후 `git log origin/main..origin/<브랜치>` 확인
+- §5 — **PATCH 요청 DTO 에 `@NotBlank`·`@NotNull` 금지.** `null` 을 거부해 "필드 미전송 = 변경 없음"을 깬다. D7 초안에서 밟았고 `/testgen` 중 철회했다
+
+### 잔가지
+
+- **`application.yml` 이 `.env` 를 읽는다** — `spring.config.import: optional:file:.env[.properties]`. `set -a && . ./.env` 가 더 이상 필요 없다. `optional:` 을 떼면 CI 가 통째로 깨진다
+- lefthook `commit-msg` 가 `wip` 타입을 거부한다 (허용: `feat fix docs style refactor perf test build ci chore revert`)
+- **`ci.yml` 트리거가 `push: main` + `pull_request` 뿐이다** — PR 없이 푸시한 브랜치는 CI 가 돌지 않는다
+- REQ-07-24·25 는 **코드가 표보다 먼저 들어갔다**(CLAUDE.md 는 표가 먼저). 이번 checkpoint 에서 표를 채웠다
+- 로컬 DB 에 테스트 계정 2건(탈퇴 1·활성 1)을 **의도적으로 남겼다** — Phase 3 의 `REQ-08-16`(탈퇴 계정 401)·`REQ-08-17`(활성 통과) 대조군으로 재사용한다
 
 ## 2026-08-04
 
