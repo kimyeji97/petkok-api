@@ -159,6 +159,18 @@ CI([`.github/workflows/ci.yml`](.github/workflows/ci.yml))에서 강제한다. *
 	- **도메인 간 참조 규칙은 `DomainBoundaryTest` 로 분리돼 있다.** `@AnalyzeClasses` 범위를 `business`·`data` 로 좁혀야 하기 때문이다 — `framework` 가 섞이면 `framework.config` 가 "config" 슬라이스로 잡혀 규칙이 엉뚱해진다
 	- ⚠️ **슬라이스 패턴은 `com.petkok.*.(*)..` 이다. 첫 세그먼트를 캡처하면(`(business|data)`) 규칙이 정반대로 동작한다** — 트리 이름이 슬라이스 키에 포함돼 `business/feeding` 과 `data/feeding` 이 다른 슬라이스가 되고 같은 도메인 참조까지 위반으로 잡힌다
 	- **§3의 패키지 이름 규칙이 곧 이 규칙의 전제**다. 이름이 어긋나면 규칙은 통과하는데 경계는 안 지켜진다
+- **컨트롤러 테스트**: **`@WebMvcTest` 관례 확정(2026-08-07, REQ-15).** HTTP 왕복이 있어야만 검증되는 것 — 직렬화 키·상태코드·에러 본문 — 을 여기서 고정한다. 단위 테스트는 서비스 반환값까지만 본다.
+
+	```java
+	@WebMvcTest(XxxController.class)
+	@Import({SecurityConfig.class, JacksonConfig.class})   // ⚠️ 빼면 조용히 거짓말한다
+	```
+
+	- ⚠️ **`@Import` 를 빠뜨리면 테스트가 통과하면서 틀린 계약을 고정한다.** 사용자 정의 `@Configuration` 은 슬라이스에 포함되지 않는다 — `JacksonConfig` 가 빠지면 응답이 `profileImageUrl`(camelCase)로 나가고, 그걸 단언하면 **실제 계약과 반대인 값이 초록불로 굳는다.** `SecurityConfig` 가 빠지면 기본 시큐리티가 401 을 내는데 **본문이 비어** 우리 규격을 검증하지 못하고, CSRF 기본값 때문에 `PATCH`·`DELETE` 가 403 이 된다
+	- ⚠️ **`Filter` 빈은 슬라이스에 자동 포함된다.** `JwtAuthenticationFilter` 가 따라 들어오므로 `JwtTokenProvider` 를 채우지 않으면 **컨텍스트가 아예 안 뜬다.** `@AutoConfigureMockMvc(addFilters = false)` 로도 빈 생성은 막히지 않는다
+	- ⚠️ **`UserStatusChecker` 를 따로 `@MockBean` 하지 말 것** (user 슬라이스 한정). `UserService` 가 그 인터페이스를 구현하므로(§3 포트 패턴) 목끼리 충돌해 `UserService` 정의가 사라진다. 에러는 **"UserService 없음"으로만 나타나 원인이 안 보인다.** 반대로 `AuthController` 슬라이스에는 `UserService` 가 없으므로 포트를 따로 채워야 한다
+	- **인증은 `SecurityMockMvcRequestPostProcessors.authentication(...)` 으로 만든다.** `@WithMockUser` 는 `AuthPrincipal` 을 만들지 못해 쓸 수 없다
+	- ⚠️ **`message` 를 단언하지 말고 `error.code` 를 단언한다.** 검증 메시지는 로케일을 탄다(실측: 슬라이스 영어 / 실제 앱 한글). **상태코드만 단언하는 것도 부족하다** — 잘못된 시큐리티 구성에서도 401 은 나온다. 2026-08-07 프로브에서 `status` 는 통과하고 `error.code` 만 깨졌다
 
 ---
 
