@@ -109,6 +109,9 @@ com.petkok
 - **PR**: PR 필수, 템플릿([`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)) 작성. CI 통과가 머지 조건
 - ⚠️ **머지 직전에 PR head SHA와 로컬 HEAD를 반드시 대조한다.** GitHub이 푸시를 PR에 반영하지 못하는 경우가 실제로 있었다 — 원격 브랜치와 `GET /branches/…`는 새 SHA인데 `GET /pulls/{n}`만 낡은 SHA를 5분 넘게 반환했고, 그대로 머지되어 **커밋 3건이 `main`에 누락**됐다(2026-07-27→28, PR #8 → #9로 복구)
 - ⚠️ **CI 초록불은 SHA와 함께 확인한다.** `gh pr checks`는 이전 실행분 결과를 그대로 보여줄 수 있다. `gh run list --branch <브랜치> --json headSha,conclusion`으로 **어느 커밋 기준인지** 확인할 것 — 위 사고에서 통과로 읽은 체크는 전날 실행분이었다
+- ⚠️ **스택 PR의 base 자동 재지정은 "선행 PR 머지"가 아니라 "base 브랜치 삭제"가 조건이다.** 선행 PR을 머지해도 그 브랜치가 원격에 남아 있으면 후속 PR의 base는 그대로이고, 머지하면 **`main`이 아니라 그 브랜치로 들어간다.** 머지는 성공으로 표시되고 PR도 `MERGED`가 되므로 **조용하다** — `main`에 아무것도 안 올라간 것은 따로 확인해야만 보인다. 2026-08-07에 실제로 발생했다(#21 머지 28분 뒤 #22가 `chore/req08-phase0-archunit`으로 머지 → Phase 1 전체 13파일이 `main`을 비껴감, #23으로 복구)
+	- 대응은 셋 중 하나 — 선행 PR 머지 시 **브랜치 삭제를 함께** 하거나, 후속 PR의 **base를 수동으로 `main`으로 변경**(`gh pr edit <n> --base main`)하거나, 애초에 스택하지 않는다
+	- **머지 후에는 `main`에 실제로 들어갔는지 확인한다.** `git log --oneline origin/main..origin/<브랜치>`가 비어 있어야 한다. PR 상태(`MERGED`)만으로는 알 수 없다
 - ⚠️ **`git log -- <경로>`로 "커밋 안 됐다"고 단정하지 말 것.** 이 명령은 **HEAD에서 도달 가능한 커밋만** 본다. 다른 브랜치의 작업은 안 보이는데 출력은 "이 파일의 전체 이력"처럼 보이고, **에러도 경고도 없다.** 2026-08-03에 이 한 줄로 "REQ-08 Phase 0가 유실됐다"고 판단해 **같은 변경을 통째로 중복 재구현**했다 — 실제로는 미푸시 로컬 브랜치(`chore/archunit-tighten-empty-allowance`의 `f6f66c7`)에 그대로 있었다. 확인은 `git log --all -- <경로>` 또는 `git branch --all --contains <sha>`로 한다
 	- 같은 이유로 **작업을 끝냈으면 브랜치를 푸시한다.** 로컬에만 있는 브랜치는 `git status`·`git log`·워킹 트리 어디에도 나타나지 않아 **다음 세션에서 없는 것과 구별되지 않는다.** 위 사고의 뿌리는 "커밋을 안 한 것"이 아니라 "푸시·PR을 안 한 것"이었다
 
