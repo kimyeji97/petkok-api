@@ -6,6 +6,18 @@
 spring:
   application:
     name: petkok-api
+
+  # 로컬 실행 편의 — 레포 루트의 .env 를 프로퍼티 소스로 읽는다.
+  #   `./gradlew bootRun` 만으로 기동된다 (`set -a && . ./.env && set +a` 불필요).
+  #   `[.properties]` 는 확장자 없는 파일을 properties 형식으로 읽으라는 지시다.
+  # ⚠️ `optional:` 을 떼지 말 것 — CI·운영에는 .env 가 없고, 필수로 바꾸면 파일이 없다는
+  #    이유만으로 기동·테스트가 통째로 실패한다.
+  # ⚠️ 우선순위상 실제 환경변수가 .env 보다 세다. 쉘에서 export 한 값이 있으면 그쪽이 이긴다.
+  # ⚠️ .env 는 커밋하지 않는다(.gitignore). 값의 형식은 properties 규칙을 따르므로
+  #    값에 `\` 가 있으면 이스케이프해야 하고, 줄 앞 `#` 은 주석이 된다.
+  config:
+    import: optional:file:.env[.properties]
+
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
 

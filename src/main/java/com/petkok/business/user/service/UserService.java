@@ -4,6 +4,7 @@ import com.petkok.data.user.dto.UserResponse;
 import com.petkok.data.user.dto.UserUpdateRequest;
 import com.petkok.data.user.entity.User;
 import com.petkok.data.user.repository.UserRepository;
+import com.petkok.data.user.repository.UserSocialAccountRepository;
 import com.petkok.framework.exception.BusinessException;
 import com.petkok.framework.exception.ErrorCode;
 import java.util.UUID;
@@ -11,15 +12,23 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 내 프로필 조회·수정. 검증 계약 REQ-08-01 ~ 05 (PLAN-REQ-08 § 검증 계약). */
+/**
+ * 내 프로필 조회·수정·탈퇴. 검증 계약 REQ-08-01 ~ 05 · 09 · 10 · 12 ~ 14 (PLAN-REQ-08 § 검증 계약).
+ *
+ * <p><b>{@code data/auth} 를 참조하지 않는다 — 의도적이다</b> (D5). 탈퇴가 refresh 토큰을 revoke 하면 {@code
+ * business/user → data/auth} 참조가 생겨 ArchUnit 도메인 간 참조 예외가 4→5 로 는다. {@link #withdraw} 주석 참고.
+ */
 @Slf4j
 @Service
 public class UserService {
 
   private final UserRepository userRepository;
+  private final UserSocialAccountRepository socialAccountRepository;
 
-  public UserService(UserRepository userRepository) {
+  public UserService(
+      UserRepository userRepository, UserSocialAccountRepository socialAccountRepository) {
     this.userRepository = userRepository;
+    this.socialAccountRepository = socialAccountRepository;
   }
 
   /**
@@ -57,6 +66,35 @@ public class UserService {
         request.profileImageUrl() != null ? request.profileImageUrl() : user.getProfileImageUrl());
 
     return toResponse(user);
+  }
+
+  /**
+   * 회원 탈퇴. {@code users.deleted_at} 을 찍고 소셜 연결을 <b>하드 삭제</b>한다. 검증 계약 REQ-08-09 · 10 · 13 · 14.
+   *
+   * <p><b>소셜 행을 먼저 지운다.</b> FK 는 {@code user_social_accounts.user_id → users.id} 한 방향이라 순서를 뒤집어도 제약
+   * 위반은 없지만, 뒤집을 이유도 없다.
+   *
+   * <p>⚠️ <b>refresh 토큰을 revoke 하지 않는다 — 빠뜨린 것이 아니라 결정이다</b> (PLAN-REQ-08 D5). revoke 하려면 {@code
+   * data/auth} 를 참조해야 하고 그러면 ArchUnit 도메인 간 참조 예외가 <b>4→5 로 는다.</b> 탈퇴 계정은 필터의 활성 검사(Phase 3)가 어떤
+   * access 토큰을 들고 와도 막으므로, refresh 로 새 토큰을 받아도 결국 차단된다.
+   *
+   * <p>대가 둘 — {@code refresh_tokens} 에 {@code revoked_at IS NULL} 행이 남고, <b>탈퇴한 사용자도 {@code
+   * /auth/refresh} 가 200 과 새 토큰을 반환한다</b>(그 토큰으로 API 를 부르면 401). 후자는 계획서 미결이다.
+   *
+   * <p>⚠️ <b>여기서 예외를 던지면 두 쓰기가 전부 사라진다</b> (AGENTS §5). 지금은 남겨야 할 쓰기가 없어 기본 롤백이 맞지만, "실패해도 남겨야 하는"
+   * 기록이 생기면 {@code noRollbackFor} 를 명시해야 한다 — 2026-07-30 {@code AuthService.refresh} 에서 같은 함정이 실제로
+   * 터졌고 <b>목 기반 테스트는 통과했다.</b>
+   *
+   * @param userId access 토큰에서 꺼낸 사용자 식별자
+   */
+  @Transactional
+  public void withdraw(UUID userId) {
+    User user = findActive(userId);
+
+    socialAccountRepository.deleteByUserId(userId);
+    user.softDelete();
+
+    log.info("User withdrawn. userId={}", userId);
   }
 
   private User findActive(UUID userId) {

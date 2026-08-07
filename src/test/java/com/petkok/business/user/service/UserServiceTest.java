@@ -2,21 +2,28 @@ package com.petkok.business.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.petkok.data.user.dto.UserResponse;
 import com.petkok.data.user.dto.UserUpdateRequest;
 import com.petkok.data.user.entity.User;
 import com.petkok.data.user.repository.UserRepository;
+import com.petkok.data.user.repository.UserSocialAccountRepository;
 import com.petkok.framework.exception.BusinessException;
 import com.petkok.framework.exception.ErrorCode;
+import java.lang.reflect.Field;
 import java.lang.reflect.RecordComponent;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 내 프로필 조회·수정. 검증 계약 REQ-08-01 ~ 05 (PLAN-REQ-08 § 검증 계약).
@@ -31,7 +38,9 @@ class UserServiceTest {
   private static final String IMAGE_URL = "https://img.example.com/a.png";
 
   private final UserRepository userRepository = mock(UserRepository.class);
-  private final UserService userService = new UserService(userRepository);
+  private final UserSocialAccountRepository socialAccountRepository =
+      mock(UserSocialAccountRepository.class);
+  private final UserService userService = new UserService(userRepository, socialAccountRepository);
 
   /** 활성 사용자 1명을 저장소에 등록한다. 반환값으로 병합 결과를 직접 관찰한다. */
   private User active() {
@@ -92,5 +101,62 @@ class UserServiceTest {
     assertThat(user)
         .extracting(User::getNickname, User::getProfileImageUrl)
         .containsExactly(NICKNAME, IMAGE_URL);
+  }
+
+  @Test
+  @DisplayName("[REQ-08-09] 탈퇴하면 users.deleted_at 이 채워진다")
+  void req_08_09_withdrawSetsDeletedAt() {
+    User user = active();
+
+    userService.withdraw(USER_ID);
+
+    assertThat(user.isDeleted()).isTrue();
+  }
+
+  @Test
+  @DisplayName("[REQ-08-10] 탈퇴하면 소셜 행이 하드 삭제된다")
+  void req_08_10_withdrawHardDeletesSocialAccounts() {
+    active();
+
+    userService.withdraw(USER_ID);
+
+    verify(socialAccountRepository).deleteByUserId(USER_ID);
+  }
+
+  @Test
+  @DisplayName("[REQ-08-14] 탈퇴는 소셜 행을 먼저 지운 뒤 deleted_at 을 찍는다")
+  void req_08_14_withdrawDeletesSocialAccountsFirst() {
+    User user = active();
+    InOrder order = inOrder(socialAccountRepository, userRepository);
+
+    userService.withdraw(USER_ID);
+
+    // 소셜 삭제가 먼저인지 확인한다. deleted_at 은 변경 감지로 반영되므로 저장소 호출이 없어
+    // "조회 → 소셜 삭제" 순서 + 삭제 시점에 아직 살아 있었다는 사실로 순서를 고정한다.
+    order.verify(userRepository).findByIdAndDeletedAtIsNull(USER_ID);
+    order.verify(socialAccountRepository).deleteByUserId(USER_ID);
+    assertThat(user.isDeleted()).isTrue();
+  }
+
+  @Test
+  @DisplayName("[REQ-08-13] withdraw 에 @Transactional 이 붙어 있다")
+  void req_08_13_withdrawIsTransactional() throws ReflectiveOperationException {
+    Transactional tx =
+        UserService.class.getMethod("withdraw", UUID.class).getAnnotation(Transactional.class);
+
+    assertThat(tx).isNotNull();
+  }
+
+  @Test
+  @DisplayName("[REQ-08-12] UserService 는 data.auth 를 참조하지 않는다 (예외를 4→5 로 늘리지 않는다)")
+  void req_08_12_userServiceDoesNotDependOnAuthData() {
+    Stream<Class<?>> fieldTypes =
+        Arrays.stream(UserService.class.getDeclaredFields()).map(Field::getType);
+    Stream<Class<?>> ctorParamTypes =
+        Arrays.stream(UserService.class.getDeclaredConstructors())
+            .flatMap(c -> Arrays.stream(c.getParameterTypes()));
+
+    assertThat(Stream.concat(fieldTypes, ctorParamTypes))
+        .noneMatch(t -> t.getName().startsWith("com.petkok.data.auth."));
   }
 }

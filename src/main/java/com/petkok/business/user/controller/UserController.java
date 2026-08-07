@@ -7,10 +7,13 @@ import com.petkok.framework.response.ApiResponse;
 import com.petkok.framework.security.AuthPrincipal;
 import com.petkok.framework.security.CurrentUser;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -43,5 +46,18 @@ public class UserController {
   public ApiResponse<UserResponse> updateMe(
       @CurrentUser AuthPrincipal principal, @Valid @RequestBody UserUpdateRequest request) {
     return ApiResponse.success(userService.updateMe(principal.userId(), request));
+  }
+
+  /**
+   * 회원 탈퇴 (소프트 딜리트). 검증 계약 REQ-08-15.
+   *
+   * <p><b>응답 본문이 없다.</b> 204 는 정의상 본문을 갖지 않으므로 공통 래퍼 {@code ApiResponse} 를 쓰지 않는다 — 씌우려면 200 으로 내려야
+   * 하는데 그건 Notion {@code API I/F} 의 "Response 204: 응답 바디 없음" 계약을 바꾸는 일이다. {@code
+   * AuthController.logout} 과 같은 이유다.
+   */
+  @DeleteMapping("/me")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void withdraw(@CurrentUser AuthPrincipal principal) {
+    userService.withdraw(principal.userId());
   }
 }
