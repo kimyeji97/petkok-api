@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-07-31 (REQ-08 계획 수립 · ArchUnit 완화 지점 정리)
+> 최종 갱신: 2026-08-07 (REQ-08 Phase 0~1 · ArchUnit 범위 정정 · Notion 대조)
 
 ## 요구사항 인덱스
 
@@ -19,7 +19,7 @@
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | 🟡 Phase 1~6 완료 · 로그인 왕복 수동 확인 남음 |
-| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | — | 🟡 계획 확정 · Phase 0(ArchUnit 정리) 완료 |
+| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | — | 🟡 Phase 0~1 완료 · Phase 2(탈퇴)·3(필터) 남음 |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
@@ -32,6 +32,101 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-08-04
+
+> REQ-08 Phase 1(프로필 조회·수정) 구현. **구조 규칙이 테스트 파일을 잡는 결함**이 여기서 처음 드러났다. 검증은 08-07 `/testrun` 에서 돌렸다.
+
+### ArchUnit 이 테스트 클래스까지 보고 있었다
+
+Phase 1 을 다 짜고 돌렸더니 `DTO_NAMING` 이 빨간불이었다. 원인은 구현이 아니라 **테스트 파일의 위치**였다 — `@AnalyzeClasses` 기본 설정이 테스트 클래스를 분석 대상에 넣어서, `com.petkok.data.user.dto.UserUpdateRequestTest` 가 "`..dto..` 는 Request/Response 로 끝난다"에 걸렸다.
+
+- **`..dto..` · `..controller..` 에 테스트가 처음 들어온 시점이라 그전까지 안 보였다.** 07-29 도입 때도, 08-03 에 `allowEmptyShould` 를 끌 때도 드러나지 않았다. 규칙 8건이 전부 통과하고 있었지만 **미러 패키지에 테스트를 두는 순간 오발하는 상태**였다
+- 계획서 「범위 — 제외」가 ArchUnit 변경을 막고 있어 **손대지 않고 멈춰 판단을 받았다.** `DoNotIncludeTests` 로 분석 범위를 프로덕션으로 한정하는 쪽으로 결정 — 완화가 아니라 **범위 정정**이다. 8개 규칙은 전부 프로덕션 구조에 대한 것이라 테스트를 빼도 잃는 커버리지가 없다
+- **프로브로 확인했다.** 프로덕션 클래스로 심은 위반 3종에 규칙 4개가 발화 — `..dto..`/`..controller..` 에 이름 안 맞는 클래스 → `DTO_NAMING`·`CONTROLLER_NAMING`, 필터의 `UserRepository` 직참조 → `FRAMEWORK_MUST_NOT_KNOW_DOMAIN` + `LAYER_DIRECTION`
+
+> **Phase 2 의 지뢰가 같이 제거됐다.** `REQ-08-15` 가 `UserController` 대상이라 `CONTROLLER_NAMING` 에 똑같이 걸릴 예정이었다.
+
+### `@NotBlank` 가 PATCH 를 통째로 깨뜨릴 뻔했다 — D7 즉시 철회
+
+08-03 에 "닉네임 검증 최소선"을 정하며 `@NotBlank` + `@Size(max = 100)` 으로 적었는데, `/testgen` 으로 케이스를 뽑다가 **D3 과 정면 충돌**하는 걸 발견했다.
+
+`@NotBlank` 는 `null` 을 거부한다. 그런데 D3 은 "누락·`null` 모두 변경 없음"이라 **닉네임을 안 보내는 것이 정상 경로**다 — 그대로 뒀으면 부분 수정 요청이 전부 400 이 됐다.
+
+> **`NOT NULL` 은 엔티티의 불변식이지 PATCH 요청 DTO 의 불변식이 아니다.** 두 층의 제약을 같은 것으로 착각한 실수다. `@Size` 는 `null` 을 통과시키므로 길이만 막는 것이 맞다.
+
+부산물로 **빈 문자열(`""`)** 이 미결로 새로 올라왔다 — `@Size` 만으로는 통과해 그대로 저장된다(`NOT NULL` 은 만족). 최소 길이 규칙이 정해지면 `@Size(min = 1, ...)` 로 함께 닫힌다.
+
+### 병합을 서비스에 둔 이유 (D6)
+
+`User.updateProfile` 이 REQ-07 때 선반영돼 있었는데 **두 필드를 무조건 덮어쓴다.** 요청 값을 그대로 넘기면 닉네임만 담긴 PATCH 가 `profile_image_url` 을 지운다 — **응답은 200 으로 정상이고 DB 만 조용히 손상된다.** 07-31 에 잡은 함정 2건(유령 계정·잔존 토큰)과 같은 종류다.
+
+엔티티가 `null` 을 "변경 없음"으로 읽게 고치는 안을 기각했다. 그러면 `null` 에 도메인 의미가 붙어 "원본에 없는 규약을 만들지 않는다"(D3)가 무너진다. 부분 반영은 HTTP PATCH 의 관심사다. `UserTest` 의 `REQ-08-08` 이 **엔티티 쪽 계약을 고정**해 두었으므로, 증상을 보고 엔티티를 고치면 빨간불이 난다.
+
+### Notion 대조 — api-list 의 revoke 서술은 원본에 없었다
+
+Phase 2 착수 전 확인 과제였던 "탈퇴 시 refresh revoke" 를 원본에서 확인했다. **D5(revoke 안 함) 유지**로 닫혔다.
+
+| 출처 | 날짜 | 탈퇴 시 revoke |
+|---|---|:--|
+| `API I/F` → 회원 탈퇴 (1차 출처) | 07-04 | 언급 없음. "소프트 딜리트" + "204" 가 전부 |
+| 테이블 정의서 §10 `revoked_at` | 07-29 역반영 | "로테이션·로그아웃·재사용 감지로 찍힌다" — **탈퇴 빠짐** |
+| 테이블 정의서 §10 저장소 선택 근거 | 07-23 | ⚠️ "로그아웃·**탈퇴** 시 즉시 무효화가 필요" |
+
+마지막 줄이 유일한 반대 근거인데 **"왜 Redis 가 아니라 DB 인가"의 논거**이지 탈퇴 동작 명세가 아니고, 나머지보다 6일 오래됐다(AGENTS §0 — 날짜로 판단).
+
+> **`api-list.md` 의 "탈퇴 → 해당 사용자 토큰 전체 revoke" 는 어느 원본에서도 나오지 않았다.** 파생 요약이 자체 생성한 문장이다. 07-31 에 이 문서만 보고 D5 를 뒤집었다면 예외가 4→5 로 늘 뻔했다. **파생 문서가 원본에 없는 내용을 만들어 낼 수 있다**는 사례가 하나 더 쌓였다(이전: `/users/me/social-accounts` 3종).
+
+### 완료 기준이 케이스보다 넓은 지점 2건 (08-07 `/testrun`)
+
+Phase 1 케이스 8개 ID 는 전부 통과했지만, **완료 기준 문장 중 테스트가 안 덮는 부분**이 남아 있다. 실패가 아니라 커버리지 공백이라 Phase 는 체크하되 사실을 남긴다.
+
+- **"전역 snake_case" 가 검증되지 않는다.** `REQ-08-01` 은 record 컴포넌트 이름(camelCase)만 확인한다 — 직렬화된 JSON 이 실제로 `profile_image_url` 로 나가는지는 아무도 안 본다. `JacksonConfig` 가 사라져도 초록불을 유지한다
+- **"101자 → 400" 의 마지막 한 칸이 비어 있다.** `REQ-08-06` 은 Bean Validation 이 위반을 만든다는 것까지고, 그게 400 이 되는 것은 코드를 읽어 확인했을 뿐이다(`GlobalExceptionHandler` 가 `MethodArgumentNotValidException` → `INVALID_INPUT`)
+
+둘 다 `@WebMvcTest` 한 건이면 닫힌다. Phase 2 의 `REQ-08-15`(컨트롤러 204) 와 함께 다루는 것이 자연스럽다.
+
+### 잔가지
+
+- **lefthook `commit-msg` 가 `wip` 타입을 거부한다.** 허용 목록은 `feat fix docs style refactor perf test build ci chore revert` 뿐이다. Phase 1 중간 커밋을 `wip(REQ-08):` 로 쓰려다 막혔고 `feat(user): … (미완)` 으로 바꿨다
+- **Phase 1 브랜치는 CI 가 돌지 않았다.** `ci.yml` 트리거가 `push: main` + `pull_request` 뿐이라 **PR 이 없으면 검증이 없다.** 지금 초록불의 근거는 로컬 게이트 재현뿐이다
+- `profile_image_url` 에도 `@Size(max = 500)` 을 붙였다 — D7 은 닉네임만 다루지만 실패 모드(`varchar(500)` 초과 → 500)와 근거(스키마)가 동일하다. **계획서 범위를 한 칸 넘은 판단**이라 기록해 둔다
+
+## 2026-08-03
+
+> `main` 기준으로 Phase 0 가 반영돼 있지 않은 것을 보고 재실행한 날이다. **08-07 에 밝혀졌지만 이 진단은 틀렸다** — 아래 정정을 함께 읽을 것.
+
+### 문서가 "완료"라고 말하는데 `main` 의 코드는 그대로였다
+
+`/progress` 로 현황을 훑고 계획서를 코드와 대조하다 나왔다. PROGRESS·계획서 둘 다 "Phase 0 완료 ✅" 로 체크돼 있었는데 —
+
+- `57f5ca1` 이 바꾼 것은 **문서 3개뿐**이었다
+- `git log -- src/test/java/com/petkok/architecture/` 의 마지막 변경이 `efef567`(07-29)
+- `allowEmptyShould(true)` 7건, `withOptionalLayers(true)`, 예외 #4 의 "임시" 주석이 **전부 그대로**
+
+그래서 "검증만 하고 커밋되지 않은 채 유실됐다"고 판단하고 `d9016e3` 으로 다시 만들었다.
+
+> ### ⚠️ 정정 (2026-08-07) — 유실이 아니었다
+>
+> 미푸시 브랜치를 훑다가 **`chore/archunit-tighten-empty-allowance`** 를 발견했다. `f6f66c7`(07-31)에 **08-03 에 다시 만든 것과 기능적으로 동일한 변경이 전부 들어 있다** — `allowEmptyShould(false)` 7건 · `withOptionalLayers(false)` · 예외 #4 승격. 07-31 세션은 검증도 커밋도 했고, **푸시·머지·PR 만 안 했다.**
+>
+> **`git log -- <경로>` 는 HEAD 에서 도달 가능한 커밋만 본다.** 다른 브랜치의 작업은 보이지 않는데 출력은 "이 파일의 전체 이력"처럼 보인다 — 에러도 경고도 없다. 08-03 에 이 한 줄로 "커밋 안 됨"을 단정했고, 그 결과 `d9016e3` 은 **f6f66c7 의 중복 재구현**이 됐다.
+>
+> 확인하려면 `git log --all -- <경로>` 나 `git branch --all --contains <sha>` 를 써야 한다. **"커밋이 없다"고 말하기 전에 `--all` 을 붙였는지 확인할 것.**
+>
+> 재작업 자체는 헛되지 않았다 — 08-03 판이 프로브 3건과 `LAYER_DIRECTION` 발화라는 수확을 남겼고(아래), 그건 07-31 판에 없다. 하지만 **작업이 사라졌다는 진단은 틀렸고, 브랜치를 놓친 것이 진짜 원인이다.**
+
+### 프로브에서 나온 예상 밖 수확 — D2 가 검토한 안은 애초에 성립하지 않았다
+
+규칙을 고쳤으니 계약대로 위반을 심어 확인했는데(CLAUDE.md), 필터에 `UserRepository` 직참조를 넣자 **규칙 #4 와 `LAYER_DIRECTION` 이 함께** 빨간불이 됐다.
+
+`LAYER_DIRECTION` 은 "어느 레이어에도 속하지 않는 클래스"의 접근까지 잡는다. 필터는 Controller·Service·Repository 어디에도 없는데 `Repository` 레이어가 `mayOnlyBeAccessedByLayers("Service")` 이기 때문이다.
+
+> **즉 규칙 #4 를 열어도 직참조는 여전히 통과하지 못한다.** 07-31 에 D2 가 "규칙 #4 를 연다 vs 포트를 둔다"로 저울질했는데, **앞쪽 안은 처음부터 성립하지 않았다.** 규칙 하나만 보고 판단했기 때문에 몰랐다. Phase 3 의 포트 방식은 두 규칙을 동시에 만족시키는 유일한 길이다.
+
+### 계획서를 코드와 대조해 결정 2건이 추가됐다
+
+계획서만 읽고 구현했으면 밟았을 것들이다 — D6(병합 위치)·D7(닉네임 검증). 둘 다 08-04 절에 적었다. 이때 D7 에 `@NotBlank` 를 넣은 것이 다음 날 철회됐다.
 
 ## 2026-07-31
 

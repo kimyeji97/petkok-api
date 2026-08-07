@@ -198,7 +198,10 @@ create index idx_refresh_user_id on refresh_tokens (user_id) where revoked_at is
 - 엔티티는 `BaseCreatedEntity` 상속 (`created_at`만 필요 — 무효화는 `revoked_at`으로 표현하며 소프트 딜리트가 아니다)
 - 토큰 원문은 저장하지 않는다. DB 유출 시 그대로 재사용 가능해지기 때문 (`SHA256Util` 사용)
 - `DELETE /auth/logout` → 해당 토큰 `revoked_at` 설정
-- `DELETE /users/me` (탈퇴) → 해당 사용자 토큰 전체 revoke
+- `DELETE /users/me` (탈퇴) → **revoke하지 않는다** (REQ-08 D5). 필터의 활성 사용자 검사가 탈퇴 계정의 access 토큰을 즉시 차단하므로, refresh로 새 토큰을 받아도 결국 막힌다. revoke하면 `business/user → data/auth` 참조가 생겨 ArchUnit 예외가 4→5로 는다
+	- ⚠️ 이 문서의 이전 판은 "해당 사용자 토큰 전체 revoke"라고 적고 있었으나 **어느 원본에도 근거가 없었다**(2026-08-04 Notion 대조). `API I/F` → 회원 탈퇴는 "소프트 딜리트 / 204"만 규정하고, 테이블 정의서 §10의 `revoked_at`은 "로테이션·로그아웃·재사용 감지로 찍힌다"로 **탈퇴를 빼고** 있다
+	- 테이블 정의서 §10의 저장소 선택 근거에는 "로그아웃·**탈퇴** 시 즉시 무효화가 필요"라는 문장이 남아 있다(2026-07-23). Redis 기각 논거이지 탈퇴 동작 명세가 아니며 위 서술보다 오래됐다 — **Notion 역반영 대상**
+	- 대가: `refresh_tokens`에 `revoked_at IS NULL` 행이 남고, 탈퇴한 사용자도 `/auth/refresh`가 200을 반환한다(그 토큰으로 API를 부르면 401)
 
 **로테이션을 적용한다.** `POST /auth/refresh` 호출 시마다 새 refresh 토큰을 발급하고 기존 토큰은 즉시 revoke한다. 응답에는 access·refresh를 함께 담아 클라이언트가 저장된 refresh를 교체하도록 한다.
 
