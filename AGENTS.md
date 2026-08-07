@@ -72,7 +72,7 @@ com.petkok
     ├── config/                 Security, JpaAuditing, Jackson, Web, R2(+R2Properties), RestTemplate
     ├── processor/              filter/(JwtAuthenticationFilter) · handler/(GlobalExceptionHandler)
     │                           · interceptor/(RestTemplateLoggingInterceptor) · aspect/ · converter/
-    ├── security/               AuthPrincipal, @CurrentUser, jwt/(JwtTokenProvider, JwtProperties)
+    ├── security/               AuthPrincipal, @CurrentUser, UserStatusChecker(포트), jwt/(JwtTokenProvider, JwtProperties)
     ├── response/               ApiResponse{data,error}, ErrorResponse
     ├── pagination/             CursorRequest, CursorPage, CursorCodec
     ├── exception/              ErrorCode, BusinessException
@@ -88,6 +88,9 @@ com.petkok
 - **repository는 entity 옆(`data/{도메인}/repository`).** 반환 타입이 Entity라 결합이 강하고, `business → data` 단방향을 깨지 않는다
 - `timeline`은 자체 테이블이 없어 `business/timeline`만 둔다. 여러 도메인 Repository를 조합하므로 도메인 간 참조 금지 규칙의 **유일한 예외**다
 - `@CurrentUser`는 `@AuthenticationPrincipal` 메타 애노테이션이라 별도 ArgumentResolver가 없다 (`processor/resolver/`를 두지 않는 이유)
+- **framework가 인터페이스를 정의하고 business가 구현하는 패턴** — `framework/security/UserStatusChecker`가 첫 사례다(2026-08-07, REQ-08 D2). framework의 컴포넌트가 도메인 정보를 필요로 할 때 **필요한 쪽이 필요한 모양을 선언하고, 아는 쪽이 채운다.** 의존은 여전히 `business → framework` 한 방향이라 트리 규칙을 깨지 않는다
+	- ⚠️ **인터페이스는 반드시 `framework`에 둔다.** `business`로 옮기면 framework가 그것을 참조하게 되어 **규칙 두 개가 동시에** 깨진다 — `FRAMEWORK_MUST_NOT_KNOW_DOMAIN`(§6 규칙 #4)과 `LAYER_DIRECTION`. 후자는 필터가 정의된 세 레이어 어디에도 속하지 않는데 `Repository` 레이어가 `mayOnlyBeAccessedByLayers("Service")`이기 때문이다. **즉 규칙 #4만 열어서는 직참조가 여전히 통과하지 못한다** (2026-08-03·08-07 프로브 실측)
+	- ⚠️ **포트 시그니처에 도메인 타입을 노출하지 않는다.** 엔티티를 돌려주면 framework가 `data..entity..`를 알게 되어 같은 규칙에 걸린다. `UserStatusChecker`가 `UUID`를 받아 `boolean`을 돌려주는 이유다
 - 베이스 엔티티는 `framework`가 아니라 `data/common/entity`. framework는 JPA 매핑 규약을 알지 않는다
 
 > ✅ **이행 완료 (2026-07-28).** 55개 파일을 위 구조로 옮겼고 `com.petkok.global.*`은 남아 있지 않다. `business/`·`data/{도메인}`은 도메인 코드가 들어올 때 생성된다(현재는 `data/common/entity`만 존재).
