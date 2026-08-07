@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-07 (REQ-07 완료 · REQ-08 Phase 2 · 카카오 매핑 결함 · 스택 PR 사고)
+> 최종 갱신: 2026-08-07 (REQ-07·REQ-08 완료 · 카카오 매핑 결함 · 스택 PR 사고)
 
 ## 요구사항 인덱스
 
@@ -19,7 +19,7 @@
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 2건 잔존) |
-| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | — | 🟡 Phase 0~2 완료 · Phase 3(필터 활성 검사) 남음 |
+| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-07 | ✅ (미결 6건 잔존) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
@@ -104,6 +104,40 @@ D5 대가로 등록해 둔 "탈퇴 계정도 `/auth/refresh` 가 200 을 반환�
 - **`ci.yml` 트리거가 `push: main` + `pull_request` 뿐이다** — PR 없이 푸시한 브랜치는 CI 가 돌지 않는다
 - REQ-07-24·25 는 **코드가 표보다 먼저 들어갔다**(CLAUDE.md 는 표가 먼저). 이번 checkpoint 에서 표를 채웠다
 - 로컬 DB 에 테스트 계정 2건(탈퇴 1·활성 1)을 **의도적으로 남겼다** — Phase 3 의 `REQ-08-16`(탈퇴 계정 401)·`REQ-08-17`(활성 통과) 대조군으로 재사용한다
+
+### Phase 3 — 포트 하나로 규칙 두 개를 만족시켰다
+
+`JwtAuthenticationFilter` 가 매 인증 요청마다 `UserStatusChecker.isActive` 를 부른다. 이게 없으면 **탈퇴해도 기존 access 토큰이 최대 30분 살아 있다** — 필터가 서명·타입만 보고 DB 를 안 보기 때문이다.
+
+**포트를 쓴 이유는 규칙 하나 때문이 아니다.** 07-31 D2 는 "규칙 #4 를 연다 vs 포트를 둔다"로 저울질했는데, 08-03 프로브에서 **직참조가 `FRAMEWORK_MUST_NOT_KNOW_DOMAIN` 과 `LAYER_DIRECTION` 을 동시에 깬다**는 것이 드러났다(필터는 정의된 세 레이어 어디에도 속하지 않는데 `Repository` 레이어는 `mayOnlyBeAccessedByLayers("Service")` 다). 즉 **앞쪽 안은 애초에 성립하지 않았고**, 포트가 유일한 길이었다. 이번에도 프로브로 재확인했다.
+
+- **비활성일 때 예외를 던지지 않는다.** 필터는 DispatcherServlet 앞이라 던지면 `GlobalExceptionHandler` 에 닿지 않아 응답 형태가 갈린다. `SecurityContext` 를 세팅하지 않고 통과시키면 `SecurityConfig` 의 entryPoint 가 기존 규격대로 401 을 낸다
+- 포트 시그니처가 `UUID → boolean` 인 것도 계약이다. 엔티티를 돌려주면 framework 가 `data..entity..` 를 알게 된다
+
+### 미결 정정이 실측으로 확인됐다 — 404 → 401
+
+오늘 낮에 "미결의 401 은 Phase 3 완료를 전제한 서술이었다"고 정정하고 **Phase 3 검증 대상으로 등록**해 뒀는데, 그대로 재현됐다.
+
+| 시점 | 탈퇴 계정 토큰으로 `GET /users/me` |
+|---|---|
+| Phase 2 | **404** `USER_NOT_FOUND` (서비스의 `findByIdAndDeletedAtIsNull` 이 잡음) |
+| Phase 3 | **401** `UNAUTHORIZED` (필터가 앞에서 잡음) |
+
+**남겨 둔 테스트 계정 2건이 그대로 쓰였다.** access 토큰은 30분 만료라 죽어 있었지만 `refresh_tokens` 가 살아 있어 `/auth/refresh` 로 재확보했다 — 탈퇴 계정도 200 을 주는 D5 동작이 오히려 검증을 쉽게 만들었다.
+
+### 남은 공백은 한 종류다 — 미결로 등록
+
+REQ-08 자동 테스트 24건이 전부 초록불이지만, **HTTP 왕복이 있어야만 검증되는 지점 3건은 여전히 "사람이 한 번 본 것"뿐**이다.
+
+| 지점 | 테스트가 덮는 곳 | 안 덮는 곳 |
+|---|---|---|
+| snake_case 직렬화 | record 컴포넌트 이름 | 직렬화된 JSON 키 |
+| 101자 → 400 | Bean Validation 위반 생성 | `INVALID_INPUT` 매핑 |
+| 탈퇴 토큰 → 401 | 인증 미설정 + 체인 계속 | entryPoint 가 내는 401 |
+
+셋 다 **깨져도 조용하다.** `@WebMvcTest` 도입을 미결로 올렸고, **REQ-08 에 끼워 넣지 말고 별도 REQ 로** 잡을 것을 권했다 — pet·diary 등 다음 도메인이 전부 같은 공백을 갖게 되므로 컨트롤러 테스트 관례를 한 번 정하는 작업으로 다루는 편이 낫다.
+
+> **한 번 봤다는 것과 고정됐다는 것은 다르다.** 오늘 카카오 로그인이 정확히 그 차이 때문에 죽어 있었다.
 
 ## 2026-08-04
 
