@@ -7,6 +7,7 @@ import com.petkok.data.user.repository.UserRepository;
 import com.petkok.data.user.repository.UserSocialAccountRepository;
 import com.petkok.framework.exception.BusinessException;
 import com.petkok.framework.exception.ErrorCode;
+import com.petkok.framework.security.UserStatusChecker;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,12 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 내 프로필 조회·수정·탈퇴. 검증 계약 REQ-08-01 ~ 05 · 09 · 10 · 12 ~ 14 (PLAN-REQ-08 § 검증 계약).
  *
+ * <p>{@link UserStatusChecker} 를 구현한다 — <b>framework 가 정의한 인터페이스를 business 가 채우는 첫 사례</b>다 (D2). 의존
+ * 방향은 여전히 {@code business → framework} 한 방향이다.
+ *
  * <p><b>{@code data/auth} 를 참조하지 않는다 — 의도적이다</b> (D5). 탈퇴가 refresh 토큰을 revoke 하면 {@code
  * business/user → data/auth} 참조가 생겨 ArchUnit 도메인 간 참조 예외가 4→5 로 는다. {@link #withdraw} 주석 참고.
  */
 @Slf4j
 @Service
-public class UserService {
+public class UserService implements UserStatusChecker {
 
   private final UserRepository userRepository;
   private final UserSocialAccountRepository socialAccountRepository;
@@ -95,6 +99,23 @@ public class UserService {
     user.softDelete();
 
     log.info("User withdrawn. userId={}", userId);
+  }
+
+  /**
+   * {@link UserStatusChecker} 구현. 필터가 매 인증 요청마다 부른다. 검증 계약 REQ-08-16 · 17.
+   *
+   * <p><b>구현체를 따로 만들지 않고 이 서비스가 직접 구현한다</b> (D2) — 새로 느는 것은 인터페이스 1개뿐이다.
+   *
+   * <p>탈퇴 즉시 차단이 목적이다. 이게 없으면 탈퇴해도 기존 access 토큰이 <b>최대 30분</b> 살아 있다({@code JWT_ACCESS_TTL}) — 필터가
+   * 서명·타입만 보고 DB 를 안 보기 때문이다.
+   *
+   * <p>예외를 던지지 않고 {@code boolean} 을 돌려주는 것도 계약의 일부다. 필터는 이 값을 보고 <b>인증을 세팅하지 않을 뿐</b>이며, 거절은 {@code
+   * SecurityConfig} 의 entryPoint 가 한다.
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public boolean isActive(UUID userId) {
+    return userRepository.findByIdAndDeletedAtIsNull(userId).isPresent();
   }
 
   private User findActive(UUID userId) {
