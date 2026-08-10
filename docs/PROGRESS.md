@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-10 (REQ-07·08·15 완료 · 카카오 매핑 결함 · 스택 PR 사고)
+> 최종 갱신: 2026-08-10 (REQ-09 Phase 1·2 — 가드 형태를 프로브로 확정 · pets CRUD)
 
 ## 요구사항 인덱스
 
@@ -20,7 +20,7 @@
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 2건 잔존) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-07 | ✅ (미결 6건 잔존) |
-| REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [api-list §3](specs/api-list.md) | — | ⏸ |
+| REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | — | 🟡 (Phase 1·2 완료) |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
@@ -33,6 +33,64 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-08-10
+
+> REQ-09 착수. **설계 판단 하나에 하루의 절반을 썼는데 그게 옳았다** — `PetAccessGuard` 는 REQ-10~12 의 여섯 도메인이 그대로 복제할 형태라, 여기서 틀리면 여섯 번 틀린다.
+
+### 가드의 형태를 문서가 아니라 프로브로 정했다
+
+"어떤 ArchUnit 규칙에 걸리는가"를 추론으로 답하지 않고 **가짜 `PetAccessGuard` 와 `business/diary/service` 를 실제로 심어** 8가지 배치를 셌다(표는 PLAN-REQ-09 「프로브 결과」).
+
+**착수 전에 적어 둔 예상이 틀렸다.** "Service → Service 라 `LAYER_DIRECTION` 에 걸린다"고 계획서에 썼는데 **걸리지 않았다** — `mayOnlyBeAccessedByLayers("Controller")` 는 같은 레이어 안의 참조를 막지 않는다.
+
+> 08-03 프로브에서 같은 규칙이 필터의 Repository 직참조를 잡았던 것과 상황이 다르다. **그때 걸린 이유는 필터가 어느 레이어에도 속하지 않아서**였다. 같은 규칙이라도 "누가 부르느냐"에 따라 결과가 갈린다 — **규칙 이름만 보고 추론하면 틀린다.** 예상과 실측이 갈린 것을 계획서에 정정해 남겼다.
+
+핵심은 **예외 개수가 아니라 그 예외가 여는 문**이었다.
+
+- **A안**(원본 §3 그대로 `Pet` 엔티티 반환) — 예외 4→6건. 그런데 `data.pet` 을 통째로 열어야 해서 **하위 도메인이 `PetRepository` 를 직접 주입해도 ArchUnit 이 통과시킨다.** 즉 **가드를 우회하는 코드가 규칙에 안 걸린다** — 소유권 앵커를 두는 목적 자체를 규칙이 못 지킨다
+- **B2′안**(framework 포트 + `boolean`) — 예외 **0건**으로 가장 깨끗한데 `species` 를 실어 나를 수 없다. **종 검증 자리가 사라지는 것은 기능 손실이라 다른 방식으로 갚을 수 없다**
+- ⭐ **D안**(읽기 전용 DTO `OwnedPetResponse(id, species)` 반환 + 예외를 `business.pet.service`·`data.pet.dto`·`data.pet.enums` **셋으로 한정**) — 예외는 7건으로 A보다 **하나 더 많은데**, 우회(`PetRepository` 직접 주입)와 엔티티 누출(`Pet` 직접 참조)이 **둘 다 잡힌다.** `entity`·`repository` 를 닫아 두기 때문이다
+
+**늘어난 예외가 오히려 경계를 더 정확히 그린다** — 이게 D안을 고른 이유다. AGENTS §5 "Entity 는 Service 밖으로 나가지 않는다"와도 결이 같다(하위 도메인에게 pet 은 남의 도메인이다).
+
+> 다만 Notion 「소스 구조」 §3 은 "`Pet` 을 받아 처리한다"고 적었으므로 **역반영 대상**이다. §6(소프트 딜리트를 `@SQLRestriction` 으로)도 실제와 갈렸다. 둘 다 사람이 Notion 에서 고쳐야 한다.
+
+### 파생 요약은 원본을 **양방향으로** 배신한다
+
+REQ-08 때는 파생 요약이 **원본에 없는 내용을 담고** 있었다. 이번엔 반대였다 — **원본 `API I/F` 의 Validation 규칙(`name` 필수, `species`·`gender` 허용값)이 `api-list §3` 에 통째로 없다.** 상태코드도 없다. 원본 5행을 직접 읽지 않았으면 검증 케이스 3건이 아예 안 나왔다.
+
+그래서 **원본 Validation 문구를 계획서 `범위—포함` 에 옮겨 적었다.** `/testrun` 의 근거 인용 검사는 **파일을 `grep`** 하는데 Notion 은 파일이 아니라 검사 대상이 못 된다. 원본에만 두면 케이스가 근거를 못 갖거나 "근거 소실" 오탐이 난다.
+
+> **대신 새 취약점이 생겼다** — 옮겨 적은 사본이 Notion 원본과 갈라져도 `grep` 은 계속 초록불이다. 이 검사가 잡는 것은 "계획서 안에서의 정합성"뿐이다.
+
+### 정의되지 않은 enum 값이 400 이 아니라 500 이었다
+
+`POST /pets` 에 `"species":"HAMSTER"` 를 보내면 **500** 이 나갔다. Jackson 의 `InvalidFormatException` 은 `MethodArgumentNotValidException` 이 **아니라** `HttpMessageNotReadableException` 으로 올라오기 때문에 기존 핸들러 셋 중 어디에도 안 걸리고 `Exception` 핸들러까지 떨어진다.
+
+REQ-08 D7 의 `@Size` 누락(101자 → 500)과 **같은 계열**이다 — 클라이언트 입력 오류가 서버 오류로 보고된다(AGENTS §5 금지).
+
+> **Phase 경계를 한 번 넘었다.** 고칠 곳이 `framework/processor/handler` 라 pet 범위 밖이지만 "하는 김에"가 아니다 — `REQ-09-15·16` 이 이것 없이는 성립하지 않는다. **대신 이 변경은 전역이다**: 모든 엔드포인트에서 깨진 JSON 이 500 대신 400 이 된다. pet 밖의 영향은 이번에 테스트로 덮지 않았다.
+
+### Checkstyle `ParameterNumber`(최대 7)와 필드 8개
+
+`Pet` 은 필드가 8개라 정적 팩토리 메서드로 만들 수 없었다. **`@Builder` 를 생성자에 붙이는 안도 실패한다** — Lombok 이 빌더를 만들어도 **소스의 생성자가 여전히 8파라미터라 Checkstyle 이 그걸 센다.**
+
+통과한 형태는 **클래스 레벨 `@Builder` + `@AllArgsConstructor(access = PRIVATE)`** 다. 생성자를 Lombok 이 만들면 소스에 없으므로 Checkstyle 이 보지 못한다.
+
+> ⚠️ **부작용 — 빌더에 `id` 가 노출된다.** 엔티티 javadoc 에 경고를 남겼지만 **코드로는 못 막았다.** 규칙을 우회한 것이라 대가가 있다는 것을 기록해 둔다.
+
+### 프로브가 거짓 음성을 냈다 — Gradle `--tests` 는 문자 클래스를 모른다
+
+핸들러를 무력화해 `REQ-09-15·16` 이 빨간불이 되는지 확인하려고 `--tests '*req_09_1[56]*'` 를 돌렸는데 **BUILD SUCCESSFUL** 이 나왔다. "안 잡힌다"로 읽었지만 실제로는 **0건 매칭**이었다 — Gradle 의 `--tests` 패턴은 `*`·`?` 만 알고 `[56]` 같은 문자 클래스를 지원하지 않는다.
+
+클래스명 필터로 다시 돌려 정정했고, 두 케이스 모두 정상 발화했다.
+
+> CLAUDE.md 가 이미 경고하는 **"0건 매칭도 BUILD SUCCESSFUL"** 의 다른 얼굴이다. 그때는 커밋 근거로 못 쓴다는 맥락이었는데, **프로브에서는 더 위험하다** — "규칙이 결함을 못 잡는다"는 **반대 결론**을 만들어 낸다.
+
+### Notion 역반영 1건 완료 (REQ-08)
+
+테이블 정의서 §10 의 Redis 기각 문장("로그아웃·**탈퇴** 시 즉시 무효화가 필요하고…")이 REQ-08 D5(탈퇴 시 revoke 하지 않는다)와 어긋나 보이던 것을 고쳤다. **문장을 지우지 않고 단서를 붙였다** — 이건 Redis 기각 논거이지 무효화 시점의 명세가 아니라는 것, 그리고 `revoked_at` 이 찍히는 경로가 로테이션·로그아웃·재사용 감지 **셋뿐**이라는 것을 함께 명시했다.
 
 ## 2026-08-07
 
