@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-07 (REQ-07·REQ-08 완료 · REQ-15 착수 · 카카오 매핑 결함 · 스택 PR 사고)
+> 최종 갱신: 2026-08-10 (REQ-07·08·15 완료 · 카카오 매핑 결함 · 스택 PR 사고)
 
 ## 요구사항 인덱스
 
@@ -24,7 +24,7 @@
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
-| REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | — | 🟡 Phase 1~2 완료·머지 · **Phase 3 은 사람 판정 대기** |
+| REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -177,7 +177,7 @@ PR #29 머지로 REQ-15 Phase 1~2 가 `main` 에 들어갔다. **그 결과 REQ-
 
 > ⚠️ **기록이 하루 늦게 정확해졌다.** 08-07 checkpoint 에서 인덱스에 "REQ-08 미결 6건" 이라 적었는데 그 시점 실제 개수는 **7건**이었다 — `@WebMvcTest` 항목을 추가한 직후였는데 세지 않았다. 해소 처리하고 나니 6건이 되어 우연히 맞아떨어졌지만, **맞은 이유가 세어서가 아니었다.** 미결 개수를 손으로 적을 때는 세고 적을 것.
 
-**REQ-15 Phase 3 은 여전히 열려 있다.** AGENTS §6 작성은 끝났으나 완료 기준("다음 담당자가 이 문서만 보고 쓸 수 있는가")을 작성자가 판정할 수 없어 `- [ ]` 로 둔 상태다.
+**REQ-15 Phase 3 은 2026-08-10 에 닫혔다.** AGENTS §6 작성은 08-07 에 끝났지만 완료 기준("다음 담당자가 이 문서만 보고 쓸 수 있는가")을 작성자가 판정할 수 없어 사흘간 `- [ ]` 로 두었고, **사람이 §6 을 읽고 충족으로 판정**해 체크했다. **이것이 이 완료 기준의 정상 경로다** — 자동화할 수 없는 기준은 사람이 읽는 것으로만 닫힌다.
 
 ## 2026-08-04
 
