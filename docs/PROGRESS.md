@@ -24,7 +24,7 @@
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
-| REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | — | 🟡 Phase 1~2 완료 · Phase 3 판정 대기 |
+| REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | — | 🟡 Phase 1~2 완료·머지 · **Phase 3 은 사람 판정 대기** |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -170,6 +170,14 @@ AGENTS §6 에 관례를 기록했고 문안과 실제 코드가 어긋나지 �
 **작성자가 그걸 판정하면 자기 채점이다.** 검증 계약에 케이스를 억지로 붙이는 것도 답이 아니다 — 자동 검증이 성립하지 않는 완료 기준에 케이스를 만들면 그게 가짜 테스트다. **사람이 §6 을 읽고 체크하도록 `- [ ]` 로 남겼다.**
 
 > 이 REQ 에서 두 번 같은 판단을 했다 — ① 자동 검증 불가한 완료 기준에 케이스를 만들지 않는다 ② 그래서 Phase 도 켜지 않는다. **"계획서가 다 됐다고 말하는데 실제로 안 된 상태"를 피하는 쪽**을 택했다.
+
+### 정리 (2026-08-10 확인)
+
+PR #29 머지로 REQ-15 Phase 1~2 가 `main` 에 들어갔다. **그 결과 REQ-08 의 미결 하나가 닫혔다** — `@WebMvcTest` 도입은 REQ-15 로 분리해 실행됐고, 공백 3건(snake_case 직렬화 · 101자→400 매핑 · 탈퇴 토큰→401)이 이제 테스트로 고정된다.
+
+> ⚠️ **기록이 하루 늦게 정확해졌다.** 08-07 checkpoint 에서 인덱스에 "REQ-08 미결 6건" 이라 적었는데 그 시점 실제 개수는 **7건**이었다 — `@WebMvcTest` 항목을 추가한 직후였는데 세지 않았다. 해소 처리하고 나니 6건이 되어 우연히 맞아떨어졌지만, **맞은 이유가 세어서가 아니었다.** 미결 개수를 손으로 적을 때는 세고 적을 것.
+
+**REQ-15 Phase 3 은 여전히 열려 있다.** AGENTS §6 작성은 끝났으나 완료 기준("다음 담당자가 이 문서만 보고 쓸 수 있는가")을 작성자가 판정할 수 없어 `- [ ]` 로 둔 상태다.
 
 ## 2026-08-04
 
