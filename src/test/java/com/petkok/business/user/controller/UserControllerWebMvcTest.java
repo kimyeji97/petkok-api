@@ -1,6 +1,8 @@
 package com.petkok.business.user.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -9,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.petkok.business.user.service.UserService;
 import com.petkok.data.user.dto.UserResponse;
+import com.petkok.data.user.dto.UserUpdateRequest;
 import com.petkok.framework.config.JacksonConfig;
 import com.petkok.framework.config.SecurityConfig;
 import com.petkok.framework.security.AuthPrincipal;
@@ -18,6 +21,7 @@ import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -187,5 +191,58 @@ class UserControllerWebMvcTest {
     mockMvc
         .perform(MockMvcRequestBuilders.get("/api/v1/users/me"))
         .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+  }
+
+  // ---- REQ-08 Phase 4 · 프로필 이미지 제거 (D8) ----
+
+  @Test
+  @DisplayName("[REQ-08-21] DELETE /users/me/profile-image 는 204 다")
+  void req_08_21_removeProfileImageReturnsNoContent() throws Exception {
+    mockMvc
+        .perform(MockMvcRequestBuilders.delete("/api/v1/users/me/profile-image").with(asUser()))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  @DisplayName("[REQ-08-21] DELETE /users/me/profile-image 는 본문이 비어 있다")
+  void req_08_21_removeProfileImageHasEmptyBody() throws Exception {
+    mockMvc
+        .perform(MockMvcRequestBuilders.delete("/api/v1/users/me/profile-image").with(asUser()))
+        .andExpect(content().string(""));
+  }
+
+  @Test
+  @DisplayName("[REQ-08-25] PATCH 로 profile_image_url: null 을 보내면 서비스에 null 로 전달된다 (변경 없음 의미론 유지)")
+  void req_08_25_explicitNullImageReachesServiceAsNull() throws Exception {
+    // 병합("null = 변경 없음")은 REQ-08-05 가 서비스에서 고정한다. 여기서는 명시적 null 이
+    // 다른 값(예: 빈 문자열)으로 변형되지 않고 그대로 도달하는지를 본다.
+    when(userService.updateMe(any(), any()))
+        .thenReturn(new UserResponse(USER_ID, "게코집사", null, null, LocalDateTime.now()));
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.patch("/api/v1/users/me")
+                .with(asUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"profile_image_url\":null}"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<UserUpdateRequest> captor = ArgumentCaptor.forClass(UserUpdateRequest.class);
+    verify(userService).updateMe(any(), captor.capture());
+    assertThat(captor.getValue().profileImageUrl()).isNull();
+  }
+
+  // ---- REQ-08 Phase 5 · 닉네임 규칙 (D9) ----
+
+  @Test
+  @DisplayName("[REQ-08-26] PATCH 로 nickname: \"\" 을 보내면 400 이다")
+  void req_08_26_emptyNicknameIsBadRequest() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.patch("/api/v1/users/me")
+                .with(asUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"\"}"))
+        .andExpect(status().isBadRequest());
   }
 }

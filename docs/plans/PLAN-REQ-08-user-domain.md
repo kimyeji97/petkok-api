@@ -1,6 +1,6 @@
 # PLAN-REQ-08 · user 도메인 (내 프로필 조회·수정·탈퇴)
 
-> 출처: 2026-07-31 세션 · 작성: 2026-07-31 · 최종 갱신: 2026-08-07 · 최종 갱신: 2026-08-27 · 상태: 🟡 **Phase 0~3 완료 · Phase 4(프로필 이미지 제거)·Phase 5(닉네임 규칙) 계획됨**. 미결 2건 잔존(필터 조회 비용 · 탈퇴 계정 refresh — 둘 다 관찰 후, 트리거 명시) — 2026-08-27 에 3건 해소
+> 출처: 2026-07-31 세션 · 작성: 2026-07-31 · 최종 갱신: 2026-08-07 · 최종 갱신: 2026-08-27 · 상태: ✅ **완료 (Phase 0~5)** — Phase 4·5 는 2026-08-27 계획·구현·검증. 미결 2건 잔존(필터 조회 비용 · 탈퇴 계정 refresh — 둘 다 관찰 후, 트리거 명시)
 
 ## 배경
 
@@ -114,11 +114,11 @@
       **비활성 사용자일 때는 예외를 던지지 않고 `SecurityContext`를 세팅하지 않은 채 통과시킨다.** 그러면 `SecurityConfig`의 `authenticationEntryPoint`가 기존 규격대로 `ApiResponse.error(UNAUTHORIZED)` + 401을 내려준다 — 필터에서 던지면 `GlobalExceptionHandler`에 닿지 않아(필터는 DispatcherServlet 앞이다) 응답 형태가 갈린다.
       완료 기준: 탈퇴 직후 기존 access 토큰으로 `GET /users/me` 호출 시 **401 + 기존 에러 본문 형태** · **규칙이 살아 있는지 프로브로 확인**(필터에 `UserRepository` 직참조를 일부러 심어 빨간불이 되는지 — CLAUDE.md 계약. 2026-08-03 실측상 `FRAMEWORK_MUST_NOT_KNOW_DOMAIN`과 `LAYER_DIRECTION` **둘 다** 발화한다) · `spotlessApply` + `build -x test` + `checkstyleMain -PciStrict` 통과
 
-- [ ] **Phase 4 — 프로필 이미지 제거 (2026-08-27 계획, D8)**
+- [x] **Phase 4 — 프로필 이미지 제거 (2026-08-27 계획·구현·검증, D8)**
       `DELETE /users/me/profile-image` → `UserService.removeProfileImage(userId)` → `user.updateProfile(user.getNickname(), null)` (기존 "받은 값을 그대로 쓴다" 계약 유지 — 서비스가 닉네임을 채워 넘긴다). 컨트롤러 테스트는 AGENTS §6 관례.
       완료 기준: 204 · 본문 없음 · 저장값 `profile_image_url = NULL` · 이미지가 이미 없는 상태에서도 204(멱등) · `PATCH /users/me` 의 D3 의미론(누락·`null` = 변경 없음)이 그대로다 · 미인증 401
 
-- [ ] **Phase 5 — 닉네임 검증 규칙 (2026-08-27 계획, D9)**
+- [x] **Phase 5 — 닉네임 검증 규칙 (2026-08-27 계획·구현·검증, D9)**
       `UserUpdateRequest.nickname` 에 `@Size(min = 1, max = 100)` · 서비스가 `strip()` 한 값으로 병합 · 공백만인 값은 트림 후 빈 문자열이 되므로 서비스에서 거부(`INVALID_INPUT` 계열 400 — 기존 `ErrorCode` 확인 후 결정). 카카오 자동가입 경로는 건드리지 않는다.
       완료 기준: `""` → 400 · 공백만(`"   "`) → 400 · `" 마당이 "` → `"마당이"` 로 저장 · 101자 → 400(기존) · `null` → 변경 없음(기존 REQ-08-06 유지) · 같은 닉네임 두 사용자 허용
 
@@ -126,6 +126,7 @@
 
 > 작성: 2026-08-03 · 근거: 이 계획서 (스펙 원본은 Notion `API I/F`) · 검증: `/testrun REQ-08`
 > `결과` 열은 `/checkpoint`가 채운다. 케이스 ID는 테스트명에 `[REQ-08-01]` 형태로 박는다.
+> **결과 갱신: 2026-08-27 — 21~29 전부 `✅` (Phase 4·5 완료).** `/testrun REQ-08` 42건 실행 · 실패 0 · 표 29건 ↔ 코드 28건(+ `REQ-08-11` 수동) · 근거 인용 9건 원문 존재. **완료 기준 중 "미인증 401"(Phase 4)은 케이스가 없어 테스트로는 고정되지 않았다** — `PUBLIC_PATHS` 에 없어 기본 보호될 뿐이다.
 > **결과 갱신: 2026-08-07 — 20건 전부 `✅` (Phase 0~3 완료).** `REQ-08-11` 은 자동화하지 않고 **로컬 DB 왕복으로 사람이 확인**했다(2026-08-07: 탈퇴 전 `a02016c0…` → 재로그인 후 **`94eef1f2…`**, 소셜 행은 새 `user_id` 로 재생성). `/testrun` 에는 잡히지 않으므로 **"14건 통과"를 "15건 검증됨"으로 읽지 말 것.** Phase 3(`16~20`)도 같은 날 구현·검증했다.
 > (이전) Phase 1(`01~08`) 8건 `✅` (`/testrun REQ-08`, 18건 실행 · 실패 0 · 근거 인용 8건 전부 유효 · 고아 ID 없음). `09~20`은 해당 Phase 미착수라 `—`.
 > **테스트 코드는 Phase별로 들어온다** — Java는 대상 클래스가 없으면 테스트 소스가 컴파일되지 않아 `./gradlew test`가 통째로 죽는다(ArchUnit 8건까지 같이 못 돈다). 그래서 "실패하는 테스트를 미리 남긴다"를 여기서는 쓰지 않고, **표가 미검증 상태를 대신 드러낸다.** 오늘 작성한 것은 대상이 이미 있는 `REQ-08-08` 하나뿐이다.
@@ -152,15 +153,15 @@
 | REQ-08-18 | 〃 | 비활성이어도 예외를 던지지 않는다 | 회귀 | Phase 3 — "필터에서 던지면 `GlobalExceptionHandler`에 닿지 않아 응답 형태가 갈린다" | 3 | ✅ |
 | REQ-08-19 | 〃 | 토큰이 없으면 `UserStatusChecker`를 호출하지 않는다 | 경계 | 제약·함정 — "공개 경로에는 DB 조회가 붙지 않는다" | 3 | ✅ |
 | REQ-08-20 | `UserStatusChecker` | `framework.security` 패키지에 있다 | 불변식 | 제약·함정 — "포트 인터페이스는 `framework`에 둔다" | 3 | ✅ |
-| REQ-08-21 | `DELETE /users/me/profile-image` | **HTTP 왕복** 204 · 본문 없음 | 정상 | Phase 4 완료 기준 — "204 · 본문 없음" | 4 | — |
-| REQ-08-22 | `UserService.removeProfileImage` | 호출 후 `profileImageUrl` 이 `null` | 정상 | Phase 4 완료 기준 — "저장값 `profile_image_url = NULL`" | 4 | — |
-| REQ-08-23 | 〃 | 닉네임은 유지된다 | 회귀 | 제약·함정 — "`User.updateProfile`은 부분 반영용이 아니다" | 4 | — |
-| REQ-08-24 | 〃 | 이미지가 없는 상태에서 호출해도 예외 없이 끝난다 | 경계 | Phase 4 완료 기준 — "이미지가 이미 없는 상태에서도 204(멱등)" | 4 | — |
-| REQ-08-25 | `PATCH /users/me` | `profile_image_url: null` 을 보내도 기존 값이 유지된다 | 불변식 | Phase 4 완료 기준 — "D3 의미론(누락·`null` = 변경 없음)이 그대로다" | 4 | — |
-| REQ-08-26 | `PATCH /users/me` | `nickname: ""` → 400 | 경계 | Phase 5 완료 기준 — "`""` → 400" | 5 | — |
-| REQ-08-27 | 〃 | 공백만인 닉네임 → 400 | 경계 | Phase 5 완료 기준 — "공백만(`"   "`) → 400" | 5 | — |
-| REQ-08-28 | `UserService.update` | 앞뒤 공백이 트림되어 저장된다 | 정상 | Phase 5 완료 기준 — "`" 마당이 "` → `"마당이"` 로 저장" | 5 | — |
-| REQ-08-29 | 〃 | 같은 닉네임을 두 사용자가 가질 수 있다 | 불변식 | D9 — "트림 후 1~100자, 중복 허용" | 5 | — |
+| REQ-08-21 | `DELETE /users/me/profile-image` | **HTTP 왕복** 204 · 본문 없음 | 정상 | Phase 4 완료 기준 — "204 · 본문 없음" | 4 | ✅ |
+| REQ-08-22 | `UserService.removeProfileImage` | 호출 후 `profileImageUrl` 이 `null` | 정상 | Phase 4 완료 기준 — "저장값 `profile_image_url = NULL`" | 4 | ✅ |
+| REQ-08-23 | 〃 | 닉네임은 유지된다 | 회귀 | 제약·함정 — "`User.updateProfile`은 부분 반영용이 아니다" | 4 | ✅ |
+| REQ-08-24 | 〃 | 이미지가 없는 상태에서 호출해도 예외 없이 끝난다 | 경계 | Phase 4 완료 기준 — "이미지가 이미 없는 상태에서도 204(멱등)" | 4 | ✅ |
+| REQ-08-25 | `PATCH /users/me` | `profile_image_url: null` 을 보내도 기존 값이 유지된다 | 불변식 | Phase 4 완료 기준 — "D3 의미론(누락·`null` = 변경 없음)이 그대로다" | 4 | ✅ |
+| REQ-08-26 | `PATCH /users/me` | `nickname: ""` → 400 | 경계 | Phase 5 완료 기준 — "`""` → 400" | 5 | ✅ |
+| REQ-08-27 | 〃 | 공백만인 닉네임 → 400 | 경계 | Phase 5 완료 기준 — "공백만(`"   "`) → 400" | 5 | ✅ |
+| REQ-08-28 | `UserService.update` | 앞뒤 공백이 트림되어 저장된다 | 정상 | Phase 5 완료 기준 — "`" 마당이 "` → `"마당이"` 로 저장" | 5 | ✅ |
+| REQ-08-29 | 〃 | 같은 닉네임을 두 사용자가 가질 수 있다 | 불변식 | D9 — "트림 후 1~100자, 중복 허용" | 5 | ✅ |
 
 **REQ-08-11은 자동화하지 않는다.** 계획서가 "목으로는 D1이 검증되지 않는다"고 못 박았다 — 유령 계정 경로는 `UNIQUE (provider, provider_user_id)`와 실제 조회 결과가 만드는 현상이다. **로컬 DB 왕복으로 사람이 확인**하고 결과 열에 근거(날짜·관찰한 `users.id`)를 남긴다. `/testrun`의 REQ 필터에는 잡히지 않으므로 **"19건 통과"를 "20건 검증됨"으로 읽지 말 것.**
 
