@@ -1,6 +1,6 @@
 # PLAN-REQ-09 · pet 도메인 + `PetAccessGuard` (소유권 앵커)
 
-> 출처: 2026-08-10 세션 · 작성: 2026-08-10 · 상태: 🟡 진행 (Phase 1·2 완료 · 결정 D1~D6 확정 · Phase 3 남음)
+> 출처: 2026-08-10 세션 · 작성: 2026-08-10 · 최종 갱신: 2026-08-27 · 상태: ✅ **완료 (Phase 1~3)**. 미결 5건은 남아 있다 — 전부 pet 도메인 밖으로 번지는 것
 
 ## 배경
 
@@ -52,6 +52,7 @@ REQ-15 로 컨트롤러 테스트 관례가 확정됐으므로 **pet 컨트롤�
 - [x] ⭐ **가드 참조를 어떻게 허용할 것인가** — **DTO 반환 + 좁은 예외 3건 (D3 확정, 2026-08-10).** 실측으로 우회·엔티티 누출이 둘 다 차단되는 것을 확인했다
 - [x] ⭐ **`PetAccessGuard` 가 어떤 ArchUnit 규칙에 걸리는가** — **2026-08-10 프로브로 확정. 아래 「프로브 결과」 참고.** 남은 판단(예외를 늘릴지 vs 다른 형태)은 미결 ①' 로 옮겼다
 - [ ] **Notion 역반영 2건 (D3·D4·D6 확정에 따른 것).** ⓐ 「소스 구조」 §6 의 소프트 딜리트 — `@SQLDelete`·`@SQLRestriction` 을 쓰라고 돼 있으나 실제는 **수동 파생 쿼리**다(`users`·`pets` 둘 다). ⓑ 「소스 구조」 §3 — 원본은 "`PetAccessGuard.getOwnedPet(petId, userId)` 로 소유권·**종 검증** 후 **Pet** 을 받아 처리한다"고 적었는데, 확정안은 **읽기 전용 DTO 를 받고 종 검증은 각 하위 Service** 가 한다. 의도는 같지만 문구가 다르다 — **사람이 Notion 에서 수정해야 한다**
+- [ ] **`DomainBoundaryTest` 의 D3 예외 3건(`business.pet.service` · `data.pet.dto` · `data.pet.enums`)을 언제 넣는가 — REQ-10 첫 하위 도메인 착수 시 (2026-08-27 등록).** Phase 3 에서 넣지 않은 이유: 지금은 소비자가 없어 **대상 없는 예외**가 되고, 이 프로젝트는 빈 규칙을 통과로 치지 않는다(`allowEmptyShould(false)` 와 같은 정신). 형태는 프로브로 검증됐으므로 REQ-10 계획서가 이 항목을 Phase 0 으로 가져간다
 - [ ] **`GET /pets` 에 커서 페이지네이션을 넣을 것인가.** 원본 응답은 `{"data":{"items":[...]}}` 뿐이고 `next_cursor` 가 없다. 그런데 AGENTS §5 는 "페이지네이션: 커서 기반"이고 `framework/pagination` 에 `CursorRequest`·`CursorPage`·`CursorCodec` 가 이미 있다. **한 사람이 가진 펫 수는 작다**는 것이 원본의 전제로 보이지만 명시돼 있지 않다 — 근거 없이 넣지도, 빼지도 않는다
 - [x] **소프트 딜리트를 어떻게 구현할 것인가** — **수동 유지 (D6 확정, 2026-08-10).** `users` 와 일치시켰고, Notion §6 과 어긋나므로 역반영 대상에 포함된다
 - [x] **`PATCH` 로 `species` 를 보내면 어떻게 되는가** — **무시 (D5 확정, 2026-08-10).** 실측으로 이것이 앱의 기본 동작임을 확인했고, 400 안 둘 다 대가가 더 컸다
@@ -135,9 +136,12 @@ D안은 AGENTS §5 의 "**Entity 는 Service 밖으로 나가지 않는다**"와
       → 완료 기준 6항목 전부 충족. `/testrun REQ-09` 에서 **케이스 14개 ID · 테스트 23건 + ArchUnit 8건 전부 통과**(검증 계약 `결과` 열 참조).
       **계획에 없던 변경 1건** — `framework` 의 `GlobalExceptionHandler` 에 `HttpMessageNotReadableException` 핸들러를 추가했다. Phase 경계 밖이지만 `REQ-09-15·16` 이 이것 없이는 성립하지 않는다(사유는 `PROGRESS.md` 2026-08-10).
 
-- [ ] **Phase 3 — `PetAccessGuard` 확정**
+- [x] **Phase 3 — `PetAccessGuard` 확정 — 2026-08-27 완료**
       Phase 1 결정대로 구현하고, **하위 도메인이 실제로 쓸 수 있는지**를 확인한다.
       완료 기준: 소유권 위반 403 · 미존재 404 가 **HTTP 왕복으로** 검증됨(AGENTS §6 관례) · 프로브로 ArchUnit 이 여전히 살아 있는지 확인
+      → `/testrun REQ-09` 에서 **REQ-09-09~13 (테스트 9건) 전부 통과**, 표 19건 ↔ 코드 19건 일치. ArchUnit 프로브 4배치(가드 정상 사용 PASS · `PetRepository` 우회 FAIL · `Pet` 참조 FAIL · 예외 없이 사용 FAIL)는 `137dec6` 커밋 본문에 기록.
+      **HTTP 왕복은 `PetController` 슬라이스로 대신했다** — 가드에는 자기 컨트롤러가 없다(소비자는 REQ-10). 같은 `ErrorCode` 의 핸들러 매핑을 고정한 것이므로 가드 자체의 HTTP 경로는 REQ-10 첫 소비자에서 재확인한다.
+      **`DomainBoundaryTest` 예외 3건은 넣지 않았다** — 아래 미결 참고.
 
 ## 검증 계약
 
@@ -161,11 +165,11 @@ D안은 AGENTS §5 의 "**Entity 는 Service 밖으로 나가지 않는다**"와
 | REQ-09-17 | `PATCH /pets/{id}` | `species` 를 보내도 종이 바뀌지 않는다 | 불변식 | D5 — "**무시한다.** `PetUpdateRequest` 에 `species` 필드를 두지 않는다" | 2 | ✅ |
 | REQ-09-18 | `Pet` 엔티티 | `@SQLDelete`·`@SQLRestriction` 이 붙어 있지 않다 | 회귀 | D6 — "`@SQLDelete`·`@SQLRestriction` 을 쓰지 않는다" | 2 | ✅ |
 | REQ-09-19 | 삭제된 펫 조회 | `PET_NOT_FOUND` (수동 필터가 실제로 건다) | 예외 | D6 — "`findByIdAndDeletedAtIsNull` 계열 파생 쿼리" | 2 | ✅ |
-| REQ-09-09 | `PetAccessGuard` | 반환 타입이 `Pet` 엔티티가 아니다 | 불변식 | D3 — "`Pet` 엔티티를 돌려주지 않는다" | 3 | — |
-| REQ-09-10 | 가드 반환 DTO | `species` 를 싣는다 | 불변식 | D4 — "`species` 를 DTO 에 실어 넘긴다" | 3 | — |
-| REQ-09-11 | 가드 반환 DTO | `data/pet/dto` 에 있다 | 불변식 | D3 — "**`data/pet/dto` 의 읽기 전용 DTO**" | 3 | — |
-| REQ-09-12 | 소유권 위반 | **HTTP 왕복** 403 `PET_FORBIDDEN` | 예외 | Phase 3 완료 기준 — "소유권 위반 403 · 미존재 404 가 **HTTP 왕복으로** 검증됨" | 3 | — |
-| REQ-09-13 | 미존재 펫 | **HTTP 왕복** 404 `PET_NOT_FOUND` | 예외 | 〃 | 3 | — |
+| REQ-09-09 | `PetAccessGuard` | 반환 타입이 `Pet` 엔티티가 아니다 | 불변식 | D3 — "`Pet` 엔티티를 돌려주지 않는다" | 3 | ✅ |
+| REQ-09-10 | 가드 반환 DTO | `species` 를 싣는다 | 불변식 | D4 — "`species` 를 DTO 에 실어 넘긴다" | 3 | ✅ |
+| REQ-09-11 | 가드 반환 DTO | `data/pet/dto` 에 있다 | 불변식 | D3 — "**`data/pet/dto` 의 읽기 전용 DTO**" | 3 | ✅ |
+| REQ-09-12 | 소유권 위반 | **HTTP 왕복** 403 `PET_FORBIDDEN` | 예외 | Phase 3 완료 기준 — "소유권 위반 403 · 미존재 404 가 **HTTP 왕복으로** 검증됨" | 3 | ✅ |
+| REQ-09-13 | 미존재 펫 | **HTTP 왕복** 404 `PET_NOT_FOUND` | 예외 | 〃 | 3 | ✅ |
 
 **`ArchUnit 8건 통과`(Phase 2·3 완료 기준)에는 케이스를 새로 만들지 않았다** — 기존 `ArchitectureTest`·`DomainBoundaryTest` 가 이미 덮는다. 다만 D3 의 좁은 예외가 실제로 우회를 막는지는 **`/implement` 의 프로브**로 확인한다(케이스로는 표현되지 않는다).
 

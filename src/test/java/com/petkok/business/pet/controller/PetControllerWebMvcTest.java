@@ -13,6 +13,8 @@ import com.petkok.data.pet.enums.Gender;
 import com.petkok.data.pet.enums.Species;
 import com.petkok.framework.config.JacksonConfig;
 import com.petkok.framework.config.SecurityConfig;
+import com.petkok.framework.exception.BusinessException;
+import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.security.AuthPrincipal;
 import com.petkok.framework.security.UserStatusChecker;
 import com.petkok.framework.security.jwt.JwtTokenProvider;
@@ -33,7 +35,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * pets 의 <b>HTTP 계약</b>. 검증 계약 REQ-09-03 · 04 · 15 · 16 (PLAN-REQ-09 § 검증 계약).
+ * pets 의 <b>HTTP 계약</b>. 검증 계약 REQ-09-03 · 04 · 12 · 13 · 15 · 16 (PLAN-REQ-09 § 검증 계약).
  *
  * <p>설정은 AGENTS §6 관례를 따른다 — {@code @Import({SecurityConfig, JacksonConfig})} 를 빼면 테스트가 통과하면서 틀린
  * 계약을 고정한다. 이 슬라이스에는 {@code UserService} 가 없으므로 {@link UserStatusChecker} 를 <b>따로 목으로 둔다</b>(필터가 자동
@@ -161,5 +163,49 @@ class PetControllerWebMvcTest {
     mockMvc
         .perform(MockMvcRequestBuilders.get("/api/v1/pets/" + PET_ID).with(asUser()))
         .andExpect(jsonPath("$.data.updated_at").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("[REQ-09-12] 남의 펫은 HTTP 왕복에서 403 이다")
+  void req_09_12_strangerGetsForbiddenStatus() throws Exception {
+    when(petService.findOne(any(), any()))
+        .thenThrow(new BusinessException(ErrorCode.PET_FORBIDDEN));
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get("/api/v1/pets/" + PET_ID).with(asUser()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @DisplayName("[REQ-09-12] 남의 펫은 HTTP 왕복에서 error.code 가 PET_FORBIDDEN 이다")
+  void req_09_12_strangerGetsForbiddenCode() throws Exception {
+    when(petService.findOne(any(), any()))
+        .thenThrow(new BusinessException(ErrorCode.PET_FORBIDDEN));
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get("/api/v1/pets/" + PET_ID).with(asUser()))
+        .andExpect(jsonPath("$.error.code").value("PET_FORBIDDEN"));
+  }
+
+  @Test
+  @DisplayName("[REQ-09-13] 없는 펫은 HTTP 왕복에서 404 다")
+  void req_09_13_missingPetGetsNotFoundStatus() throws Exception {
+    when(petService.findOne(any(), any()))
+        .thenThrow(new BusinessException(ErrorCode.PET_NOT_FOUND));
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get("/api/v1/pets/" + PET_ID).with(asUser()))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("[REQ-09-13] 없는 펫은 HTTP 왕복에서 error.code 가 PET_NOT_FOUND 다")
+  void req_09_13_missingPetGetsNotFoundCode() throws Exception {
+    when(petService.findOne(any(), any()))
+        .thenThrow(new BusinessException(ErrorCode.PET_NOT_FOUND));
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get("/api/v1/pets/" + PET_ID).with(asUser()))
+        .andExpect(jsonPath("$.error.code").value("PET_NOT_FOUND"));
   }
 }

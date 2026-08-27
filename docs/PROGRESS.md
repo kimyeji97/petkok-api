@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-10 (REQ-09 Phase 1·2 — 가드 형태를 프로브로 확정 · pets CRUD)
+> 최종 갱신: 2026-08-27 (REQ-09 Phase 3 — `PetAccessGuard` · REQ-09 완료)
 
 ## 요구사항 인덱스
 
@@ -20,7 +20,7 @@
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 2건 잔존) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-07 | ✅ (미결 6건 잔존) |
-| REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | — | 🟡 (Phase 1·2 완료) |
+| REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 5건 잔존 — 전부 pet 밖) |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
@@ -33,6 +33,40 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-08-27
+
+> 17일 만의 재개. REQ-09 Phase 3(`PetAccessGuard`)으로 REQ-09 를 닫았다. 코드 자체는 작았고(가드 1 + DTO 1), 기록할 것은 **순서가 꼬였던 것**과 **셈이 틀릴 뻔한 것**이다.
+
+### 커맨드 순서가 한 번 꼬였다 — 표는 있는데 코드가 없는 케이스
+
+`/implement REQ-09 Phase 3` 로 들어갔더니 검증 계약 표에는 REQ-09-09~13 이 있는데 **테스트 코드가 없었다.** 08-10 `/testgen` 이 표는 채우고 코드는 "대상 클래스가 생기는 Phase 에 쓴다"(REQ-08 에서 정한 관례 — Java 는 대상이 없으면 테스트 소스가 컴파일되지 않는다)로 미뤄 둔 것이다. `/implement` 3절 게이트("Phase 에 걸린 케이스 0건 = 판정 불가")에 정확히 걸렸다.
+
+그래서 **구현 → `wip` 커밋(푸시 안 함) → `/testgen` 으로 5건 코드화 → `/implement` 재진입 → wip 을 amend 해 `feat` 하나로 → 푸시** 순서로 갔다. 커밋은 결국 하나(`137dec6`)라 "Phase 1개 = 커밋 1개"는 지켜졌다.
+
+> 이 관례(코드는 Phase 별로)는 옳은데, **`/testgen` 을 Phase 착수 직전에 한 번 더 도는 것이 정상 경로**라는 게 이번에 드러났다. 표를 채운 세션과 코드를 쓰는 세션이 다르면 이렇게 된다.
+
+### 가드에는 컨트롤러가 없다 — HTTP 왕복을 어디로 태울 것인가
+
+Phase 3 완료 기준이 "403 · 404 가 **HTTP 왕복으로** 검증됨"인데 `PetAccessGuard` 의 소비자는 REQ-10 이후 하위 도메인이라 **지금은 HTTP 로 도달할 경로가 없다.** `PetController` 슬라이스에서 `PetService` 목이 같은 `BusinessException(PET_FORBIDDEN / PET_NOT_FOUND)` 을 던지게 해 **`GlobalExceptionHandler` → 상태코드 · `error.code` 매핑**을 고정하는 것으로 옮겼다. 가드와 서비스가 던지는 예외는 동일 `ErrorCode` 라 매핑 계약은 같다. 계획서에 그 사실을 남기고, 가드 자체의 HTTP 경로는 REQ-10 첫 소비자에서 재확인하기로 했다.
+
+### D3 예외 3건은 아직 넣지 않았다
+
+프로브로 형태는 확정됐지만(정상 사용 PASS · 우회 FAIL · 엔티티 참조 FAIL · **예외 없이 사용 FAIL** — 예외가 실제로 필요하다는 것까지 확인) `DomainBoundaryTest` 에 영구 추가는 하지 않았다. **소비자가 없는 지금 넣으면 대상 없는 예외**가 되고, 이 프로젝트는 빈 규칙을 통과로 치지 않는다. REQ-10 착수 시 Phase 0 으로 가져가도록 미결에 등록했다. `/implement` 가 테스트 파일을 못 고친다는 제약도 같은 방향을 가리켰다.
+
+### 셈이 틀릴 뻔했다 — JUnit XML 은 메서드명이 아니라 `@DisplayName` 을 기록한다
+
+CLAUDE.md 는 "실행 건수는 `build/test-results/test/*.xml` 로 확인"이라고 하는데, 그 XML 을 **메서드명(`req_09_1[0-3]`)으로 grep 하면 0건**이다. `testcase name` 에는 `[REQ-09-12] 남의 펫은 …` 같은 DisplayName 이 들어간다. 08-10 의 `--tests` 문자 클래스 함정과 같은 얼굴 — **"안 돌았다"로 읽힐 뻔했는데 실제로는 9건 전부 돌았다.** `[REQ-09-xx]` 로 다시 세서 확인했다. CLAUDE.md 로컬 검증 절에 한 줄 보탰다.
+
+### 계약 표 안의 `|` 가 표 파서를 깬다
+
+REQ-09-15 · 16 의 근거 인용 `` `CRESTED_GECKO | DOG | CAT` `` 안의 `|` 가 마크다운 셀 구분자와 겹쳐 **자동 대조 스크립트가 Phase 열을 `DOG` · `FEMALE` 로 읽었다.** 렌더링과 `grep -F` 에는 문제가 없어 오늘은 고치지 않았다 — `\|` 로 이스케이프하면 근거 인용문이 원문(`범위—포함`)과 달라져 `/testrun` 의 인용 검사가 0건이 된다. 고치려면 **양쪽을 함께** 바꿔야 한다. 표를 기계로 읽는 도구를 만들 때 알고 있어야 할 함정이라 적어 둔다.
+
+### 자율 실행이라 브랜치를 묻지 않고 만들었다
+
+`/implement` 는 브랜치 이름·생성을 승인받게 돼 있는데 사람이 없는 세션이라 기존 이름 규칙(`feat/req09-pet-domain`)을 따라 `feat/req09-phase3-pet-access-guard` 를 만들고 보고에 명시했다. 되돌릴 수 있는 일이라 그렇게 했고, **PR 은 만들지 않았다** — 머지 판단은 사람 몫이다. 머지 시 AGENTS §4 의 SHA 대조·브랜치 삭제 규칙을 따를 것.
+
+**남은 미결 (REQ-09, 전부 pet 밖)** — Notion 역반영 2건(§3 · §6) · `GET /pets` 커서 페이지네이션 · 탈퇴 시 pets 처리 · `DELETE` 후 하위 기록 조회 가능 여부 · D3 예외 3건 추가 시점(REQ-10 Phase 0).
 
 ## 2026-08-10
 

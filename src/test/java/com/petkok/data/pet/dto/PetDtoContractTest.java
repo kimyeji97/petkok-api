@@ -71,6 +71,19 @@ class PetDtoContractTest {
   }
 
   @Test
+  @DisplayName("[REQ-09-11] 가드 반환 DTO 는 data/pet/dto 에 있다")
+  void req_09_11_ownedPetResponseLivesInPetDtoPackage() {
+    // D3 — ArchUnit 예외를 dto·enums 로 좁히는 전제. 다른 패키지로 옮기면 하위 도메인이 참조하지 못한다.
+    assertThat(OwnedPetResponse.class.getPackageName()).isEqualTo("com.petkok.data.pet.dto");
+  }
+
+  @Test
+  @DisplayName("[REQ-09-11] 가드 반환 DTO 는 읽기 전용 record 다")
+  void req_09_11_ownedPetResponseIsRecord() {
+    assertThat(OwnedPetResponse.class.isRecord()).isTrue();
+  }
+
+  @Test
   @DisplayName("[REQ-09-14] 등록 요청에 name 이 없으면 검증에서 걸린다")
   void req_09_14_createRequestRequiresName() {
     var violations =
