@@ -73,6 +73,21 @@ public class UserService implements UserStatusChecker {
   }
 
   /**
+   * 프로필 이미지 제거 — {@code profile_image_url} 을 {@code null} 로. 검증 계약 REQ-08-22 ~ 24 (PLAN-REQ-08 D8).
+   *
+   * <p><b>{@code PATCH /users/me} 로는 못 하는 일이라 별도 메서드다.</b> D3 이 누락·{@code null} 을 모두 "변경 없음"으로 두므로
+   * PATCH 에는 제거 신호를 실을 자리가 없다. {@code null} = 제거로 바꾸면 D3 이 뒤집히고, {@code ""} = 제거는 원본에 없는 규약이다.
+   *
+   * <p>{@link User#updateProfile} 은 두 필드를 무조건 덮어쓰므로 <b>닉네임을 채워 넘긴다</b>(D6 과 같은 이유 — 빠뜨리면 닉네임이
+   * {@code null} 이 되어 {@code NOT NULL} 위반으로 500). 이미 이미지가 없어도 예외 없이 끝난다(멱등).
+   */
+  @Transactional
+  public void removeProfileImage(UUID userId) {
+    User user = findActive(userId);
+    user.updateProfile(user.getNickname(), null);
+  }
+
+  /**
    * 회원 탈퇴. {@code users.deleted_at} 을 찍고 소셜 연결을 <b>하드 삭제</b>한다. 검증 계약 REQ-08-09 · 10 · 13 · 14.
    *
    * <p><b>소셜 행을 먼저 지운다.</b> FK 는 {@code user_social_accounts.user_id → users.id} 한 방향이라 순서를 뒤집어도 제약

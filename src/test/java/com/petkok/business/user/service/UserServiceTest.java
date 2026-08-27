@@ -1,6 +1,7 @@
 package com.petkok.business.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -158,5 +159,75 @@ class UserServiceTest {
 
     assertThat(Stream.concat(fieldTypes, ctorParamTypes))
         .noneMatch(t -> t.getName().startsWith("com.petkok.data.auth."));
+  }
+
+  // ---- Phase 4 · 프로필 이미지 제거 (D8) ----
+
+  @Test
+  @DisplayName("[REQ-08-22] 프로필 이미지 제거 후 profileImageUrl 이 null 이다")
+  void req_08_22_removeProfileImageSetsNull() {
+    User user = active();
+
+    userService.removeProfileImage(USER_ID);
+
+    assertThat(user.getProfileImageUrl()).isNull();
+  }
+
+  @Test
+  @DisplayName("[REQ-08-23] 프로필 이미지 제거 시 닉네임은 유지된다")
+  void req_08_23_removeProfileImageKeepsNickname() {
+    // User.updateProfile 은 두 필드를 통째로 덮어쓴다 — 서비스가 닉네임을 채워 넘겨야 한다.
+    User user = active();
+
+    userService.removeProfileImage(USER_ID);
+
+    assertThat(user.getNickname()).isEqualTo(NICKNAME);
+  }
+
+  @Test
+  @DisplayName("[REQ-08-24] 이미지가 없는 상태에서 제거해도 예외 없이 끝난다 (멱등)")
+  void req_08_24_removeProfileImageIsIdempotent() {
+    User user = User.of(NICKNAME, null, null);
+    when(userRepository.findByIdAndDeletedAtIsNull(USER_ID)).thenReturn(Optional.of(user));
+
+    assertThatCode(() -> userService.removeProfileImage(USER_ID)).doesNotThrowAnyException();
+  }
+
+  // ---- Phase 5 · 닉네임 규칙 (D9) ----
+
+  @Test
+  @DisplayName("[REQ-08-27] 공백만인 닉네임은 INVALID_INPUT 으로 거부된다")
+  void req_08_27_blankOnlyNicknameIsRejected() {
+    // @Size(min = 1) 는 "   "(길이 3) 를 통과시키므로 트림 후 빈 값은 서비스가 거부해야 한다.
+    active();
+
+    assertThatThrownBy(() -> userService.updateMe(USER_ID, new UserUpdateRequest("   ", null)))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.INVALID_INPUT);
+  }
+
+  @Test
+  @DisplayName("[REQ-08-28] 닉네임 앞뒤 공백은 트림되어 저장된다")
+  void req_08_28_nicknameIsStripped() {
+    User user = active();
+
+    userService.updateMe(USER_ID, new UserUpdateRequest(" 마당이 ", null));
+
+    assertThat(user.getNickname()).isEqualTo("마당이");
+  }
+
+  @Test
+  @DisplayName("[REQ-08-29] 같은 닉네임을 두 사용자가 가질 수 있다 (중복 허용)")
+  void req_08_29_duplicateNicknameIsAllowed() {
+    UUID otherId = UUID.fromString("99999999-2222-3333-4444-555555555555");
+    User first = active();
+    User second = User.of("다른집사", null, null);
+    when(userRepository.findByIdAndDeletedAtIsNull(otherId)).thenReturn(Optional.of(second));
+    userService.updateMe(USER_ID, new UserUpdateRequest("마당이", null));
+
+    userService.updateMe(otherId, new UserUpdateRequest("마당이", null));
+
+    assertThat(second.getNickname()).isEqualTo(first.getNickname());
   }
 }

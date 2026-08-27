@@ -49,6 +49,18 @@ public class UserController {
   }
 
   /**
+   * 프로필 이미지 제거. 검증 계약 REQ-08-21 (PLAN-REQ-08 D8).
+   *
+   * <p>{@code PATCH /users/me} 와 분리한 이유는 {@link UserUpdateRequest} 참고 — {@code null} 이 "변경 없음"이라
+   * 제거를 표현할 수 없다. 204 · 본문 없음은 {@link #withdraw} 와 같은 이유로 {@code ApiResponse} 를 쓰지 않는다.
+   */
+  @DeleteMapping("/me/profile-image")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void removeProfileImage(@CurrentUser AuthPrincipal principal) {
+    userService.removeProfileImage(principal.userId());
+  }
+
+  /**
    * 회원 탈퇴 (소프트 딜리트). 검증 계약 REQ-08-15.
    *
    * <p><b>응답 본문이 없다.</b> 204 는 정의상 본문을 갖지 않으므로 공통 래퍼 {@code ApiResponse} 를 쓰지 않는다 — 씌우려면 200 으로 내려야
