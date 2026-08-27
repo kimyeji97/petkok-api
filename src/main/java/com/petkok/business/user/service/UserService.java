@@ -49,7 +49,8 @@ public class UserService implements UserStatusChecker {
   }
 
   /**
-   * 내 프로필 수정. <b>보낸 필드만 반영한다</b> (PLAN-REQ-08 D3). 검증 계약 REQ-08-03 ~ 05.
+   * 내 프로필 수정. <b>보낸 필드만 반영한다</b> (PLAN-REQ-08 D3). 닉네임은 트림 후 저장(D9). 검증 계약 REQ-08-03 ~ 05 · 27 ~
+   * 29.
    *
    * <p>⚠️ <b>병합을 여기서 하는 것이 이 메서드의 핵심이다</b> (D3 · D6). {@link User#updateProfile} 은 두 필드를 <b>무조건
    * 덮어쓴다</b> — 요청 값을 그대로 넘기면 닉네임만 담긴 PATCH 가 {@code profile_image_url} 을 지운다. 응답은 200 으로 정상이고 <b>DB
@@ -66,10 +67,24 @@ public class UserService implements UserStatusChecker {
     User user = findActive(userId);
 
     user.updateProfile(
-        request.nickname() != null ? request.nickname() : user.getNickname(),
+        request.nickname() != null ? normalizeNickname(request.nickname()) : user.getNickname(),
         request.profileImageUrl() != null ? request.profileImageUrl() : user.getProfileImageUrl());
 
     return toResponse(user);
+  }
+
+  /**
+   * 닉네임 정규화 — 앞뒤 공백 트림, 트림 후 빈 값은 거부. 검증 계약 REQ-08-27 · 28 (PLAN-REQ-08 D9).
+   *
+   * <p>{@code @Size(min = 1)} 은 {@code " "} 를 통과시키므로 <b>공백만인 값은 여기서만 걸린다.</b> {@code null} 은 호출부가
+   * 먼저 걸러 "변경 없음"으로 처리한다(D3) — 이 메서드는 {@code null} 을 받지 않는다. 중복 검사는 하지 않는다(D9 — 스키마에 UNIQUE 없음).
+   */
+  private static String normalizeNickname(String raw) {
+    String nickname = raw.strip();
+    if (nickname.isEmpty()) {
+      throw new BusinessException(ErrorCode.INVALID_INPUT);
+    }
+    return nickname;
   }
 
   /**
