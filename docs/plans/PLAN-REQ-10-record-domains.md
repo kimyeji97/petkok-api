@@ -121,6 +121,36 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
       `DiaryEntry`(`BaseTimeEntity`) · `ConditionTag` enum 4종(D1) · CRUD 5행 · 목록 `condition_tag` 필터.
       완료 기준: `condition_tag: "거식"` → 400 · `entry_date` 미래 → 400(기준 타임존은 미결 답) · 응답에 `updated_at` 있음(D11) · 응답에 `photos`·`photo_count` **없음**(D4) · `photo_ids` 를 보내도 무시되고 201 · 필터가 걸린 목록도 keyset 유지 · 나머지는 Phase 1 기준
 
+## 검증 계약
+
+> 작성: 2026-08-27 · 근거: 이 계획서 (원본은 Notion `API I/F` · 「소스 구조」) · 검증: `/testrun REQ-10`
+> `결과` 열은 `/checkpoint`가 채운다. 케이스 ID는 테스트명에 `[REQ-10-01]` 형태로 박는다.
+> **Phase 0 의 01~03 은 프로브다** — 가짜 클래스를 심었다 지우는 확인이라 영구 테스트로 남지 않는다. `/implement REQ-10 0` 이 실행하고 결과를 커밋 본문에 남기며, `결과` 열은 `REQ-08-11` 처럼 `✅ 수동` 으로 채운다.
+> **테스트 코드는 Phase 별로 들어온다** (Java 는 대상 클래스가 없으면 테스트 소스가 컴파일되지 않는다 — REQ-08·09 실측). Phase 1 코드는 `/implement REQ-10 1` 직전 `/testgen` 재호출로 쓴다. Phase 2~5 행은 각 Phase 착수 전 미결을 닫은 뒤 추가한다.
+> **`message` 를 단언하지 않는다** — `status` 와 `error.code` 만 본다(AGENTS §6). 인용문에 `|` 가 들어가면 표 셀이 갈라지므로 **`|` 앞에서 끊는다**.
+
+| ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
+|----|------|--------|:--:|------|:--:|:--:|
+| REQ-10-01 | `DomainBoundaryTest` | 하위 Service 가 `PetAccessGuard` · `OwnedPetResponse` · `Species` 만 주입 → 통과 | 프로브 | Phase 0 완료 기준 — "가짜 `business/weight/service` 가 가드를 주입해 통과" | 0 | — |
+| REQ-10-02 | 〃 | 하위 Service 가 `PetRepository` 직접 주입 → 규칙 FAIL | 프로브 | Phase 0 완료 기준 — "`PetRepository` 직접 주입은 **여전히 FAIL**" | 0 | — |
+| REQ-10-03 | 〃 | 하위 Service 가 `Pet` 엔티티 참조 → 규칙 FAIL | 프로브 | Phase 0 완료 기준 — "`Pet` 엔티티 직접 참조는 **여전히 FAIL**" | 0 | — |
+| REQ-10-04 | `POST /weight` | **HTTP 왕복** 201 | 정상 | Phase 1 완료 기준 — "4행이 원본 상태코드(201/200/200/204)대로" | 1 | — |
+| REQ-10-05 | `DELETE /weight/{log_id}` | **HTTP 왕복** 204 · 본문 없음 | 정상 | 〃 | 1 | — |
+| REQ-10-06 | `WeightService` 진입 | 남의 펫 → `PET_FORBIDDEN` (가드 위임) | 예외 | Phase 1 완료 기준 — "남의 펫 403" | 1 | — |
+| REQ-10-07 | 〃 | 삭제된 펫 → `PET_NOT_FOUND` | 예외 | Phase 1 완료 기준 — "삭제된 펫 404" | 1 | — |
+| REQ-10-08 | 기록 조회 | 다른 펫에 속한 기록 id → `RESOURCE_NOT_FOUND` | 예외 | D6 — "`findByIdAndPetId(id, petId)`" · 제약·함정 — "기록 조회에 `pet_id` 를 함께 걸지 않으면 남의 기록이 보인다" | 1 | — |
+| REQ-10-09 | `WeightService` | `PetRepository` · `Pet` 을 참조하지 않는다 | 불변식 | D5 — "`PetRepository`·`Pet` 은 참조하지 않는다" | 1 | — |
+| REQ-10-10 | 목록 | 같은 `measured_at` 여러 건이 페이지 경계에 걸려도 누락·중복 없음 | 회귀 | D8 — "`id` desc 타이브레이크" · 제약·함정 — "같은 날짜 여러 건에서 누락·중복" | 1 | — |
+| REQ-10-11 | 목록 응답 | `items` · `next_cursor` · `has_next` 키 (snake_case) | 불변식 | 범위—포함 — "`{items, next_cursor, has_next}` 다(= `CursorPage`)" | 1 | — |
+| REQ-10-12 | `POST /weight` | `weight_g` 0 → 400 | 경계 | 원본 Validation — "`weight_g` 필수 (양의 정수)" | 1 | — |
+| REQ-10-13 | 〃 | `weight_g` 누락 → 400 | 경계 | 〃 | 1 | — |
+| REQ-10-14 | 〃 | `measured_at` 누락 → 400 | 경계 | 원본 Validation — "`measured_at` 필수" | 1 | — |
+| REQ-10-15 | PATCH 요청 DTO | `@NotNull` · `@NotBlank` 가 없다 | 회귀 | 제약·함정 — "PATCH DTO 에 `@NotNull`·`@NotBlank` 금지" | 1 | — |
+| REQ-10-16 | `PATCH /weight/{log_id}` | `memo` 만 보내면 `weight_g` 가 유지된다 | 회귀 | D10 — "병합은 서비스" | 1 | — |
+| REQ-10-17 | 삭제 | 삭제 후 같은 id 조회 → `RESOURCE_NOT_FOUND` (하드 삭제) | 정상 | D7 — "`delete` 는 행 삭제, 204" | 1 | — |
+
+**아래 2건은 계획서 미결이라 케이스를 쓰지 않았다** — 체중 경고 파생 필드(Phase 1 미결 ①) · 목록 `cursor`/`limit` 파라미터(Phase 1 미결 ②). 미결이 닫히면 행을 추가한다.
+
 ## 제약·함정
 
 - **가드 소비 형태는 D5 하나뿐이다.** `PetRepository` 주입·`Pet` 참조는 ArchUnit 이 잡는다(REQ-09 프로브 실측). 잡히면 예외를 늘리지 말고 코드를 고친다
