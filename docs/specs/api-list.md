@@ -45,8 +45,9 @@
 | Method | Path | 인증 | 설명 |
 | --- | --- | :---: | --- |
 | GET | `/users/me` | 🔒 | 내 프로필 |
-| PATCH | `/users/me` | 🔒 | 닉네임·프로필 이미지 수정 |
+| PATCH | `/users/me` | 🔒 | 닉네임·프로필 이미지 수정. **Validation(2026-08-27 Notion 명시)**: `nickname` 트림 후 1~100자(`""`·공백만 400, 중복 허용) · `profile_image_url` ≤500자 · 누락·`null` = 변경 없음 |
 | DELETE | `/users/me` | 🔒 | 회원 탈퇴 (soft delete) |
+| DELETE | `/users/me/profile-image` | 🔒 | 프로필 이미지 제거 (`profile_image_url` = null). 이미 없어도 204 (멱등). **2026-08-27 Notion 행 추가** — `PATCH /users/me` 가 누락·`null` 을 모두 "변경 없음"으로 두므로(REQ-08 D3) 제거 신호를 실을 자리가 없어 분리했다 |
 
 > Notion API I/F에 **소셜 계정 목록·연결·해제 엔드포인트는 없다.** 이전 판의 이 문서가 `/users/me/social-accounts` 3종을 임의로 추가했었으나 원본에 근거가 없어 제거했다. 필요하다면 Notion에 먼저 추가한 뒤 이 문서에 반영한다.
 
@@ -197,7 +198,7 @@ create index idx_refresh_user_id on refresh_tokens (user_id) where revoked_at is
 
 - 엔티티는 `BaseCreatedEntity` 상속 (`created_at`만 필요 — 무효화는 `revoked_at`으로 표현하며 소프트 딜리트가 아니다)
 - 토큰 원문은 저장하지 않는다. DB 유출 시 그대로 재사용 가능해지기 때문 (`SHA256Util` 사용)
-- `DELETE /auth/logout` → 해당 토큰 `revoked_at` 설정
+- `DELETE /auth/logout` → **해당 사용자의 refresh 토큰 전체** `revoked_at` 설정. 원본(Notion `API I/F`)은 "Refresh Token 무효화. Request Body 없음"만 규정해 **범위를 말하지 않는다** — Body 가 없어 특정 토큰을 지목할 수 없으므로 전체 revoke 가 유일한 구현 해석이다(2026-08-27 확정, REQ-07-18). 대가는 기기별 로그아웃 불가. 이 문서 이전 판의 "해당 토큰"은 원본에 없는 문구였다
 - `DELETE /users/me` (탈퇴) → **revoke하지 않는다** (REQ-08 D5). 필터의 활성 사용자 검사가 탈퇴 계정의 access 토큰을 즉시 차단하므로, refresh로 새 토큰을 받아도 결국 막힌다. revoke하면 `business/user → data/auth` 참조가 생겨 ArchUnit 예외가 4→5로 는다
 	- ⚠️ 이 문서의 이전 판은 "해당 사용자 토큰 전체 revoke"라고 적고 있었으나 **어느 원본에도 근거가 없었다**(2026-08-04 Notion 대조). `API I/F` → 회원 탈퇴는 "소프트 딜리트 / 204"만 규정하고, 테이블 정의서 §10의 `revoked_at`은 "로테이션·로그아웃·재사용 감지로 찍힌다"로 **탈퇴를 빼고** 있다
 	- 테이블 정의서 §10의 저장소 선택 근거에는 "로그아웃·**탈퇴** 시 즉시 무효화가 필요"라는 문장이 남아 있다(2026-07-23). Redis 기각 논거이지 탈퇴 동작 명세가 아니며 위 서술보다 오래됐다 — **Notion 역반영 대상**

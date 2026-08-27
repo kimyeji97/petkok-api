@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-27 (REQ-09 Phase 3 — `PetAccessGuard` · REQ-09 완료)
+> 최종 갱신: 2026-08-27 (REQ-09 완료 · 미결 12건 일괄 처리 — 10건 해소, REQ-08 Phase 4·5 신설)
 
 ## 요구사항 인덱스
 
@@ -18,9 +18,9 @@
 | REQ-06 | API 설계 초안 + 설계 결정 3건 확정 | [api-list.md](specs/api-list.md) | 2026-07-23 | ✅ |
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
-| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 2건 잔존) |
-| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-07 | ✅ (미결 6건 잔존) |
-| REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 5건 잔존 — 전부 pet 밖) |
+| REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
+| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | — | 🟡 (Phase 0~3 완료 2026-08-07 · **Phase 4 프로필 이미지 제거 · Phase 5 닉네임 규칙** 계획됨 2026-08-27 · 미결 2건은 관찰 후) |
+| REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
@@ -66,7 +66,29 @@ REQ-09-15 · 16 의 근거 인용 `` `CRESTED_GECKO | DOG | CAT` `` 안의 `|` �
 
 `/implement` 는 브랜치 이름·생성을 승인받게 돼 있는데 사람이 없는 세션이라 기존 이름 규칙(`feat/req09-pet-domain`)을 따라 `feat/req09-phase3-pet-access-guard` 를 만들고 보고에 명시했다. 되돌릴 수 있는 일이라 그렇게 했고, **PR 은 만들지 않았다** — 머지 판단은 사람 몫이다. 머지 시 AGENTS §4 의 SHA 대조·브랜치 삭제 규칙을 따를 것.
 
-**남은 미결 (REQ-09, 전부 pet 밖)** — Notion 역반영 2건(§3 · §6) · `GET /pets` 커서 페이지네이션 · 탈퇴 시 pets 처리 · `DELETE` 후 하위 기록 조회 가능 여부 · D3 예외 3건 추가 시점(REQ-10 Phase 0).
+~~**남은 미결 (REQ-09, 전부 pet 밖)** — Notion 역반영 2건(§3 · §6) · `GET /pets` 커서 페이지네이션 · 탈퇴 시 pets 처리 · `DELETE` 후 하위 기록 조회 가능 여부 · D3 예외 3건 추가 시점(REQ-10 Phase 0).~~ → 같은 날 오후에 아래에서 처리.
+
+### 미결 12건을 REQ-10 착수 전에 한 번에 털었다 (오후)
+
+REQ-07 2건 · REQ-08 5건 · REQ-09 5건. **원칙은 하나 — 원본(Notion `API I/F`)을 먼저 읽고, 원본에 없으면 사람이 정한 뒤 Notion 에 먼저 쓰고 레포에 옮긴다.** 결과 10건 해소 · 2건은 재검토 트리거만 명시하고 유지(필터 조회 비용 → 첫 배포 후 실측 / 탈퇴 계정 refresh → 앱의 refresh 흐름 확인 후).
+
+**원본을 읽고 나서야 보인 것** — 미결 6건의 원본 행이 전부 **한 줄짜리**였다(`DELETE /pets`: "소프트 딜리트. 연관 기록 보존. 204" / `DELETE /auth/logout`: "Refresh Token 무효화. Body 없음. 204" / `DELETE /users/me`: "소프트 딜리트. 204" …). 즉 미결의 답은 원본에 **없었고**, 파생 요약 `api-list` 가 덧붙인 문장(logout 의 "해당 토큰 `revoked_at`")이 미결처럼 보이게 만든 경우도 있었다. **"원본끼리 어긋난다"고 적어 둔 것이 실은 "파생 요약이 원본에 없는 말을 했다"였다** — REQ-08·09 에서 두 번 본 것과 같은 얼굴.
+
+**결정과 근거** (전부 계획서 미결 절에 `[x]` + 결론으로 기록):
+- `DELETE /pets` 연관 기록 보존 = **DB 행 보존, API 조회 불가** — 하위 엔드포인트가 전부 `/pets/{petId}/...` 아래라 `PetAccessGuard` 의 404 가 곧 계약. REQ-10 추가 작업 없음
+- `GET /pets` 페이지네이션 **안 넣음** — 원본 응답에 `next_cursor` 없음 재확인
+- 탈퇴 시 pets **그대로** — 필터가 탈퇴 사용자를 막고 재가입은 새 `users.id` 라 API 로 닿지 않는다. 함께 소프트 딜리트하는 안은 `business/user → data/pet` 참조가 생겨 기각
+- logout **전체 revoke 유지** — Body 없어 특정 불가. api-list 의 낡은 문장 정정
+- 동시 refresh **감수** — 유예 윈도우는 탈취 탐지를 약화시키고 Notion §7 에 근거 없음. refresh 직렬화는 클라이언트 책임(앱 구현 시 클라이언트 계약에 적을 것)
+- 프로필 이미지 제거 → **D8 전용 엔드포인트 `DELETE /users/me/profile-image`** (REQ-08 Phase 4). `null` = 제거는 D3 을 뒤집고 의존성이 늘어 기각, `""` = 제거는 원본 없는 규약이라 기각
+- 닉네임 → **D9 트림 후 1~100자 · 중복 허용 · `""`/공백만 400** (REQ-08 Phase 5). `@NotBlank` 는 AGENTS §5 금지, 중복 금지는 스키마 변경이 따라와 기각
+
+**Notion 에 쓴 것 3건** (전부 fetch 로 저장 형태 확인) — 「소스 구조」 §3·§6·§11 역반영 · `API I/F` 에 행 1개 신규 · `PATCH /users/me` 행에 Validation 절 추가. **§13 ArchUnit 스케치는 일부러 안 고쳤다** — 예외 3건이 코드에 들어간 뒤(REQ-10 Phase 0) 맞춰야 문서가 코드보다 앞서지 않는다.
+
+> **`API I/F` 데이터베이스에 행 추가는 `create-pages` 로 된다.** CLAUDE.md 가 "「설계」 탭은 API 로 수정 불가"라고 적어 둔 것은 **탭 페이지 본문** 얘기고, 그 안의 DB 에 행을 만드는 것(`data_source_id` 부모)은 열려 있었다. 이전엔 "사람이 직접"으로 미뤄 두던 종류의 일이라 CLAUDE.md 에 보탰다.
+
+> **새 검증 계약 9행의 근거 인용을 쓰자마자 검사했다.** REQ-08-23 이 처음엔 계획서에 없는 문구("부분 반영 병합은 서비스에서" — 그건 REQ-09 계획서 문장이다)를 인용하고 있었다. 행 자체가 매칭돼 `grep` 1건으로 보여 놓치기 쉽다 — **2건 이상**이어야 원문이 있는 것이다.
+
 
 ## 2026-08-10
 
