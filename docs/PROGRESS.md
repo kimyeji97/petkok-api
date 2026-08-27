@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-27 (REQ-09 완료 · 미결 12건 일괄 처리 — 10건 해소, REQ-08 Phase 4·5 신설)
+> 최종 갱신: 2026-08-27 (REQ-09 완료 · 미결 12건 처리 · REQ-08 Phase 4·5 구현으로 REQ-08 재완료)
 
 ## 요구사항 인덱스
 
@@ -19,7 +19,7 @@
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
-| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | — | 🟡 (Phase 0~3 완료 2026-08-07 · **Phase 4 프로필 이미지 제거 · Phase 5 닉네임 규칙** 계획됨 2026-08-27 · 미결 2건은 관찰 후) |
+| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
 | REQ-10 | 기록 도메인 5종 (diary/feeding/activity/weight/shed) | [api-list §4~8](specs/api-list.md) | — | ⏸ |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
@@ -88,6 +88,16 @@ REQ-07 2건 · REQ-08 5건 · REQ-09 5건. **원칙은 하나 — 원본(Notion 
 > **`API I/F` 데이터베이스에 행 추가는 `create-pages` 로 된다.** CLAUDE.md 가 "「설계」 탭은 API 로 수정 불가"라고 적어 둔 것은 **탭 페이지 본문** 얘기고, 그 안의 DB 에 행을 만드는 것(`data_source_id` 부모)은 열려 있었다. 이전엔 "사람이 직접"으로 미뤄 두던 종류의 일이라 CLAUDE.md 에 보탰다.
 
 > **새 검증 계약 9행의 근거 인용을 쓰자마자 검사했다.** REQ-08-23 이 처음엔 계획서에 없는 문구("부분 반영 병합은 서비스에서" — 그건 REQ-09 계획서 문장이다)를 인용하고 있었다. 행 자체가 매칭돼 `grep` 1건으로 보여 놓치기 쉽다 — **2건 이상**이어야 원문이 있는 것이다.
+
+### REQ-08 Phase 4·5 — 오전에 정한 것을 저녁에 구현했다
+
+같은 날 `/testgen` → `/implement 4` → `/implement 5` → `/testrun`. 코드는 작다(엔드포인트 1 · 메서드 2 · 애노테이션 1). 남길 것은 둘.
+
+**Phase 5 의 "공백만" 거부가 두 층에 나뉜 이유** — `@Size(min = 1)` 은 `""` 는 잡지만 `"   "`(길이 3) 는 통과시킨다. 트림 후 검사를 애노테이션 하나로 표현하려면 `null` 처리까지 얽혀 D3("`null` = 변경 없음")과 부딪힌다. 그래서 **DTO 는 `""` 만, 서비스가 `strip()` 후 빈 값을 `INVALID_INPUT` 으로** 거른다. 새 `ErrorCode` 는 만들지 않았다(계획서 "기존 확인 후 결정" → 기존으로 충분).
+
+**같은 브랜치에 Phase 를 두 커밋으로 쌓았다.** `/testgen` 이 Phase 4·5 케이스를 한 번에 같은 테스트 파일에 넣었기 때문에 Phase 4 커밋(`68d43c8`)은 **단독으로 CI 빨강**(Phase 5 케이스 3건)이다. 커밋 본문에 그 사실을 적었고 Phase 5 커밋(`978361e`)이 닫는다. Phase 단위 커밋과 "테스트는 먼저 쓴다"가 정적 타입 언어에서 만나면 이 모양이 된다 — **PR 은 두 커밋을 묶어서** 낸다.
+
+> Phase 4 완료 기준의 "미인증 401" 은 케이스가 없어 **테스트로 고정되지 않았다.** `PUBLIC_PATHS` 에 없으니 기본 보호되지만, 계획서에 그 사실을 적고 체크했다. 필요하면 REQ-08-30 으로 추가.
 
 
 ## 2026-08-10
