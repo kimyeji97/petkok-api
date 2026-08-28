@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · ADR-0002 · 로컬 Postgres 구성 · **REQ-16 Phase 0~1 완료** — timestamptz 전환)
+> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · ADR-0002 · 로컬 Postgres 구성 · **REQ-16 Phase 0~2 완료** — timestamptz 전환 · 노출 KST)
 
 ## 요구사항 인덱스
 
@@ -25,7 +25,7 @@
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
-| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0~1 완료 2026-08-28** · Phase 2~4 · 미결 ⑥ 신규) |
+| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0~2 완료 2026-08-28** · Phase 3~4 남음 · 미결 3건) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -210,6 +210,22 @@ Docker 로 `postgres:17`(실제 17.11, 운영 Supabase 와 메이저 일치)을 
 > 교훈: **프로브가 무효였음을 알려 주는 것은 출력의 존재이지 부재가 아니다.** 결과 grep 은 성공 패턴과 실패 패턴을 **둘 다** 넣어야 하고, 어느 쪽도 안 걸리면 그건 "판정 불가"이지 통과가 아니다. 오늘 세 번째로 밟은 조용한 무동작이다.
 
 `REQ-16-14` 는 처음부터 초록이라 **성립 조건을 따로 쟀다** — `application.yml` 에서 `time_zone: UTC` 를 지우니 1건 실행 · 1건 실패. 회귀 방어 케이스는 이 역프로브 없이는 "지워도 통과하는 테스트"와 구별되지 않는다.
+
+### REQ-16 Phase 2 — 응답은 `+09:00`, 오프셋 없는 요청은 KST
+
+케이스 3건(08·09·15) 통과 · 전건 177/0.
+
+**계획서는 이 Phase 를 "`JacksonConfig` 한 곳"으로 잡았는데 두 곳이 됐다.** 계획이 틀린 게 아니라 **D9 가 Phase 2 착수 직전에 추가되면서** 범위가 늘어난 것이다 — "오프셋 없는 요청 값의 동작"이 Phase 0 에서 정해졌어야 했는데 프로브가 그걸 재지 않아, Phase 2 를 시작하기 직전 대화에서 "오프셋 없으면 KST" 로 정했다.
+
+**⭐ 설정 한 줄로는 절반만 된다.** Phase 0 이 고른 `setTimeZone(Asia/Seoul)` 은 **직렬화**의 렌더 기준일 뿐이다. 오프셋 없는 입력은 **Jackson 이 아예 거부해** 컨트롤러에 도달조차 못 하고 400 이 된다(실측 — 서비스 호출 0회, 목이 "zero interactions" 로 신고했다). `ISO_OFFSET_DATE_TIME` 이 오프셋을 필수로 요구하기 때문이라, `ISO_DATE_TIME` + `parseBest` 로 읽고 오프셋이 없을 때만 KST 를 채우는 `OffsetDateTimeDeserializer` 를 `processor/converter` 에 추가했다(AGENTS §3 이 이미 자리를 잡아 둔 패키지다 — 새 관례가 아니다).
+
+> **응답 쪽과 요청 쪽은 서로 다른 두 장치다.** 한쪽만 보고 "설정 하나로 끝났다"고 읽으면 다른 쪽이 조용히 400 이 된다. 양쪽 javadoc 에 서로를 가리키는 경고를 남겼다.
+
+**09 는 이 커밋 전에도 통과했다.** 회귀 방어 케이스라 정상이지만, 그대로 두면 "지워도 통과하는 테스트"와 구별되지 않는다. 성립 조건을 따로 쟀다 — `parseBest` 의 후보 순서를 뒤집어 `LocalDateTime` 을 먼저 시도하게 하면 `Z` 와 `+09:00` 이 **다른 순간**이 되어 빨간불이 난다. 실수로 충분히 일어날 만한 형태를 골랐다.
+
+**`JacksonConfig` 는 전역이라 전건을 돌려야 한다.** `@WebMvcTest` 슬라이스 전부가 이것을 `@Import` 하고 응답 시각 표기가 모든 도메인에서 바뀐다. 깨진 것은 없었는데, 이유는 **시각 값을 단언하는 기존 케이스가 애초에 없어서**다(`created_at` 은 `exists()` 만 본다). 그래서 Phase 2 서술의 "기존 REQ 컨트롤러 테스트 갱신"은 **안 한 게 아니라 할 것이 없었다** — Phase 1 의 기계적 타입 변경으로 이미 끝나 있었다.
+
+> ⚠️ **`Asia/Seoul` 이 지금 두 파일에 하드코딩돼 있다** (`JacksonConfig` · `OffsetDateTimeDeserializer`). Phase 3 의 REQ-16-11 이 `framework/constant` 상수로 합치는 케이스인데, **한 곳만 바꾸면 조용히 갈린다.** 양쪽 javadoc 에 "Phase 3 에서 옮긴다 · 늘리지 말 것"을 적어 두었다.
 
 ## 2026-08-27
 

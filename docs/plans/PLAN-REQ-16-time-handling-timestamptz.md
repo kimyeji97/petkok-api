@@ -18,7 +18,7 @@
 
 - **V3 마이그레이션** — `timestamp` 19개 → `timestamptz`. 대상: `users`(3) · `user_social_accounts`(1) · `pets`(3) · `diary_entries`(2) · `feeding_logs`(2) · `activity_logs`(2) · `weight_logs`(1) · `shed_records`(1) · `photos`(1) · `refresh_tokens`(3)
 - **엔티티 시각 타입 전환** — `BaseCreatedEntity.createdAt` · `BaseTimeEntity.updatedAt` · `BaseSoftDeleteEntity.deletedAt` · `RefreshToken.expiresAt`·`revokedAt` · `ActivityLog.loggedAt` (6개 필드, `LocalDateTime` → D2 가 정하는 타입)
-- **직렬화 규약** — 응답 시각은 KST 오프셋을 붙여 내보낸다(`2026-06-30T18:00:00+09:00`). `framework/config/JacksonConfig` 한 곳
+- **직렬화 규약** — 응답 시각은 KST 오프셋을 붙여 내보낸다(`2026-06-30T18:00:00+09:00`). ~~`framework/config/JacksonConfig` 한 곳~~ **두 곳이 됐다**(2026-08-28) — 직렬화는 `JacksonConfig` 의 `timeZone(...)` 한 줄이지만, **역직렬화(D9)는 설정으로 얻을 수 없어** `processor/converter/OffsetDateTimeDeserializer` 가 필요했다
 - **역직렬화 규약** — 오프셋이 있는 요청 값(`Z` · `+09:00`)을 그 순간 그대로 해석
 - **계산 기준 고정** — 달력 판정(당일·미래·일수·주기)은 전부 `Asia/Seoul`. `ZoneId` 상수를 `framework/constant` 에 한 곳
 - **`now` 획득 경로 통일** — `AuthService` 2곳의 `LocalDateTime.now()` (D5)
@@ -46,6 +46,7 @@
 | **D6** 기존 행 변환 | **`USING <col> AT TIME ZONE 'UTC'`** — 앱이 UTC 로 썼다는 전제 그대로 | 앱 경로(JPA Auditing)로 들어간 행은 전부 UTC 다. **DB `default now()` 로 들어간 행은 세션 TZ 라 9시간 어긋나지만**(2026-07-30 실측), 로컬·dev 데이터뿐이고 `created_at` 은 「소스 구조」 §6 상 **앱이 SoT** 라 기본값은 안전망일 뿐이다 | **데이터를 비우고 재생성** — 마이그레이션이 환경마다 다르게 동작하게 된다. **`USING` 없이 타입 변경** — Postgres 가 세션 TZ 로 해석해 배포 환경에 따라 결과가 달라진다 |
 | **D7** 마이그레이션 번호 | **`V3__time_to_timestamptz.sql`.** REQ-10 Phase 3 의 `food_size` 는 **`V4`** 로 민다 | 이 REQ 가 먼저 나간다(범위—제외). 적용된 마이그레이션은 되돌릴 수 없으므로 번호를 먼저 확정한다 | — |
 | **D8** DB `default now()` | **손대지 않는다** | `now()` 는 `timestamptz` 컬럼에서 올바른 순간을 반환한다 — 타입을 바꾸면 07-30 함정이 **자동으로 사라진다**(세션 TZ 와 무관해진다). 이것이 D1 의 부수 효과 중 가장 큰 것이다 | **`default` 제거** — 앱이 SoT 이므로 제거해도 되지만 이 REQ 의 범위가 아니고, 안전망을 없애는 변경은 따로 판단할 일이다 |
+| **D9** 오프셋 없는 요청 값 | **KST 로 해석한다.** `"2026-06-30T18:00:00"` 은 `2026-06-30T09:00:00Z` 와 같은 순간이다 | 2026-08-28 확정. 사용자가 전원 국내이고 노출·계산이 이미 KST 고정(D3·D4)이라, 오프셋이 빠진 값을 KST 벽시계로 읽는 것이 API 를 쓰는 쪽의 기대와 일치한다 | **400 으로 거부** — 엄격하지만 클라이언트가 오프셋을 빠뜨리는 흔한 실수를 오류로 만든다. **UTC 로 해석** — 저장 형식이라는 내부 사정을 요청 규약에 끌어들이고, 한국 사용자에게 9시간 어긋난다 |
 
 ## 미결 질문
 
@@ -74,8 +75,9 @@
       `V3__time_to_timestamptz.sql` (19 컬럼 · D6 의 `USING`) · 엔티티 6필드 타입 변경 · DTO 시각 필드 타입 변경(6파일).
       완료 기준: 마이그레이션이 로컬 DB 에 적용됨 ✅(`petkok_local` v3 · `timestamptz` 19개) · ~~`ddl-auto: validate` 통과(엔티티 ↔ 스키마 대조)~~ **이 근거는 무효다 — validate 는 타입을 안 본다(제약·함정 참조). 통과는 했으나 대조의 근거가 못 된다** · `./gradlew test` 전건 통과 ✅(174/0)
 
-- [ ] **Phase 2 — 직렬화·역직렬화 규약 (`JacksonConfig`)**
-      Phase 0 에서 고른 설정 적용. 기존 REQ 컨트롤러 테스트 갱신.
+- [x] **Phase 2 — 직렬화·역직렬화 규약 (`JacksonConfig`)** — 완료 2026-08-28 (`0465aec`)
+      Phase 0 에서 고른 설정 적용. ~~기존 REQ 컨트롤러 테스트 갱신~~ **할 것이 없었다** — 시각 *값* 을 단언하는 케이스가 애초에 없고(`created_at` 은 `exists()` 만 본다), 타입 변경은 Phase 1 에서 끝났다.
+      ⚠️ **"`JacksonConfig` 한 곳"이 아니라 두 곳이 됐다** — D9(오프셋 없으면 KST)가 착수 직전에 추가됐고, 그건 설정으로 얻을 수 없다. `processor/converter/OffsetDateTimeDeserializer` 를 함께 만들었다.
       완료 기준: 응답 시각이 전부 `+09:00` 표기 · `Z` 로 온 요청과 `+09:00` 으로 온 요청이 **같은 순간**으로 저장됨 · 오프셋 없는 요청 값의 동작이 케이스로 고정됨(거부인지 KST 해석인지는 Phase 0 에서 정한다)
 
 - [ ] **Phase 3 — 계산 기준 KST 고정 (`Clock` · `ZoneId` 상수)**
@@ -104,13 +106,14 @@
 | REQ-16-05 | 〃 | 모든 타입 변환에 `USING ... AT TIME ZONE 'UTC'` 가 붙어 있다 | 회귀 | D6 — "`USING <col> AT TIME ZONE 'UTC'`" · 기각안 — "Postgres 가 세션 TZ 로 해석해 배포 환경에 따라 결과가 달라진다" | 1 | ✅ |
 | REQ-16-06 | 엔티티 6필드 | 시각 필드에 `LocalDateTime` 이 남아 있지 않다 (타입 무관 단언) | 불변식 | 범위—포함 — "(6개 필드, `LocalDateTime` → D2 가 정하는 타입)" | 1 | ✅ |
 | REQ-16-07 | 날짜 필드 5개 **중 3개** | `measuredAt` · `entryDate` · `shedDate` · `birthday` · `adoptionDate` 는 여전히 `LocalDate` 다 | 불변식 | 범위—제외 — "날짜만 있는 값이라 타임존 개념이 없다. 타입을 바꾸지 않는다" | 1 | ✅ |
-| REQ-16-08 | 응답 (HTTP 왕복) | 시각 필드가 `+09:00` 오프셋을 달고 나간다 | 정상 | Phase 2 완료 기준 — "응답 시각이 전부 `+09:00` 표기" | 2 | — |
-| REQ-16-09 | 요청 (HTTP 왕복) | `...Z` 로 온 값과 `...+09:00` 으로 온 같은 순간이 동일하게 저장된다 | 회귀 | Phase 2 완료 기준 — "`Z` 로 온 요청과 `+09:00` 으로 온 요청이" | 2 | — |
+| REQ-16-08 | 응답 (HTTP 왕복) | 시각 필드가 `+09:00` 오프셋을 달고 나간다 | 정상 | Phase 2 완료 기준 — "응답 시각이 전부 `+09:00` 표기" | 2 | ✅ |
+| REQ-16-09 | 요청 (HTTP 왕복) | `...Z` 로 온 값과 `...+09:00` 으로 온 같은 순간이 동일하게 저장된다 | 회귀 | Phase 2 완료 기준 — "`Z` 로 온 요청과 `+09:00` 으로 온 요청이" | 2 | ✅ |
 | REQ-16-10 | ArchUnit | `LocalDateTime.now()` 를 직접 호출하는 클래스가 없다 | 불변식 | Phase 3 완료 기준 — "`LocalDateTime.now()` 직접 호출이 `business`·`framework` 에 0건" | 3 | — |
 | REQ-16-11 | `ZoneId` 상수 | `framework/constant` 에 있고 값이 `Asia/Seoul` 이다 | 불변식 | 범위—포함 — "`ZoneId` 상수를 `framework/constant` 에 한 곳" | 3 | — |
 | REQ-16-12 | `AuthService` 만료 판정 | 고정 `Clock` 을 주입하면 실행 시각과 무관하게 만료 경계가 재현된다 | 회귀 | Phase 3 완료 기준 — "고정 `Clock` 으로 refresh 만료 경계 테스트가 시각에 의존하지 않고 통과" | 3 | — |
 | REQ-16-13 | 엔티티 6필드 | 타입이 정확히 `OffsetDateTime` 이다 | 불변식 | D2 — "(2026-08-28 Phase 0 프로브로 확정)" | 1 | ✅ |
 | REQ-16-14 | `application.yml` | `hibernate.jdbc.time_zone` 이 `UTC` 로 남아 있다 | 회귀 | 미결 ② — "지우면 훗날 `timestamp` 컬럼이 다시 생겼을 때 JVM 기본 TZ 의존이 살아난다" | 1 | ✅ |
+| REQ-16-15 | 요청 (HTTP 왕복) | 오프셋 없는 값은 KST 로 해석된다 | 정상 | D9 — "**KST 로 해석한다.** `"2026-06-30T18:00:00"` 은 `2026-06-30T09:00:00Z` 와 같은 순간이다" | 2 | ✅ |
 
 > **결과 갱신: 2026-08-28 — 01~03 `✅ 수동` (Phase 0).** 프로브 3건 실행 · 실패 0 · 코드와 `req16_probe` 스키마는 삭제. 실측값은 PROGRESS 2026-08-28.
 >
@@ -129,9 +132,17 @@
 > - ⚠️ **14 는 처음부터 통과한다.** 값이 이미 있기 때문이고, 회귀 방어라 정상이다. 성립 조건은 "**지웠을 때 빨개지는가**" 이므로 `/implement` 에서 한 번 지워 보고 확인한다. 이 설정은 `timestamptz` 에 무영향이라(Phase 0 실측) **"안 쓰는 설정"으로 보여 정리 대상이 되기 쉽고**, 지운 순간이 아니라 훗날 `timestamp` 컬럼이 생긴 순간에 터진다 — 그 시차를 잡는 케이스다.
 > - 14 를 테스트로 두었으므로 `CLAUDE.md` 계약 승격은 하지 않는다. 계약은 사람이 읽어야 지켜지지만 테스트는 지운 즉시 빨간불이 난다.
 
-**아래 2건은 근거가 없어 케이스를 쓰지 않았다** — 미결이 닫히면 행을 추가한다.
+> **2026-08-28 — 08·09 코드 작성.** `ActivityTimeSerializationWebMvcTest`. Phase 2 착수 직전 `/testgen` 재호출로 썼다.
+>
+> ⭐ **08 의 응답 픽스처는 오프셋을 `Z` 로 둔다.** `timestamptz` 는 원래 오프셋을 저장하지 않아 **DB 에서 읽으면 항상 `Z`** 이기 때문이다(Phase 0 실측). 픽스처에 `+09:00` 을 미리 달면 **설정이 없어도 통과해** 케이스가 아무것도 검증하지 못한다 — Phase 0 프로브에서 실제로 그렇게 재다가 "설정 불필요"라는 정반대 결론이 나올 뻔했다.
+>
+> ⚠️ **09 는 지금도 통과할 수 있다.** Jackson 이 두 표기를 이미 같은 순간으로 읽는다. 그래도 두는 이유는 회귀 방어다 — `ADJUST_DATES_TO_CONTEXT_TIME_ZONE` 을 건드리거나 타입을 `LocalDateTime` 으로 되돌리면 이 케이스가 먼저 깨진다. 14 와 같은 성격이라 **`/implement` 에서 역프로브로 성립 조건을 확인할 것.**
+>
+> ⚠️ **Phase 2 완료 기준은 08·09 로 다 덮이지 않는다.** 세 번째 항목 "오프셋 없는 요청 값의 동작이 케이스로 고정됨"이 **여전히 미결**이다 — Phase 0 프로브가 그것을 재지 않았다(계획서는 "Phase 0 에서 정한다"고 썼지만 정해지지 않았다). **정하기 전에는 Phase 2 를 완료로 체크할 수 없다.**
 
-- **오프셋 없는 요청 값의 동작** (Phase 2 완료 기준이 "케이스로 고정됨"이라고만 말한다) — 거부인지 KST 해석인지가 **미결 ①③과 함께 Phase 0 에서 정해진다.** 지금 쓰면 그 결정을 테스트가 먼저 확정해 버린다
+**아래 1건은 근거가 없어 케이스를 쓰지 않았다** (원래 2건 — 하나는 2026-08-28 에 닫혔다). 미결이 닫히면 행을 추가한다.
+
+- ~~**오프셋 없는 요청 값의 동작**~~ **2026-08-28 닫힘 → D9(KST 해석).** 케이스 REQ-16-15 로 추가했다. **Phase 0 이 이것을 재지 않아** 계획서가 "Phase 0 에서 정한다"고 적어 둔 것이 지켜지지 않았고, Phase 2 착수 직전 대화에서 정했다
 - **`Clock` 빈의 zone** (D5 가 "`Asia/Seoul` 또는 UTC — D2 와 함께 정한다"로 열어 두었다). 또한 Phase 3 완료 기준의 "KST 자정 전후 판정이 케이스로 고정됨"은 **이 REQ 의 범위보다 넓다** — 판정 로직(당일·미래·일수)은 REQ-10 Phase 3 이후에 들어온다. **여기서는 상수·`Clock` 까지만 고정하고, 자정 경계 케이스는 REQ-10 이 가져간다**
 
 **Phase 4(문서 역반영)에는 케이스가 없다** — Notion·`CLAUDE.md` 편집이라 테스트로 고정할 대상이 아니다. 완료 판정은 미결 ④ 를 닫는 것으로 한다.
@@ -148,6 +159,9 @@
 	- ⭐ **`framework/util/date/LocalDateTimeUtil` 에 `LocalDateTime.now()` 가 2건 있다.** 이식한 범용 유틸이라 없앨 수 없는데, **REQ-16-10 의 "`business`·`framework` 에 0건"과 정면 충돌한다.** Phase 3 착수 전에 예외를 둘지(그렇다면 규칙을 어떻게 쓸지) 정해야 한다 — 안 정하면 유틸을 뜯어고치거나 케이스를 몰래 약화시키게 된다
 - ⚠️ **`LocalDateTime.now()` 는 JVM 기본 TZ 에 암묵 의존한다** (D5). 배포 환경에 `TZ` 가 없으면 **에러 없이** 9시간 어긋난다. 이 REQ 가 끝난 뒤 새 코드가 다시 부르면 규약이 조용히 무너지므로 Phase 3 완료 기준에 `grep` 0건을 넣었다
 - ⚠️ **DB `default now()` 로 심은 행과 앱이 쓴 행이 9시간 어긋난다** (2026-07-30 실측) — `timestamptz` 전환으로 **사라지는 함정**이다(D8). 전환 후에는 `now() at time zone 'UTC'` 픽스처 규칙도 함께 폐기해야 한다. 폐기를 빠뜨리면 이번엔 반대로 9시간 어긋난다
+- ⚠️ **응답 쪽과 요청 쪽은 서로 다른 두 장치다.** `setTimeZone(Asia/Seoul)` 은 **직렬화의 렌더 기준일 뿐**이고, 오프셋 없는 입력을 해석해 주지 않는다 — Jackson 기본 역직렬화는 그런 값을 **아예 거부해** 컨트롤러에 도달조차 못 하고 400 이 된다(2026-08-28 실측: 서비스 호출 0회). **한쪽만 보고 "설정 하나로 끝났다"고 읽으면 다른 쪽이 조용히 400 이 된다**
+- ⚠️ **`Asia/Seoul` 이 두 파일에 하드코딩돼 있다** (`JacksonConfig` · `OffsetDateTimeDeserializer`). Phase 3 의 REQ-16-11 이 `framework/constant` 상수로 합치는데, **한 곳만 바꾸면 조용히 갈린다.** 늘리지 말 것 — 양쪽 javadoc 에 같은 경고를 남겨 두었다
+- ⚠️ **`JacksonConfig` 는 전역이라 이 파일을 고치면 전건을 돌려야 한다.** `@WebMvcTest` 슬라이스 전부가 `@Import` 하고 응답 시각 표기가 모든 도메인에서 바뀐다. REQ 필터만으로는 회귀가 안 보인다
 - ⚠️ **응답 형태 변경은 클라이언트 계약 변경이다.** `created_at` 이 모든 도메인에서 바뀐다(auth · user · pet · weight · activity). 앱 구현 전이라 지금이 가장 싸다
 - ⚠️ **`date` 컬럼은 타입을 바꾸지 않는다** — `measured_at`·`entry_date`·`shed_date` 를 `timestamptz` 로 만들면 "그 날짜"가 순간이 되어 커서 정렬(REQ-10 D8)과 파생 필드 정의(D3)가 전부 흔들린다
 - ⚠️ **테스트가 시각을 단언하는 7파일** — 대부분 DTO 생성용 `LocalDateTime.now()` 라 타입만 바뀌면 되지만, `AuthServiceRefreshTest`·`RefreshTokenTest` 는 **만료 경계**를 다뤄 의미가 바뀔 수 있다. `/testrun` 의 (a)/(b) 분류를 그대로 적용할 것
