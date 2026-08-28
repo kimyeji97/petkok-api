@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-27 (REQ-09·REQ-08 완료 · 미결 12건 처리 · Notion 개발상태 반영 · REQ-10 계획 + ADR-0001 + 검증 계약 표)
+> 최종 갱신: 2026-08-28 (REQ-10 Phase 0 — ArchUnit 예외 3건 · 프로브 4건 · PR #35·#36 머지)
 
 ## 요구사항 인덱스
 
@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (계획 수립 2026-08-27 · Phase 0~5 미착수 · 미결 14건) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0 코드 완료 2026-08-28 · §13 역반영 남음 · Phase 1 미결 2건) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -33,6 +33,31 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-08-28
+
+> REQ-10 첫 커밋. `DomainBoundaryTest` 에 `PetAccessGuard` 소비 예외 3건(`business.pet.service` · `data.pet.dto` · `data.pet.enums`)을 넣고 프로브로 확인했다(`016c692`, PR #36). 어제 문서 브랜치(PR #35)와 같이 머지됐다. 코드는 한 파일이고, 기록할 것은 **확인 방법**과 **경계 판단** 둘이다.
+
+### 프로브는 4건이었다 — 계획서의 3건 + "예외 없는 원본에서 FAIL"
+
+REQ-10-01~03 은 계획서대로 심었다 지웠다(가드 주입 PASS · `PetRepository` 우회 FAIL · `Pet` 엔티티 FAIL — 발화 규칙은 셋 다 `NO_CROSS_DOMAIN_DEPENDENCY`). 여기에 **규칙 변경을 `stash` 로 걷어낸 상태에서 01 을 한 번 더** 돌렸다 — FAIL 이 나야 "예외가 실제로 필요하고 프로브가 공허하지 않다"가 성립한다. REQ-09 프로브에도 같은 항목("예외 없이 사용 FAIL")이 있었는데, 규칙 파일이 바뀐 뒤에는 다시 재야 한다. CLAUDE.md "구조 규칙을 고치면 일부러 위반을 심어 잡히는지 확인"의 반쪽은 **고치기 전에도 잡혔는지**다.
+
+> `--tests '*DomainBoundaryTest'` 로 걸어도 XML 에는 **ArchUnit 8건 전부** 기록된다(`ArchitectureTest` 의 7건 포함). 클래스 필터가 ArchUnit JUnit 엔진에는 그대로 안 먹는 모양인데, 이번엔 "8건 통과"가 완료 기준이라 오히려 편했다. 건수를 셀 때 놀라지 말 것.
+
+### `/implement` 가 테스트 파일을 만졌다 — 이 Phase 한정
+
+`/implement` 는 테스트 파일을 고치지 않는 것이 안전장치인데, Phase 0 의 산출물이 **구조 규칙 파일 자체**다. 계획서가 이 Phase 를 `/implement` 에 명시 배정했고, 검증 계약도 "심었다 지우는 프로브 · `✅ 수동`"으로 잡혀 있어 단언을 약화시킬 케이스가 없다. 구조 규칙은 검증 계약이 아니라 **구현물**로 취급했다. 다른 Phase 에는 적용하지 않는다.
+
+### 체크는 켜지 않았다 — 완료 기준에 §13 역반영이 있다
+
+코드·프로브는 끝났지만 Phase 0 완료 기준 마지막 항목 "「소스 구조」 §13 ArchUnit 스케치 역반영"이 남았다. REQ-09 에서 "코드에 들어간 뒤 맞춘다"로 미뤄 둔 것이라 지금이 그 시점이다. 계획서에는 `- [ ]` 그대로 두고 "체크 보류" 사유를 적었다. **Notion 을 고친 뒤 체크한다.**
+
+### 자율 실행 메모
+
+- 브랜치는 `origin/main` 에서 분기했다 — 어제 docs 브랜치 위에 스택하면 AGENTS §4 의 base 함정을 밟는다. 두 PR 모두 base `main` · SHA 대조 일치 · 머지 후 `origin/main..` 빈 것 확인
+- 이 머신에는 `lefthook` 이 없어 pre-commit 훅이 안 걸린다 — 게이트(spotless · build · checkstyle `-PciStrict` · test 114건)를 직접 돌렸다
+
+**남은 것 (REQ-10)** — §13 역반영(→ Phase 0 체크) · Phase 1 착수 전 미결 2건(체중 경고 응답 형태 · 목록 3행 `cursor`/`limit` 절) · `/testgen REQ-10` 으로 Phase 1 케이스 14건 코드화.
 
 ## 2026-08-27
 
