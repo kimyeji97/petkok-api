@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0 코드 완료 2026-08-28 · §13 역반영 남음 · Phase 1 미결 2건) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0 완료 2026-08-28 · Phase 1 미결 2건) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -48,16 +48,16 @@ REQ-10-01~03 은 계획서대로 심었다 지웠다(가드 주입 PASS · `PetR
 
 `/implement` 는 테스트 파일을 고치지 않는 것이 안전장치인데, Phase 0 의 산출물이 **구조 규칙 파일 자체**다. 계획서가 이 Phase 를 `/implement` 에 명시 배정했고, 검증 계약도 "심었다 지우는 프로브 · `✅ 수동`"으로 잡혀 있어 단언을 약화시킬 케이스가 없다. 구조 규칙은 검증 계약이 아니라 **구현물**로 취급했다. 다른 Phase 에는 적용하지 않는다.
 
-### 체크는 켜지 않았다 — 완료 기준에 §13 역반영이 있다
+### §13 역반영을 같은 날 끝내고 체크를 켰다
 
-코드·프로브는 끝났지만 Phase 0 완료 기준 마지막 항목 "「소스 구조」 §13 ArchUnit 스케치 역반영"이 남았다. REQ-09 에서 "코드에 들어간 뒤 맞춘다"로 미뤄 둔 것이라 지금이 그 시점이다. 계획서에는 `- [ ]` 그대로 두고 "체크 보류" 사유를 적었다. **Notion 을 고친 뒤 체크한다.**
+`/checkpoint` 시점엔 완료 기준 마지막 항목 "「소스 구조」 §13 ArchUnit 스케치 역반영"이 남아 `- [ ]` 로 두었다가, 승인 후 Notion 을 고치고(callout 1개 + 스케치 ① 의 `ignoreDependency` 7건 — REQ-08 의 `framework`·`auth→user` 도 스케치엔 빠져 있어 함께 맞췄다) `fetch` 로 저장 확인한 뒤 켰다. **문서가 코드보다 앞서지 않도록 코드 머지 → 역반영 순서**를 지켰다. "고치기 전 규칙에서도 FAIL 인지 대조"는 CLAUDE.md 로컬 검증 절에 승격했다.
 
 ### 자율 실행 메모
 
 - 브랜치는 `origin/main` 에서 분기했다 — 어제 docs 브랜치 위에 스택하면 AGENTS §4 의 base 함정을 밟는다. 두 PR 모두 base `main` · SHA 대조 일치 · 머지 후 `origin/main..` 빈 것 확인
 - 이 머신에는 `lefthook` 이 없어 pre-commit 훅이 안 걸린다 — 게이트(spotless · build · checkstyle `-PciStrict` · test 114건)를 직접 돌렸다
 
-**남은 것 (REQ-10)** — §13 역반영(→ Phase 0 체크) · Phase 1 착수 전 미결 2건(체중 경고 응답 형태 · 목록 3행 `cursor`/`limit` 절) · `/testgen REQ-10` 으로 Phase 1 케이스 14건 코드화.
+**남은 것 (REQ-10)** — Phase 1 착수 전 미결 2건(체중 경고 응답 형태 · 목록 3행 `cursor`/`limit` 절) · `/testgen REQ-10` 으로 Phase 1 케이스 14건 코드화.
 
 ## 2026-08-27
 

@@ -1,6 +1,6 @@
 # PLAN-REQ-10 · 기록 도메인 5종 (weight · activity · feeding · shed · diary)
 
-> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0 코드 완료 2026-08-28 · §13 역반영 남음)
+> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0 완료 2026-08-28)
 
 ## 배경
 
@@ -91,13 +91,13 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 - [ ] **거꾸리 경고** — 「소스 구조」 §8 에만 있고 `API I/F` 응답에 없다. 어느 엔드포인트에 어떤 형태로 실을지 원본에 먼저 적히기 전엔 만들지 않는다
 
 **전체**
-- [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절 ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제 ⓔ 체중 경고 필드 명시 ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건 (Phase 0 후)
+- [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절 ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제 ⓔ 체중 경고 필드 명시 ~~ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건~~ (2026-08-28 완료 — callout + 스케치 ① 갱신, `fetch` 로 저장 확인)
 
 ## 작업 단계
 
 > Phase 1 개 = 커밋 1 개 (`/implement` 규칙). 각 Phase 의 검증 계약은 `/testgen` 이 Phase 착수 직전에 채운다(REQ-09 실측 — 표를 먼저 채워 두면 `/implement` 게이트에 걸린다).
 
-- [ ] **Phase 0 — ArchUnit 예외 3건 + 프로브** — 코드·프로브 완료 (2026-08-28, `016c692` · PR #36). **체크 보류: 완료 기준 중 「소스 구조」 §13 역반영이 남았다**
+- [x] **Phase 0 — ArchUnit 예외 3건 + 프로브** — 완료 2026-08-28 (`016c692` · PR #36 · 「소스 구조」 §13 역반영 같은 날)
       `DomainBoundaryTest` 에 `ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.business.pet.service.."))` · `data.pet.dto..` · `data.pet.enums..` 추가. REQ-09 프로브에서 검증된 형태.
       완료 기준: 가짜 `business/weight/service` 가 가드를 주입해 통과 · `PetRepository` 직접 주입은 **여전히 FAIL** · `Pet` 엔티티 직접 참조는 **여전히 FAIL** (셋 다 프로브 후 삭제) · ArchUnit 8건 통과 · 「소스 구조」 §13 역반영
 
