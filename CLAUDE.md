@@ -21,7 +21,7 @@
 - **앱을 띄우려면 `.env`가 필요하다** — `set -a && . ./.env && set +a && ./gradlew bootRun`. `DB_PASSWORD`에는 기본값이 없어 주입하지 않으면 기동이 막힌다(의도적)
 	- ⚠️ **`.env`의 `KEY=`(빈 값)은 "미설정"이 아니다.** 빈 문자열이 환경변수로 들어가고 Spring의 `${VAR:기본값}`은 **미정의일 때만** 기본값을 쓴다 — 빈 값이면 기본값이 무력화된다. 기본값을 쓰려면 그 줄을 주석 처리할 것
 - ⚠️ **문서에 실제 시크릿을 쓰지 말 것.** 함정·재현 로그를 `PROGRESS.md`에 적다가 실제 로컬 DB 비밀번호가 public 레포에 커밋된 적이 있다(2026-07-29 `5c7313b`). 재현 상황을 설명할 때는 값을 더미로 바꾼 뒤 적는다
-- `docs/specs/`의 두 문서 — [`api-list.md`](docs/specs/api-list.md)(Notion API I/F 파생), [`db-schema.md`](docs/specs/db-schema.md)(Notion 테이블 정의서 파생) — 는 **둘 다 파생 요약이다.** 원본이 아니다. `docs/adr/`는 비어 있고 **ADR-001·ADR-002의 원본은 Notion에 있다.** 설계 판단 전에 AGENTS.md §0(출처 우선순위)을 먼저 볼 것
+- `docs/specs/`의 두 문서 — [`api-list.md`](docs/specs/api-list.md)(Notion API I/F 파생), [`db-schema.md`](docs/specs/db-schema.md)(Notion 테이블 정의서 파생) — 는 **둘 다 파생 요약이다.** 원본이 아니다. **ADR-001·ADR-002(스택·DB 엔진)의 원본은 Notion에 있고**, 그 이후 결정은 `docs/adr/ADR-0001…`(4자리)에 쌓인다. 설계 판단 전에 AGENTS.md §0(출처 우선순위)을 먼저 볼 것
 
 ## Notion 편집 함정 (AGENTS.md §0 보완)
 

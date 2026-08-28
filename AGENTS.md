@@ -10,7 +10,8 @@
 | 대상 | 1차 출처 |
 | --- | --- |
 | 요구사항, 유저 스토리, 비즈니스 규칙, 제약사항 | **Notion** → 기획/분석 |
-| ADR (ADR-001 스택 선택, ADR-002 DB 엔진 선택) | **Notion** → 기획/분석. `docs/adr/`는 비어 있다 |
+| ADR — 스택 선택(ADR-001) · DB 엔진(ADR-002) | **Notion** → 기획/분석. 이 두 건은 이관하지 않는다 |
+| ADR — 그 이후 설계 결정 | [`docs/adr/`](docs/adr/) (`ADR-0001` 부터 4자리, `/workplan` 이 승격). 첫 건 2026-08-27 — 파생 상태 단일 출처. Notion 의 3자리 번호와 겹치지 않는다 |
 | 테이블 정의서(DDL), ERD | **Notion** → 설계 → DB 탭. 파생 요약은 [`docs/specs/db-schema.md`](docs/specs/db-schema.md) |
 | **API 계약 (엔드포인트·메서드·인증 여부)** | **Notion** → 설계 → API 탭 → `API I/F` DB |
 | 소스 구조·레이어 규칙·파생 로직 설계 | **Notion** → 설계 → 소스 구조/아키텍처 설계 |
