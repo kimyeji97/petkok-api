@@ -1,6 +1,6 @@
 # PLAN-REQ-10 · 기록 도메인 5종 (weight · activity · feeding · shed · diary)
 
-> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 📝 초안
+> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0 완료 2026-08-28)
 
 ## 배경
 
@@ -91,13 +91,13 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 - [ ] **거꾸리 경고** — 「소스 구조」 §8 에만 있고 `API I/F` 응답에 없다. 어느 엔드포인트에 어떤 형태로 실을지 원본에 먼저 적히기 전엔 만들지 않는다
 
 **전체**
-- [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절 ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제 ⓔ 체중 경고 필드 명시 ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건 (Phase 0 후)
+- [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절 ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제 ⓔ 체중 경고 필드 명시 ~~ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건~~ (2026-08-28 완료 — callout + 스케치 ① 갱신, `fetch` 로 저장 확인)
 
 ## 작업 단계
 
 > Phase 1 개 = 커밋 1 개 (`/implement` 규칙). 각 Phase 의 검증 계약은 `/testgen` 이 Phase 착수 직전에 채운다(REQ-09 실측 — 표를 먼저 채워 두면 `/implement` 게이트에 걸린다).
 
-- [ ] **Phase 0 — ArchUnit 예외 3건 + 프로브**
+- [x] **Phase 0 — ArchUnit 예외 3건 + 프로브** — 완료 2026-08-28 (`016c692` · PR #36 · 「소스 구조」 §13 역반영 같은 날)
       `DomainBoundaryTest` 에 `ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.business.pet.service.."))` · `data.pet.dto..` · `data.pet.enums..` 추가. REQ-09 프로브에서 검증된 형태.
       완료 기준: 가짜 `business/weight/service` 가 가드를 주입해 통과 · `PetRepository` 직접 주입은 **여전히 FAIL** · `Pet` 엔티티 직접 참조는 **여전히 FAIL** (셋 다 프로브 후 삭제) · ArchUnit 8건 통과 · 「소스 구조」 §13 역반영
 
@@ -124,6 +124,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 ## 검증 계약
 
 > 작성: 2026-08-27 · 근거: 이 계획서 (원본은 Notion `API I/F` · 「소스 구조」) · 검증: `/testrun REQ-10`
+> **결과 갱신: 2026-08-28 — 01~03 `✅ 수동` (Phase 0 프로브).** 가짜 `business/weight/service/WeightService` 를 3형태로 심어 `DomainBoundaryTest` 실행(XML 로 8건 실행 확인, 프로브 후 삭제). 01 은 예외 없는 원본 규칙에서 FAIL 인 것까지 대조해 공허하지 않음을 확인. 커밋 `016c692` 본문에 결과를 남겼다. `/testrun` 에는 잡히지 않는다.
 > `결과` 열은 `/checkpoint`가 채운다. 케이스 ID는 테스트명에 `[REQ-10-01]` 형태로 박는다.
 > **Phase 0 의 01~03 은 프로브다** — 가짜 클래스를 심었다 지우는 확인이라 영구 테스트로 남지 않는다. `/implement REQ-10 0` 이 실행하고 결과를 커밋 본문에 남기며, `결과` 열은 `REQ-08-11` 처럼 `✅ 수동` 으로 채운다.
 > **테스트 코드는 Phase 별로 들어온다** (Java 는 대상 클래스가 없으면 테스트 소스가 컴파일되지 않는다 — REQ-08·09 실측). Phase 1 코드는 `/implement REQ-10 1` 직전 `/testgen` 재호출로 쓴다. Phase 2~5 행은 각 Phase 착수 전 미결을 닫은 뒤 추가한다.
@@ -131,9 +132,9 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 
 | ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
 |----|------|--------|:--:|------|:--:|:--:|
-| REQ-10-01 | `DomainBoundaryTest` | 하위 Service 가 `PetAccessGuard` · `OwnedPetResponse` · `Species` 만 주입 → 통과 | 프로브 | Phase 0 완료 기준 — "가짜 `business/weight/service` 가 가드를 주입해 통과" | 0 | — |
-| REQ-10-02 | 〃 | 하위 Service 가 `PetRepository` 직접 주입 → 규칙 FAIL | 프로브 | Phase 0 완료 기준 — "`PetRepository` 직접 주입은 **여전히 FAIL**" | 0 | — |
-| REQ-10-03 | 〃 | 하위 Service 가 `Pet` 엔티티 참조 → 규칙 FAIL | 프로브 | Phase 0 완료 기준 — "`Pet` 엔티티 직접 참조는 **여전히 FAIL**" | 0 | — |
+| REQ-10-01 | `DomainBoundaryTest` | 하위 Service 가 `PetAccessGuard` · `OwnedPetResponse` · `Species` 만 주입 → 통과 | 프로브 | Phase 0 완료 기준 — "가짜 `business/weight/service` 가 가드를 주입해 통과" | 0 | ✅ 수동 |
+| REQ-10-02 | 〃 | 하위 Service 가 `PetRepository` 직접 주입 → 규칙 FAIL | 프로브 | Phase 0 완료 기준 — "`PetRepository` 직접 주입은 **여전히 FAIL**" | 0 | ✅ 수동 |
+| REQ-10-03 | 〃 | 하위 Service 가 `Pet` 엔티티 참조 → 규칙 FAIL | 프로브 | Phase 0 완료 기준 — "`Pet` 엔티티 직접 참조는 **여전히 FAIL**" | 0 | ✅ 수동 |
 | REQ-10-04 | `POST /weight` | **HTTP 왕복** 201 | 정상 | Phase 1 완료 기준 — "4행이 원본 상태코드(201/200/200/204)대로" | 1 | — |
 | REQ-10-05 | `DELETE /weight/{log_id}` | **HTTP 왕복** 204 · 본문 없음 | 정상 | 〃 | 1 | — |
 | REQ-10-06 | `WeightService` 진입 | 남의 펫 → `PET_FORBIDDEN` (가드 위임) | 예외 | Phase 1 완료 기준 — "남의 펫 403" | 1 | — |
