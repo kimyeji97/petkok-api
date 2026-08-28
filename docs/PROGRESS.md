@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-28 (REQ-10 Phase 0 완료 · Phase 1 weight · Phase 2 activity 코드 완료 · PR #35~#39 머지)
+> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · 시각 처리를 REQ-16 으로 분리 + ADR-0002)
 
 ## 요구사항 인덱스
 
@@ -21,10 +21,11 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0 완료 · Phase 1·2 코드 완료 2026-08-28, 로컬 DB 확인 후 체크) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0~2 완료 2026-08-28 · **Phase 3 이후는 REQ-16 뒤** · 로컬 DB 확인 2건) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
+| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (계획 수립 2026-08-28 · Phase 0~4 미착수) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -81,6 +82,41 @@ REQ-10-01~03 은 계획서대로 심었다 지웠다(가드 주입 PASS · `PetR
 - 응답의 `logged_at` 은 `Z` 없이 나간다(`2026-06-30T09:00:00`) — Jackson 에 시각 포맷 설정이 없어 기존 엔티티(`created_at`)와 같다. D12 가 "응답은 ISO-8601 `Z`"라 적었지만 framework 전역 사항이라 이 Phase 에서 손대지 않았다. **REQ-10 미결로 올린다** — 요청 `…Z` 는 jsr310 기본(lenient)이 UTC 로 읽어 문제없다
 
 **남은 것 (REQ-10)** — 로컬 DB 확인 2건(→ Phase 1·2 체크) · 응답 시각 `Z` 표기(미결) · Phase 3(feeding) 착수 전 미결 4건(`fed_at` "당일" · 스트릭 규칙 · 게코 외 종의 스트릭 · `food_size` 처리 — 마지막은 D13 과 같은 결이 자연스럽다).
+
+### 시각 처리를 REQ-16 으로 떼어냈다 — 결정이 세 번 뒤집혔다 (밤)
+
+Phase 2 에서 올린 "응답 시각 `Z`" 미결이 framework 전역 결정으로 번져 별도 REQ 가 됐다. **기록할 것은 결론이 아니라 뒤집힌 경로다** — 결론만 보면 왜 이 형식인지 알 수 없다.
+
+1. "날짜는 전부 KST" → 처음엔 **계산만 KST · 저장은 UTC 유지**(현행 유지, 비용 0)로 답이 나왔다
+2. 곧바로 **계정별 타임존**(기본 KST)으로 확대 — `users.timezone` · `PATCH /users/me` 확장 · 요청 스코프로 TZ 를 나르는 framework 포트가 따라오는 별건이라 REQ 를 새로 잡아야 했다
+3. 다시 **KST 고정으로 축소**되면서 "저장은 KST 가 나은가 UTC 가 나은가"라는 원래 질문으로 돌아왔고, **`timestamptz`**(순간 저장)로 확정됐다 → [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md)
+
+**저장을 KST 로 바꾸는 안이 왜 기각됐는지가 이 REQ 의 핵심이다.** 변환이 없어 깔끔해 보이지만 "JVM 기본 TZ = KST" · "DB 세션 TZ = KST"라는 **암묵 전제** 위에 서고, 컨테이너에 `TZ` 를 안 넣거나 Supabase 세션 TZ(UTC)를 만나면 **에러 없이** 9시간 어긋난다. `.env` 의 빈 값이 기본값을 무력화한 건 · `db.schema` 를 한쪽만 배선한 건과 **같은 얼굴**이다. 반대로 `timestamptz` 는 **타입이 규약을 대신 기억한다** — "이 값이 어느 타임존인가"를 사람이 알 필요가 없어진다.
+
+> **계정별 타임존은 기각이 아니라 연기다.** `timestamptz` 는 이미 순간을 저장하므로 나중에 열어도 **재마이그레이션이 필요 없다**(경계의 변환 대상만 KST 고정에서 사용자 값으로 바꾸면 된다). ADR-0002 의 재검토 조건에 그렇게 적었고, 이게 채택 근거의 절반이다. 나머지 절반은 "배포 전인 지금이 전환 비용이 가장 싸다"는 것.
+
+- ⚠️ **컬럼을 두 번 셌다 — 처음 보고한 "17개"가 틀렸고 실제는 19개**(V1 16 · V2 3). `grep -c 'timestamp '` 가 줄 끝 `deleted_at timestamp`(뒤에 공백 없음) 2건과 `revoked_at timestamp,`(쉼표) 1건을 놓쳤다. **패턴 끝에 공백을 붙여 세면 컬럼 정의가 조용히 빠진다** — 0건이 아니라 "그럴듯하게 적은 수"로 나와서 더 위험하다
+- **`V3` 를 REQ-16 이 가져간다** → REQ-10 Phase 3 의 `feeding_logs.food_size` 는 **`V4`** 다. 적용된 마이그레이션은 한 글자도 못 고치므로 번호를 먼저 확정했다
+- ⚠️ **07-30 픽스처 규칙(`now() at time zone 'UTC'`)은 전환과 함께 폐기해야 한다.** `timestamptz` 에서 `now()` 는 세션 TZ 와 무관하게 올바른 순간을 반환하므로, 규칙을 남겨 두면 이번엔 **반대 방향으로** 9시간 어긋난다. 함정이 사라지는 게 아니라 **뒤집힌다**
+- Phase 0(프로브)의 미결 ①②③ 중 **③(Jackson 이 `+09:00` 을 내는 설정)과 ① 일부는 DB 없이 닫힌다** — `ObjectMapper` 왕복만으로 확인된다. DB 가 필요한 것은 `timestamptz` 왕복 정확성과 `hibernate.jdbc.time_zone` 의 영향뿐이다
+- `date` 컬럼 5개(`entry_date`·`measured_at`·`shed_date`·`birthday`·`adoption_date`)는 **타입을 바꾸지 않는다.** 날짜만 있는 값에는 타임존이 없고, 바꾸면 커서 정렬(REQ-10 D8)과 체중 파생 필드 정의(D3)가 전부 흔들린다
+
+### REQ-10 Phase 3 미결 4건 — 답은 나왔고 Notion 역반영이 남았다
+
+네 건 모두 "원본에 없는 거부 규약을 만들지 않는다"(REQ-09 D5 · D13)와 같은 결로 정해졌다.
+
+| 미결 | 결정 |
+|---|---|
+| `fed_at` "당일 시간만 허용" | **미래 시각만 거부** — 서버 현재 시각 이전이면 과거 소급 허용. 순간 비교라 타임존 논쟁이 사라진다("오늘 날짜만" 안은 자정 직후 입력과 어제 급여 소급을 막는다) |
+| 거식 스트릭 | **일수 기준** — 마지막 `is_refused = false` 급여(`last_eaten_at`)부터 기준 시각까지의 KST 달력 일수. `>= 7` DANGER · `>= 3` CAUTION · 나머지 NONE. 게코는 며칠에 한 번 먹는 게 정상이라 "연속 거식 **건수**" 안은 "7일"과 맞지 않는다 |
+| 게코 외 종의 스트릭 호출 | **`FEATURE_NOT_SUPPORTED_SPECIES` 신설** — 게코 전용 기능 공통 코드. 문구가 탈피 전용인 `SHED_NOT_SUPPORTED_SPECIES` 는 아직 소비자가 없으므로 제거하고 shed 도 이 코드로 간다 |
+| 개/고양이의 `food_size` | **그대로 저장** (D13 과 동일). 거부하는 것은 enum 밖의 값뿐 |
+
+> ⚠️ **넷 다 아직 Notion 에 안 적었다.** 이 프로젝트의 원칙은 "원본에 먼저 쓰고 레포로 옮긴다"인데 시각 논의로 갈라지면서 순서가 끊겼다. 계획서에는 결론을 `[x]` 로 남기되 **역반영 대기**를 명시했다 — **Phase 3 착수 전에 Notion 부터 고칠 것.**
+
+> **원본 자기모순 1건을 찾았다.** 거식 스트릭 응답 예시가 `current_streak_days: 5` 인데 `level: "DANGER"` 다. 같은 행의 규칙은 `DANGER (7일+)` 이므로 5일이면 `CAUTION` 이어야 한다. 예시를 고치거나 일수를 8 로 바꿔야 하고, **어느 쪽이든 사람이 정할 일**이라 역반영 목록에 올렸다.
+
+**남은 것 (REQ-10)** — 로컬 DB 확인 2건(→ Phase 1·2 체크) · Notion 역반영 4건(Phase 3 결정) + 스트릭 예시 모순 · Phase 3 이후는 **REQ-16 완료 뒤**.
 
 ## 2026-08-27
 
