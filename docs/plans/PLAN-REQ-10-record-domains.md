@@ -61,6 +61,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 | **D9** Phase 순서 | **weight → activity → feeding → shed → diary** | weight 가 가장 단순(파생 필드 1, 종 분기 없음)해서 **가드 소비 패턴·커서·D6 을 여기서 확정**하고 나머지가 복제한다. activity 는 종 분기만, feeding 은 +V3+계산기, shed 는 게코 전용+계산기, diary 는 D4 로 REQ-11 순서와 얽혀 마지막 | **diary 먼저**(원본 "Diary" 가 도메인 목록 첫째) — 사진 연결 미결과 얽혀 첫 Phase 가 가장 불확실해진다 |
 | **D10** PATCH 의미론 | REQ-08 D3 그대로 — 누락·`null` = "변경 없음", DTO 에 `@NotNull`/`@NotBlank` 금지, 병합은 서비스 | 원본 5행 전부 "변경할 필드만 포함". AGENTS §5 | (REQ-08 에서 기각한 `JsonNullable`·`""` 안) |
 | **D11** 엔티티 베이스 | diary = `BaseTimeEntity`(`updated_at` 있음), 나머지 4 = `BaseCreatedEntity` | `V1__init.sql` 컬럼 · 「소스 구조」 §5. ⚠️ **diary 응답에는 `updated_at` 이 들어간다** — 원본 목록·상세 예시에 있다. pet·user 와 다르다 | — |
+| **D13** `distance_km` 처리 | **거부하지 않는다 — 종·활동 유형과 무관하게 보낸 값을 그대로 저장, 안 보내면 `null`** (2026-08-28 확정, Notion 「활동 기록」 행에 먼저 명시) | 원본 "선택(게코 미사용)"·테이블 정의서 "실내 활동·게코는 사용하지 않음"은 **입력 UI 가 숨긴다**는 뜻이지 서버 거부 규약이 아니다. 원본에 없는 거부 규약을 만들지 않는다(REQ-09 D5 와 같은 결). 서버가 거부하는 것은 종별 `activity_type` 뿐 | **400 `INVALID_INPUT`** — 명시적이지만 원본에 없는 규약이고, 개/고양이의 실내 활동(`PLAY` 등)에 거리가 올 때까지 규칙을 늘려야 한다 |
 | **D12** 시각 타입 | `fed_at`·`logged_at` = `LocalDateTime`(기존 규약, `hibernate.jdbc.time_zone: UTC`). 요청·응답은 ISO-8601 `Z` | 원본 예시 `"2026-06-30T18:00:00Z"`. REQ-07 실측(PROGRESS 07-30) — 앱은 UTC 로 저장하고 DB `now()` 는 KST 라 **SQL 로 심은 픽스처는 9시간 어긋난다** | `OffsetDateTime`/`Instant` 전환 — 기존 엔티티 전부와 갈라진다 |
 
 ## 미결 질문
@@ -72,7 +73,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 - [x] **목록 API 의 `cursor`/`limit` — 2026-08-28 역반영 완료.** 활동·체중·탈피 목록 행에 `Query Parameters: cursor / limit (기본 20)` + 정렬키(`logged_at`/`measured_at`/`shed_date` desc, `id` desc) 추가. (원문:) activity·weight·shed 목록은 응답에 `next_cursor` 만 있고 Query Parameters 절이 없다. 같은 규약으로 간주하되 **원본 3행에 파라미터 절을 추가**하는 역반영이 필요하다
 
 **Phase 2 (activity) 전**
-- [ ] **게코가 `distance_km` 를 보내면** — 원본 "선택(게코 미사용)". 무시하고 `null` 저장 vs 400. REQ-09 D5(`PATCH` 의 `species` 무시)와 같은 결로 "무시"가 자연스럽지만 원본이 말하지 않는다
+- [x] **게코가 `distance_km` 를 보내면 — 거부하지 않고 그대로 저장 (D13 확정, 2026-08-28).** Notion 「활동 기록」 행에 먼저 명시했다. (원문:) 원본 "선택(게코 미사용)". 무시하고 `null` 저장 vs 400. REQ-09 D5(`PATCH` 의 `species` 무시)와 같은 결로 "무시"가 자연스럽지만 원본이 말하지 않는다
 
 **Phase 3 (feeding) 전**
 - [ ] **`fed_at` "당일 시간만 허용"의 뜻.** ① 오늘 날짜만(어제 기록 불가?) ② 미래만 불가 ③ 서버 현재 시각 이전만. "당일"의 기준 타임존(KST? 클라이언트?)도 없다
@@ -91,6 +92,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 - [ ] **거꾸리 경고** — 「소스 구조」 §8 에만 있고 `API I/F` 응답에 없다. 어느 엔드포인트에 어떤 형태로 실을지 원본에 먼저 적히기 전엔 만들지 않는다
 
 **전체**
+- [ ] **응답 시각의 `Z` 표기** (2026-08-28 등록) — D12 는 "요청·응답은 ISO-8601 `Z`"인데 Jackson 에 시각 포맷 설정이 없어 응답 `logged_at`·`created_at` 이 `2026-06-30T09:00:00`(Z 없음)으로 나간다. 기존 엔티티 전부 같은 상태라 framework 전역 결정이다 — `JacksonConfig` 에 `LocalDateTime` 직렬화 포맷을 두거나 D12 문구를 현실에 맞추거나. Phase 3 전에 정한다
 - [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ~~ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절~~ (2026-08-28 완료) ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제 ~~ⓔ 체중 경고 필드 명시~~ (2026-08-28 완료) ~~ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건~~ (2026-08-28 완료 — callout + 스케치 ① 갱신, `fetch` 로 저장 확인)
 
 ## 작업 단계
@@ -105,7 +107,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
       `WeightLog` 엔티티(`BaseCreatedEntity`) · `WeightLogRepository`(`findByIdAndPetId` · keyset 목록) · `WeightService`(가드 소비, D6, 파생 필드 D3) · `WeightController`. **여기서 확정되는 것**: 가드 소비 코드 모양 · 커서 페이로드 형태 · D6 404 · 목록 응답 = `CursorPage`.
       완료 기준: 4행이 원본 상태코드(201/200/200/204)대로 · 남의 펫 403 · 삭제된 펫 404 · 남의 기록 id 404(D6) · 목록 `has_next`/`next_cursor` 가 keyset 으로 동작(같은 `measured_at` 여러 건에서 누락·중복 없음) · `weight_g` 0 이하 400 · 체중 경고 필드가 미결 답대로 · ArchUnit 통과
 
-- [ ] **Phase 2 — activity (4행)**
+- [ ] **Phase 2 — activity (4행)** — 코드·케이스 19건 완료 (2026-08-28, `47cf630`). **체크 보류: Phase 1 과 같은 로컬 DB 확인 2건**(`@Query` 기동 · keyset 경계) — Phase 1 확인 시 같이 본다
       Phase 1 형태 복제 + `ActivityType` enum + 종별 검증(`INVALID_SPECIES_ACTIVITY`).
       완료 기준: 게코가 `WALK` → 400 `INVALID_SPECIES_ACTIVITY` · 개가 `HANDLING` → 400 · 개가 `WALK` → 201 · 게코가 `HANDLING` → 201 · PATCH 로 `activity_type` 을 바꿔도 종 검증이 다시 걸린다 · 나머지는 Phase 1 과 동일 기준
 
@@ -157,6 +159,28 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 | REQ-10-22 | `GET /weight` | `limit` 미지정 → 서비스가 받는 `CursorRequest.limit()` 이 20 | 경계 | 미결 질문(Phase 1) — "`Query Parameters: cursor / limit (기본 20)`" | 1 | ✅ |
 | REQ-10-23 | `GET /weight` | 해석 불가한 `cursor` → `INVALID_CURSOR` | 예외 | D8 — "`CursorCodec` 으로 opaque" · `CursorCodec.decode` 가 `INVALID_CURSOR` 를 던진다 | 1 | ✅ |
 
+| REQ-10-24 | `ActivityService` | 게코가 `WALK` → `INVALID_SPECIES_ACTIVITY` | 예외 | Phase 2 완료 기준 — "게코가 `WALK` → 400 `INVALID_SPECIES_ACTIVITY`" | 2 | ✅ |
+| REQ-10-25 | 〃 | 개가 `HANDLING` → `INVALID_SPECIES_ACTIVITY` | 예외 | Phase 2 완료 기준 — "개가 `HANDLING` → 400" | 2 | ✅ |
+| REQ-10-26 | 〃 | 고양이가 `HANDLING` → `INVALID_SPECIES_ACTIVITY` | 예외 | 원본 Validation — "🦎 게코=`HANDLING`만" (개/고양이는 나머지 넷) | 2 | ✅ |
+| REQ-10-27 | 〃 | 개가 `WALK` → 저장 | 정상 | Phase 2 완료 기준 — "개가 `WALK` → 201" | 2 | ✅ |
+| REQ-10-28 | 〃 | 게코가 `HANDLING` → 저장 | 정상 | Phase 2 완료 기준 — "게코가 `HANDLING` → 201" | 2 | ✅ |
+| REQ-10-29 | 〃 | PATCH 로 게코 기록의 `activity_type` 을 `WALK` 로 → `INVALID_SPECIES_ACTIVITY` | 회귀 | Phase 2 완료 기준 — "PATCH 로 `activity_type` 을 바꿔도 종 검증이 다시 걸린다" | 2 | ✅ |
+| REQ-10-30 | 〃 | PATCH 에 `activity_type` 이 없으면 종 검증 없이 통과 | 정상 | D10 — "누락·`null` = "변경 없음"" | 2 | ✅ |
+| REQ-10-31 | 〃 | 게코가 `distance_km` 를 보내면 그대로 저장되고 400 이 아니다 | 정상 | D13 — "보낸 값을 그대로 저장" | 2 | ✅ |
+| REQ-10-32 | `POST /activity` | **HTTP 왕복** 201 | 정상 | Phase 2 완료 기준 — "나머지는 Phase 1 과 동일 기준" · Phase 1 완료 기준 — "4행이 원본 상태코드(201/200/200/204)대로" | 2 | ✅ |
+| REQ-10-33 | `DELETE /activity/{log_id}` | **HTTP 왕복** 204 · 본문 없음 | 정상 | 〃 | 2 | ✅ |
+| REQ-10-34 | `POST /activity` | 종 위반은 **HTTP 왕복** 400 · `error.code` = `INVALID_SPECIES_ACTIVITY` | 예외 | Phase 2 완료 기준 — "게코가 `WALK` → 400 `INVALID_SPECIES_ACTIVITY`" | 2 | ✅ |
+| REQ-10-35 | `POST /activity` | 정의되지 않은 `activity_type` → 400 | 경계 | 제약·함정 — "정의되지 않은 enum 값은 400" | 2 | ✅ |
+| REQ-10-36 | `POST /activity` | `activity_type` 누락 → 400 | 경계 | 원본 Validation — "`activity_type` 필수" | 2 | ✅ |
+| REQ-10-37 | `POST /activity` | `logged_at` 누락 → 400 | 경계 | 원본 Validation — "`logged_at` 필수" | 2 | ✅ |
+| REQ-10-38 | PATCH 요청 DTO | `@NotNull` · `@NotBlank` 가 없다 | 회귀 | 제약·함정 — "PATCH DTO 에 `@NotNull`·`@NotBlank` 금지" | 2 | ✅ |
+| REQ-10-39 | `ActivityService` | `memo` 만 보내면 `duration_minutes` 가 유지된다 | 회귀 | D10 — "병합은 서비스" | 2 | ✅ |
+| REQ-10-40 | 〃 | 남의 펫 → `PET_FORBIDDEN` (가드 위임) | 예외 | Phase 1 완료 기준 — "남의 펫 403" (Phase 2 "나머지는 Phase 1 과 동일 기준") | 2 | ✅ |
+| REQ-10-41 | 〃 | 다른 펫에 속한 기록 id → `RESOURCE_NOT_FOUND` | 예외 | D6 — "`findByIdAndPetId(id, petId)`" | 2 | ✅ |
+| REQ-10-42 | 목록 | `next_cursor` 에 마지막 항목 `id` · 다음 페이지 조회가 `logged_at`·`id` 둘 다 전달 | 회귀 | D8 — "`id` desc 타이브레이크" (REQ-10-10 과 같은 필요조건 검증) | 2 | ✅ |
+
+> **결과 갱신: 2026-08-28 — 24~42 전부 `✅` (Phase 2).** `/testrun` 22 메서드 실행 · 실패 0 · 표 19행 ↔ 코드 19 ID 일치 · 인용 전건 원문 존재. Phase 1 과 같은 이유(로컬 DB 기동·keyset 경계 미확인)로 Phase 2 체크는 보류.
+> **2026-08-28 추가 — 24~42 (Phase 2, activity).** D13 확정 후 추가. Phase 1 과 같은 형태의 케이스(가드 위임·D6·커서·PATCH 병합)는 도메인마다 한 번씩 다시 고정한다 — 복제 과정에서 빠뜨리는 것이 이 REQ 의 주 실패 모드다.
 > **2026-08-28 추가 — 18~23.** Phase 1 미결 2건(체중 경고 형태 · `cursor`/`limit`)이 닫혀 행을 추가했다. **REQ-10-10 은 DB 없이 검증한다** — 이 레포에 DB 테스트 하네스(H2·Testcontainers)가 없어 "누락·중복 없음"을 실제 페이지 경계에서 재지 못한다. 대신 그 성질의 **필요조건 두 가지**를 고정한다: ⓐ `next_cursor` 페이로드에 마지막 항목의 `id` 가 실린다 ⓑ 다음 페이지 조회가 `measured_at` 과 `id` 를 **둘 다** 저장소에 넘긴다. 실제 경계 동작은 Phase 1 완료 시 로컬 DB 로 한 번 수동 확인한다.
 
 ## 제약·함정

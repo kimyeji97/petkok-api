@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-28 (REQ-10 Phase 0 완료 · Phase 1 weight 코드 완료 · 미결 2건 확정 · PR #35~#37 머지)
+> 최종 갱신: 2026-08-28 (REQ-10 Phase 0 완료 · Phase 1 weight · Phase 2 activity 코드 완료 · PR #35~#39 머지)
 
 ## 요구사항 인덱스
 
@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0 완료 · Phase 1 코드 완료 2026-08-28, 로컬 DB 확인 후 체크) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0 완료 · Phase 1·2 코드 완료 2026-08-28, 로컬 DB 확인 후 체크) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -69,7 +69,18 @@ REQ-10-01~03 은 계획서대로 심었다 지웠다(가드 주입 PASS · `PetR
 - **`/testrun` 의 인용 검사가 브랜치 상태에 속을 수 있다.** 코드 브랜치(`origin/main` 분기)에서 돌리자 인용 4건이 1건(표 행 자체)만 매칭됐다 — 원문은 아직 안 머지된 문서 PR(#38)에 있었다. 스펙 변경이 아니라 **문서 브랜치와 코드 브랜치가 갈라진 것**. 검사는 두 브랜치를 합친 상태에서 읽어야 한다
 - `grep` 이 `ugrep` 별칭이면 `-c` 가 빈 출력을 낸다 — 세는 건 `| wc -l` 로. 0건이 아니라 **빈 문자열**로 나와 "0건"으로 오독하기 쉽다
 
-**남은 것 (REQ-10)** — 로컬 DB 확인 2건(→ Phase 1 체크) · Phase 2 착수 전 미결 1건(게코가 `distance_km` 를 보내면).
+~~**남은 것 (REQ-10)** — 로컬 DB 확인 2건(→ Phase 1 체크) · Phase 2 착수 전 미결 1건(게코가 `distance_km` 를 보내면).~~ → 아래.
+
+### Phase 2 (activity) — 복제가 실제로 됐다, 결정 하나(D13)로 (저녁)
+
+`distance_km` 는 **거부하지 않고 그대로 저장**(D13). "게코 미사용"·"실내 활동은 NULL"은 입력 UI 규약이지 서버 거부 규약이 아니고, 원본에 없는 거부 규약을 만들지 않는다(REQ-09 D5 와 같은 결). 서버가 거부하는 것은 종별 `activity_type` 뿐 — `ActivityType.isAllowedFor(Species)` 한 줄(게코 = `HANDLING` 만, 나머지 종 = `HANDLING` 제외)이 규칙 전부다. Notion 「활동 기록」 행에 먼저 적었다.
+
+- **weight 형태가 그대로 복제됐다.** 엔티티·저장소·DTO·커서·서비스·컨트롤러 8파일이 이름만 다르다. 차이는 종 검증 3줄과 `logged_at` 이 `LocalDateTime` 인 것뿐. **PATCH 로 유형이 바뀔 때도 종 검증을 다시 거는 것**(REQ-10-29)이 복제에서 빠뜨리기 가장 쉬운 자리라 케이스로 고정했다
+- **Phase 1 의 공통 케이스(가드 위임·D6·커서·PATCH 병합)를 Phase 2 에서 다시 썼다.** 같은 코드 형태라도 도메인마다 한 번씩 고정한다 — 복제 과정의 누락이 이 REQ 의 주 실패 모드다
+- 문서와 코드를 **한 브랜치**에 커밋 분리로 올렸다(`docs:` 2개 · `feat:` 1개). Phase 1 에서 문서/코드 브랜치가 갈려 `/testrun` 인용 검사가 1건으로 보이던 문제가 없어진다. 커밋 주체 분리(파일 집합)는 그대로다
+- 응답의 `logged_at` 은 `Z` 없이 나간다(`2026-06-30T09:00:00`) — Jackson 에 시각 포맷 설정이 없어 기존 엔티티(`created_at`)와 같다. D12 가 "응답은 ISO-8601 `Z`"라 적었지만 framework 전역 사항이라 이 Phase 에서 손대지 않았다. **REQ-10 미결로 올린다** — 요청 `…Z` 는 jsr310 기본(lenient)이 UTC 로 읽어 문제없다
+
+**남은 것 (REQ-10)** — 로컬 DB 확인 2건(→ Phase 1·2 체크) · 응답 시각 `Z` 표기(미결) · Phase 3(feeding) 착수 전 미결 4건(`fed_at` "당일" · 스트릭 규칙 · 게코 외 종의 스트릭 · `food_size` 처리 — 마지막은 D13 과 같은 결이 자연스럽다).
 
 ## 2026-08-27
 
