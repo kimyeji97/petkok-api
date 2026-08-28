@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · REQ-16 분리 + ADR-0002 · 로컬 Postgres 구성 · REQ-16 Phase 0 프로브 완료)
+> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · ADR-0002 · 로컬 Postgres 구성 · **REQ-16 Phase 0~1 완료** — timestamptz 전환)
 
 ## 요구사항 인덱스
 
@@ -25,7 +25,7 @@
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
-| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0 완료 2026-08-28** — 미결 ①②③⑤ 닫힘 · Phase 1~4 미착수) |
+| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0~1 완료 2026-08-28** · Phase 2~4 · 미결 ⑥ 신규) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -169,6 +169,47 @@ Docker 로 `postgres:17`(실제 17.11, 운영 Supabase 와 메이저 일치)을 
 `build.gradle.kts` 에 `compileOnly`/`annotationProcessor` 만 있고 `testCompileOnly`/`testAnnotationProcessor` 가 없다. 프로브 엔티티에 `@Getter` 를 붙였다가 컴파일이 깨져 손으로 접근자를 썼다. **REQ-16 Phase 1·2 에서 시각 타입을 다루는 테스트를 쓸 때 다시 걸린다** — 의존성 추가는 제안·승인 대상이라 손대지 않았다.
 
 **남은 것 (REQ-16)** — Phase 1(`V3` 19컬럼 + 엔티티 6필드) 착수 가능. `D5` 의 `Clock` zone 과 "오프셋 없는 요청 값의 동작"은 아직 미결이다.
+
+### REQ-16 Phase 1 — `V3` 19컬럼 + 엔티티·DTO 를 `OffsetDateTime` 으로
+
+케이스 6건(04·05·06·07·13·14) 전부 통과 · 전건 174/0. `petkok_local` 은 v3 이고 `timestamptz` 19개다.
+
+**적용 전에 버리는 DB 로 예행했다.** 적용된 마이그레이션은 한 글자도 못 고치므로(`CLAUDE.md`) `v3check` 데이터베이스를 만들어 V1~V3 를 처음부터 돌려 보고, 컬럼 타입과 기동을 확인한 뒤에야 `petkok_local` 에 넣었다. DB 를 갈아엎을 수 있는 지금이 이 예행의 값이 가장 싼 시점이다.
+
+계획서가 열거하지 않았지만 **타입이 묶여 있어 함께 바뀐 곳이 3개** 나왔다 — `ActivityCursor`(keyset 페이로드) · 두 Repository 의 `@Query` 파라미터 · `JwtTokenProvider.getExpiresAt`. 마지막 것은 `refresh_tokens.expires_at` 을 채우는 값이라 따라올 수밖에 없고, 이 참에 `ZoneId.systemDefault()` 를 `ZoneOffset.UTC` 로 바꿨다 — **순간은 그대로이고 JVM TZ 의존만 사라진다.**
+
+> **테스트 7파일은 `/implement` 가 고쳤다 — 사용자 승인을 받고서다.** 타입을 바꾸면 컴파일이 통째로 깨져 `/testrun` 이 실행조차 못 하기 때문이다(REQ-10 Phase 0 의 "이 Phase 한정"과 같은 자리). 범위는 **기계적 타입 치환만**으로 못박았고, 단언 문구·기대값은 건드리지 않았다. 애초에 **시각 값을 단언하는 케이스가 없다는 것을 먼저 확인**하고 들어갔다 — `created_at` 은 `exists()` 만 보고, `logged_at` 은 요청 본문에만 나온다. 있었다면 그건 Phase 2 영역이라 손대면 안 됐다.
+
+### ⚠️ `ddl-auto: validate` 는 타입을 보지 않는다 — 계획서 제약이 틀렸다
+
+계획서 「제약·함정」이 *"`ddl-auto: validate` 는 타입까지 본다 … 기동 시점에 터진다. 이건 좋은 실패다"* 라고 적어 두었고, **Phase 1 완료 기준의 "엔티티 ↔ 스키마 대조"가 이 문장 위에 서 있었다.** 실측은 반대다.
+
+- 엔티티를 `OffsetDateTime` 으로 두고 컬럼을 `timestamp` 로 남긴 채(`SPRING_FLYWAY_TARGET=2` 로 Flyway 를 V2 에서 정지) 기동 → **그대로 떴다**
+- 검사기 자체는 살아 있다 — `users.email` 을 지우자 `Schema-validation: missing column [email] in table [users]` 로 막혔다
+
+즉 **컬럼 존재만 보고 타입은 안 본다.** 엔티티만 바꾸고 마이그레이션을 빠뜨리면(또는 그 반대) **조용히 통과한다.** 이 프로젝트가 반복해 밟은 얼굴이 하나 더 늘었다.
+
+그래서 이번 Phase 의 실제 방어선은 `validate` 가 아니라 **REQ-16-04·05(마이그레이션 텍스트 검사)** 다. 다만 그건 *SQL 에 19개가 적혀 있는가* 를 볼 뿐 **DB 의 실제 컬럼 타입과 엔티티를 맞대보지는 않는다.** 그 구멍을 메우려면 DB 를 조회하는 케이스가 필요한데, **DB 가 있는 환경에서만 돌아 CI 에서 깨진다** — 미결로 올렸다(⑥).
+
+> 계획서 제약 문장은 **실측대로 고쳤다.** 조용히 고친 게 아니라 여기 남기는 이유는, 저 문장이 완료 기준의 근거였기 때문이다. "계획과 실제가 어긋났으면 그게 가장 중요한 기록"이라는 규칙이 정확히 이 경우다.
+
+### 계획서 열거가 셋 어긋났다 — 전부 동작은 옳고 문서만 틀렸다
+
+| 계획서 | 실제 | 영향 |
+|---|---|---|
+| `date` 컬럼 **5개** | **6개** — `photos.taken_at` 이 빠졌다 | 동작은 옳다(안 건드림). REQ-16-07 이 "5개 중 3개"가 아니라 **"6개 중 3개"** 를 덮는다 |
+| `now()` 호출부 **`AuthService` 2곳** | **3곳** — `BaseSoftDeleteEntity.softDelete()` | 이번엔 `OffsetDateTime.now()` 로만 바꿨다. `Clock` 주입은 Phase 3 이므로 넘기지 않았다 |
+| — | `framework/util/date/LocalDateTimeUtil` 에 `LocalDateTime.now()` **2건** | ⭐ **REQ-16-10("`business`·`framework` 에 0건")과 정면 충돌.** 이식한 범용 유틸이라 없앨 수 없다 — Phase 3 착수 전에 예외를 둘지 정해야 한다 |
+
+세 번째가 특히 중요하다. **Phase 3 완료 기준이 지금 상태로는 달성 불가능**하고, 그걸 모른 채 Phase 3 을 시작하면 유틸을 뜯어고치거나 케이스를 몰래 약화시키게 된다.
+
+### 프로브가 두 번 무효였다 — 둘 다 "통과"로 보였다
+
+`validate` 가 타입을 보는지 재려고 엔티티 한 필드만 `LocalDateTime` 으로 되돌렸더니 **컴파일이 깨졌다**(DTO 가 같은 타입으로 묶여 있다). 결과 grep 패턴에 `BUILD FAILED` 를 안 넣어 두어 **아무 줄도 출력되지 않았고**, 하마터면 "실패 신호 없음 = 통과"로 읽을 뻔했다. 방향을 바꿔 **DB 쪽을 V2 에 멈추는** 방식으로 다시 쟀다.
+
+> 교훈: **프로브가 무효였음을 알려 주는 것은 출력의 존재이지 부재가 아니다.** 결과 grep 은 성공 패턴과 실패 패턴을 **둘 다** 넣어야 하고, 어느 쪽도 안 걸리면 그건 "판정 불가"이지 통과가 아니다. 오늘 세 번째로 밟은 조용한 무동작이다.
+
+`REQ-16-14` 는 처음부터 초록이라 **성립 조건을 따로 쟀다** — `application.yml` 에서 `time_zone: UTC` 를 지우니 1건 실행 · 1건 실패. 회귀 방어 케이스는 이 역프로브 없이는 "지워도 통과하는 테스트"와 구별되지 않는다.
 
 ## 2026-08-27
 

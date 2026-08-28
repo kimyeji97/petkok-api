@@ -58,6 +58,7 @@
 - [x] **③ Jackson 이 KST 오프셋을 내는 정확한 설정** → **`ObjectMapper.setTimeZone(Asia/Seoul)` 한 줄.** `WRITE_DATES_AS_TIMESTAMPS`·`ADJUST_DATES_TO_CONTEXT_TIME_ZONE` 은 손댈 필요 없고, `WRITE_DATES_WITH_CONTEXT_TIME_ZONE` 은 **켜 둬야 한다**(끄면 `Z` 로 돌아간다). `ObjectMapper` 의 TZ 는 `UTC`·`hasExplicitTimeZone=false` 라 **JVM 기본 TZ 를 따라가지 않는다**.
       원래 질문: — `ObjectMapper.setTimeZone` · `WRITE_DATES_AS_TIMESTAMPS` · `ADJUST_DATES_TO_CONTEXT_TIME_ZONE` 의 조합. **추측하지 말고 실제 응답 문자열로 확인한다** (REQ-15 의 "`@Import` 를 빼면 조용히 틀린 계약을 고정한다"와 같은 자리)
 - [ ] **④ Notion 역반영의 범위** — `API I/F` 시각 예시가 `…Z` 로 적힌 행이 몇 개인지 세지 않았다. 「소스 구조」 §6 에 시각 규약 절이 없어 신설이 필요한지도 미확인
+- [ ] **⑥ 엔티티 ↔ DB 실제 컬럼 타입 대조를 무엇으로 하는가** (2026-08-28 신규) — `validate` 가 타입을 안 보는 것이 실측으로 드러나, 마이그레이션을 빠뜨려도 조용히 통과한다. DB 를 조회하는 케이스를 쓰면 막히지만 **DB 가 있는 환경에서만 돌아 CI 에서 깨진다.** Testcontainers 도입(의존성 추가 · 승인 대상)과 함께 판단할 일이다
 - [x] **⑤ 로컬 DB 없이 어디까지 검증되는가** → **전제가 깨졌다.** 2026-08-28 이 머신에 Docker 로 Postgres 17 을 세웠다(`CLAUDE.local.md`). Phase 1 판정 가능. 다만 **`./gradlew test` 는 여전히 DB 를 쓰지 않는다**(Testcontainers 미도입) — DB 왕복은 수동 확인이다.
       원래 질문: — 이 세션 머신에는 `.env` 도 Postgres 도 없다. REQ-10 Phase 1·2 의 확인 2건도 같은 이유로 밀려 있다. **`ddl-auto: validate` 통과와 마이그레이션 실행은 DB 없이 확인할 수 없다** — Phase 1 완료 기준이 여기에 걸린다
 
@@ -69,9 +70,9 @@
       `timestamptz` 컬럼 하나를 만든 임시 테이블에 세 타입(`OffsetDateTime`·`Instant`·`ZonedDateTime`)을 각각 매핑해 왕복시키고, `@WebMvcTest` 로 **응답 문자열**을 눈으로 확인한다. `hibernate.jdbc.time_zone` 을 켠 상태·끈 상태 둘 다.
       완료 기준: 미결 ①②③이 **실측값과 함께** 닫힘 · 고른 타입으로 `2026-06-30T18:00:00+09:00` 이 실제로 출력되는 것을 확인 · 프로브 코드는 삭제(REQ-10 Phase 0 과 같은 방식, 결과는 커밋 본문에)
 
-- [ ] **Phase 1 — V3 마이그레이션 + 엔티티 타입 전환**
+- [x] **Phase 1 — V3 마이그레이션 + 엔티티 타입 전환** — 완료 2026-08-28 (`5730b5a`)
       `V3__time_to_timestamptz.sql` (19 컬럼 · D6 의 `USING`) · 엔티티 6필드 타입 변경 · DTO 시각 필드 타입 변경(6파일).
-      완료 기준: 마이그레이션이 로컬 DB 에 적용됨 · `ddl-auto: validate` 통과(엔티티 ↔ 스키마 대조) · `./gradlew test` 전건 통과 · **미결 ⑤ 때문에 DB 있는 환경에서만 판정 가능**
+      완료 기준: 마이그레이션이 로컬 DB 에 적용됨 ✅(`petkok_local` v3 · `timestamptz` 19개) · ~~`ddl-auto: validate` 통과(엔티티 ↔ 스키마 대조)~~ **이 근거는 무효다 — validate 는 타입을 안 본다(제약·함정 참조). 통과는 했으나 대조의 근거가 못 된다** · `./gradlew test` 전건 통과 ✅(174/0)
 
 - [ ] **Phase 2 — 직렬화·역직렬화 규약 (`JacksonConfig`)**
       Phase 0 에서 고른 설정 적용. 기존 REQ 컨트롤러 테스트 갱신.
@@ -90,7 +91,8 @@
 > 작성: 2026-08-28 · 근거: 이 계획서 (원본은 Notion 「소스 구조」 · `API I/F`) · 검증: `/testrun REQ-16`
 > `결과` 열은 `/checkpoint`가 채운다. 케이스 ID는 테스트명에 `[REQ-16-01]` 형태로 박는다.
 > **Phase 0 의 01~03 은 프로브다** — 세 후보 타입을 심었다 지우는 확인이라 영구 테스트로 남지 않는다. `/implement REQ-16 0` 이 실행하고 결과를 커밋 본문에 남기며, `결과` 열은 `REQ-10-01` 처럼 `✅ 수동` 으로 채운다.
-> ⚠️ **테스트 코드는 이번에 쓰지 않았다 — 표만 넣는다.** 미결 ①(엔티티 시각 타입)이 안 닫혀 **단언할 타입이 없고**, Java 는 대상 타입이 없으면 테스트 소스 전체가 컴파일되지 않는다(REQ-08·09·10 실측). 04 이후의 코드는 **각 Phase 착수 직전 `/testgen` 재호출**로 쓴다. 지금 쓰면 `main` 이 빨간불이 되어 REQ-10 작업까지 막힌다.
+> **2026-08-28 2차 `/testgen` — Phase 1 케이스(04~07)의 코드를 썼다.** 미결 ①이 Phase 0 프로브로 닫혀 단언할 타입이 생겼기 때문이다. 08 이후는 각 Phase 착수 직전에 쓴다.
+> ⚠️ (1차 기록) **테스트 코드는 이번에 쓰지 않았다 — 표만 넣는다.** 미결 ①(엔티티 시각 타입)이 안 닫혀 **단언할 타입이 없고**, Java 는 대상 타입이 없으면 테스트 소스 전체가 컴파일되지 않는다(REQ-08·09·10 실측). 04 이후의 코드는 **각 Phase 착수 직전 `/testgen` 재호출**로 쓴다. 지금 쓰면 `main` 이 빨간불이 되어 REQ-10 작업까지 막힌다.
 > **`message` 를 단언하지 않는다** — `status` 와 `error.code` 만 본다(AGENTS §6).
 
 | ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
@@ -98,21 +100,34 @@
 | REQ-16-01 | Jackson 직렬화 | `OffsetDateTime` · `Instant` · `ZonedDateTime` 중 어느 것이 `+09:00` 을 내는가 (DB 불필요) | 프로브 | Phase 0 완료 기준 — "고른 타입으로 `2026-06-30T18:00:00+09:00` 이 실제로 출력되는 것을 확인" | 0 | ✅ 수동 |
 | REQ-16-02 | Hibernate 왕복 | 고른 타입으로 `timestamptz` 컬럼에 쓰고 읽었을 때 순간이 보존된다 (DB 필요) | 프로브 | 미결 ① — "ⓐ `timestamptz` 읽기/쓰기가 정확한가" | 0 | ✅ 수동 |
 | REQ-16-03 | `hibernate.jdbc.time_zone` | 켠 상태와 끈 상태의 저장·조회 결과 차이 (DB 필요) | 프로브 | 미결 ② — "남겨야 하는지, 지워야 하는지, 지우면 무엇이 바뀌는지 실측 필요" | 0 | ✅ 수동 |
-| REQ-16-04 | `V3__time_to_timestamptz.sql` | `timestamptz` 로 바꾸는 컬럼이 **19개**다 (빠뜨린 컬럼 없음) | 회귀 | 범위—포함 — "`timestamp` 19개 → `timestamptz`" | 1 | — |
-| REQ-16-05 | 〃 | 모든 타입 변환에 `USING ... AT TIME ZONE 'UTC'` 가 붙어 있다 | 회귀 | D6 — "`USING <col> AT TIME ZONE 'UTC'`" · 기각안 — "Postgres 가 세션 TZ 로 해석해 배포 환경에 따라 결과가 달라진다" | 1 | — |
-| REQ-16-06 | 엔티티 6필드 | 시각 필드에 `LocalDateTime` 이 남아 있지 않다 (타입 무관 단언) | 불변식 | 범위—포함 — "(6개 필드, `LocalDateTime` → D2 가 정하는 타입)" | 1 | — |
-| REQ-16-07 | 날짜 필드 5개 | `measuredAt` · `entryDate` · `shedDate` · `birthday` · `adoptionDate` 는 여전히 `LocalDate` 다 | 불변식 | 범위—제외 — "날짜만 있는 값이라 타임존 개념이 없다. 타입을 바꾸지 않는다" | 1 | — |
+| REQ-16-04 | `V3__time_to_timestamptz.sql` | `timestamptz` 로 바꾸는 컬럼이 **19개**다 (빠뜨린 컬럼 없음) | 회귀 | 범위—포함 — "`timestamp` 19개 → `timestamptz`" | 1 | ✅ |
+| REQ-16-05 | 〃 | 모든 타입 변환에 `USING ... AT TIME ZONE 'UTC'` 가 붙어 있다 | 회귀 | D6 — "`USING <col> AT TIME ZONE 'UTC'`" · 기각안 — "Postgres 가 세션 TZ 로 해석해 배포 환경에 따라 결과가 달라진다" | 1 | ✅ |
+| REQ-16-06 | 엔티티 6필드 | 시각 필드에 `LocalDateTime` 이 남아 있지 않다 (타입 무관 단언) | 불변식 | 범위—포함 — "(6개 필드, `LocalDateTime` → D2 가 정하는 타입)" | 1 | ✅ |
+| REQ-16-07 | 날짜 필드 5개 **중 3개** | `measuredAt` · `entryDate` · `shedDate` · `birthday` · `adoptionDate` 는 여전히 `LocalDate` 다 | 불변식 | 범위—제외 — "날짜만 있는 값이라 타임존 개념이 없다. 타입을 바꾸지 않는다" | 1 | ✅ |
 | REQ-16-08 | 응답 (HTTP 왕복) | 시각 필드가 `+09:00` 오프셋을 달고 나간다 | 정상 | Phase 2 완료 기준 — "응답 시각이 전부 `+09:00` 표기" | 2 | — |
 | REQ-16-09 | 요청 (HTTP 왕복) | `...Z` 로 온 값과 `...+09:00` 으로 온 같은 순간이 동일하게 저장된다 | 회귀 | Phase 2 완료 기준 — "`Z` 로 온 요청과 `+09:00` 으로 온 요청이" | 2 | — |
 | REQ-16-10 | ArchUnit | `LocalDateTime.now()` 를 직접 호출하는 클래스가 없다 | 불변식 | Phase 3 완료 기준 — "`LocalDateTime.now()` 직접 호출이 `business`·`framework` 에 0건" | 3 | — |
 | REQ-16-11 | `ZoneId` 상수 | `framework/constant` 에 있고 값이 `Asia/Seoul` 이다 | 불변식 | 범위—포함 — "`ZoneId` 상수를 `framework/constant` 에 한 곳" | 3 | — |
 | REQ-16-12 | `AuthService` 만료 판정 | 고정 `Clock` 을 주입하면 실행 시각과 무관하게 만료 경계가 재현된다 | 회귀 | Phase 3 완료 기준 — "고정 `Clock` 으로 refresh 만료 경계 테스트가 시각에 의존하지 않고 통과" | 3 | — |
+| REQ-16-13 | 엔티티 6필드 | 타입이 정확히 `OffsetDateTime` 이다 | 불변식 | D2 — "(2026-08-28 Phase 0 프로브로 확정)" | 1 | ✅ |
+| REQ-16-14 | `application.yml` | `hibernate.jdbc.time_zone` 이 `UTC` 로 남아 있다 | 회귀 | 미결 ② — "지우면 훗날 `timestamp` 컬럼이 다시 생겼을 때 JVM 기본 TZ 의존이 살아난다" | 1 | ✅ |
 
 > **결과 갱신: 2026-08-28 — 01~03 `✅ 수동` (Phase 0).** 프로브 3건 실행 · 실패 0 · 코드와 `req16_probe` 스키마는 삭제. 실측값은 PROGRESS 2026-08-28.
 >
 > ⚠️ **REQ-16-03 은 케이스 문구대로 재지 못했다 — 이탈.** 표는 "켠 상태와 **끈 상태**"라고 적었지만 실제로는 `UTC` vs `Asia/Seoul` 두 값으로 대조했다. Spring 에서 이 프로퍼티를 **깨끗하게 "없음"으로 만들 방법이 없어서다**(`=` 빈 값을 주면 Hibernate 가 `GMT` 로 읽어 "끈 상태"가 아니다). 두 값이 `timestamptz` 에서 **완전히 같은 결과**를 냈으므로 "무영향"이라는 ② 의 답은 그대로 성립하지만, **진짜 미설정 상태는 재지 않았다.** 되돌아올 여지가 있으면 여기다.
 >
 > ⚠️ **01 은 첫 시도가 무효였다.** 입력값에 이미 `+09:00` 을 달아 두어 **네 설정이 전부 같은 답**을 냈고, 그대로 읽었으면 "설정 불필요"라는 정반대 결론이 나왔다. 실제 응답 경로는 **DB 에서 읽은 `Z`** 다. 대조군(`America/New_York` → `-04:00`)까지 넣어 설정이 실제로 작동하는 것을 확인한 뒤에야 갈렸다.
+
+> **2026-08-28 — 04~07 코드 작성.** `V3TimestamptzMigrationTest`(04·05) · `TimeFieldTypeContractTest`(06·07). 네 건 모두 **지금은 실패한다** — `V3` 도 엔티티 전환도 없기 때문이고, 이것이 정상이다(`SecurityConfigPublicPathsTest` 와 같은 자리).
+>
+> ⚠️ **REQ-16-07 은 6개 중 3개만 덮는다** (계획서가 처음에 `date` 컬럼을 5개로 셌으나 `photos.taken_at` 이 빠져 있었다 — 2026-08-28 실측). `entryDate`(diary) · `shedDate`(shed) 는 **엔티티 자체가 없다** — 그 도메인은 REQ-10 Phase 3~5 다. Java 는 없는 클래스를 참조하면 테스트 소스 전체가 컴파일되지 않으므로 뺐다. **diary·shed 가 들어올 때 `TimeFieldTypeContractTest.DATE_FIELDS` 에 두 줄을 추가해야 하고, 빠뜨려도 초록불이다** — REQ-10 Phase 3·4 완료 기준에 이 항목을 넣을 것.
+>
+> **04·05 는 SQL 을 파싱하지 않고 텍스트로 센다.** 여기서 잡을 사고는 문법 오류가 아니라 **빠뜨린 컬럼**과 **빠뜨린 `USING` 절**이고, 둘 다 문법적으로 올바른 SQL 이라 DB 가 알려주지 않는다. 대신 마이그레이션을 계획서가 정한 `alter column … type timestamptz using … at time zone 'UTC'` 형태로 쓰지 않으면 **(a) 테스트 결함으로 빨간불이 난다.**
+
+> **2026-08-28 — 13·14 추가 승인.** 미결 ①②가 Phase 0 에서 닫혀 근거가 생긴 두 건이다.
+> - **13 은 06 과 겹치지 않는다** — 06 은 *빠뜨린 필드*, 13 은 *잘못 고른 타입*을 잡는다. 06 만 있으면 누가 `Instant` 로 바꿔도 초록불이고, 13 만 있으면 한 필드를 안 바꿨을 때 원인이 "타입 틀림"으로 보인다. **실패 원인이 갈리도록** 나눴다.
+> - ⚠️ **14 는 처음부터 통과한다.** 값이 이미 있기 때문이고, 회귀 방어라 정상이다. 성립 조건은 "**지웠을 때 빨개지는가**" 이므로 `/implement` 에서 한 번 지워 보고 확인한다. 이 설정은 `timestamptz` 에 무영향이라(Phase 0 실측) **"안 쓰는 설정"으로 보여 정리 대상이 되기 쉽고**, 지운 순간이 아니라 훗날 `timestamp` 컬럼이 생긴 순간에 터진다 — 그 시차를 잡는 케이스다.
+> - 14 를 테스트로 두었으므로 `CLAUDE.md` 계약 승격은 하지 않는다. 계약은 사람이 읽어야 지켜지지만 테스트는 지운 즉시 빨간불이 난다.
 
 **아래 2건은 근거가 없어 케이스를 쓰지 않았다** — 미결이 닫히면 행을 추가한다.
 
@@ -124,8 +139,13 @@
 ## 제약·함정
 
 - ⚠️ **적용된 마이그레이션은 한 글자도 못 고친다** (`CLAUDE.md`). `V3` 를 로컬에 한 번 적용하면 수정이 아니라 `V4` 를 새로 써야 한다. **Phase 0 프로브가 끝나기 전에 `V3` 를 적용하지 말 것**
-- ⚠️ **`ddl-auto: validate` 는 타입까지 본다.** 엔티티만 바꾸고 마이그레이션을 빠뜨리면(또는 그 반대) **기동 시점에 터진다.** 이건 좋은 실패다 — 조용하지 않다
+- ⚠️ **`ddl-auto: validate` 는 컬럼 *존재*만 보고 *타입*은 보지 않는다** (2026-08-28 실측 — 이 계획서가 처음에 정반대로 적어 두었던 항목이다). 엔티티를 `OffsetDateTime` 으로 두고 컬럼을 `timestamp` 로 남긴 채(`SPRING_FLYWAY_TARGET=2`) 기동해도 **그대로 뜬다.** 검사기 자체는 살아 있다 — `users.email` 을 지우면 `Schema-validation: missing column` 으로 막힌다.
+	- **따라서 "엔티티 ↔ 스키마 대조"는 실제로 일어나지 않는다.** 엔티티만 바꾸고 마이그레이션을 빠뜨리면(또는 그 반대) **조용히 통과한다.** Phase 1 의 실제 방어선은 REQ-16-04·05(마이그레이션 텍스트 검사)이고, 그마저 DB 의 실제 컬럼 타입과는 맞대보지 않는다 → 미결 ⑥
 - ⚠️ **`hibernate.jdbc.time_zone` 은 `timestamptz` 에서 의미가 달라진다.** `timestamp` 시절의 근거로 남겨 두면 안 된다(미결 ②)
+- ⚠️ **이 계획서의 열거가 셋 어긋났다** (2026-08-28 Phase 1 실측). 동작은 전부 옳고 문서만 틀렸지만, **Phase 3 이 이걸 모르고 시작하면 안 된다.**
+	- `date` 컬럼은 **5개가 아니라 6개** — `photos.taken_at` 이 빠졌다. 안 건드리는 것은 그대로 맞고, REQ-16-07 이 덮는 범위가 "5개 중 3개"가 아니라 **"6개 중 3개"** 다
+	- `now()` 직접 호출은 **`AuthService` 2곳이 아니라 3곳** — `BaseSoftDeleteEntity.softDelete()` 가 빠졌다. Phase 1 에서 `OffsetDateTime.now()` 로만 바꿔 두었고 `Clock` 주입은 Phase 3 몫이다
+	- ⭐ **`framework/util/date/LocalDateTimeUtil` 에 `LocalDateTime.now()` 가 2건 있다.** 이식한 범용 유틸이라 없앨 수 없는데, **REQ-16-10 의 "`business`·`framework` 에 0건"과 정면 충돌한다.** Phase 3 착수 전에 예외를 둘지(그렇다면 규칙을 어떻게 쓸지) 정해야 한다 — 안 정하면 유틸을 뜯어고치거나 케이스를 몰래 약화시키게 된다
 - ⚠️ **`LocalDateTime.now()` 는 JVM 기본 TZ 에 암묵 의존한다** (D5). 배포 환경에 `TZ` 가 없으면 **에러 없이** 9시간 어긋난다. 이 REQ 가 끝난 뒤 새 코드가 다시 부르면 규약이 조용히 무너지므로 Phase 3 완료 기준에 `grep` 0건을 넣었다
 - ⚠️ **DB `default now()` 로 심은 행과 앱이 쓴 행이 9시간 어긋난다** (2026-07-30 실측) — `timestamptz` 전환으로 **사라지는 함정**이다(D8). 전환 후에는 `now() at time zone 'UTC'` 픽스처 규칙도 함께 폐기해야 한다. 폐기를 빠뜨리면 이번엔 반대로 9시간 어긋난다
 - ⚠️ **응답 형태 변경은 클라이언트 계약 변경이다.** `created_at` 이 모든 도메인에서 바뀐다(auth · user · pet · weight · activity). 앱 구현 전이라 지금이 가장 싸다
