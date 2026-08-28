@@ -52,7 +52,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 |---|---|---|---|
 | **D1** `condition_tag` 허용값 | **4종 — `정상 · 활발 · 거꾸리 · 구토`** (`API I/F` 다이어리 작성 행). `ConditionTag` enum 4개. `V1__init.sql` 주석(4종)과 일치해 V1 을 건드릴 일이 없다 | → [ADR-0001](../adr/ADR-0001-derived-state-single-source.md) | ↑ (7종 문구 3곳은 역반영 대상) |
 | **D2** `food_size` (S/M/L) | **`feeding_logs` 에 컬럼 추가 — `V3__feeding_food_size.sql`** (`food_size varchar(1) null`) | `API I/F` 급여 기록·목록이 **응답 계약에 `food_size` 를 포함**한다. 스키마가 계약보다 늦은 것이지 계약이 틀린 게 아니다. 게코 곤충 사이즈는 `amount`(마리 수)·`amount_unit` 과 **다른 축**이라 매핑으로 갚을 수 없다. 테이블 정의서 역반영 대상 | **`amount`/`amount_unit` 매핑**(`api-list §5` "엔티티는 그대로") — 응답에서 `food_size` 가 사라져 계약 위반. **필드 제거 + Notion 수정** — 게코 사용자에게 곤충 사이즈는 실사용 정보 |
-| **D3** 체중 20% 경고 | **응답에 파생 필드** — 저장하지 않고 조회 시 직전 기록과 비교해 계산. **필드명·형태는 Notion 행에 먼저 명시한 뒤 확정**(미결) | 원본 callout 이 목록·기록 두 행에 명시. 「소스 구조」 §1-4 "파생 상태는 저장하지 않고 계산" | **클라이언트 계산** — 서버 응답에 없으면 원본 문구가 공허해지고, 목록 API 소비자마다 다르게 구현한다 |
+| **D3** 체중 20% 경고 | **응답에 파생 필드** — 저장하지 않고 조회 시 직전 기록과 비교해 계산. **2026-08-28 확정(Notion 「체중 목록」 행에 먼저 명시)**: `weight_change_rate`(직전 대비 %, 소수 1자리, 첫 기록 `null`) · `is_weight_warning`(`\|변화율\| >= 20` → `true`, 첫 기록 `false`) · 직전 = `measured_at` desc, `id` desc 정렬에서 바로 다음 1건 | 원본 callout 이 목록·기록 두 행에 명시. 「소스 구조」 §1-4 "파생 상태는 저장하지 않고 계산" | **클라이언트 계산** — 서버 응답에 없으면 원본 문구가 공허해지고, 목록 API 소비자마다 다르게 구현한다 |
 | **D4** 다이어리 ↔ 사진 | **REQ-11 로 이관.** 이번 diary 는 `photo_ids` 무시 · `photos` · `photo_count` 미포함 | `photos` 테이블·업로드가 REQ-11 이고, diary 가 photos 엔티티를 참조하면 **도메인 간 참조(diary→gallery)** 가 생겨 ArchUnit 예외 또는 포트 설계가 필요하다. 그 설계는 gallery 가 있어야 할 수 있다 | **REQ-10 에 포함** — 범위가 두 도메인으로 번진다. diary 를 마지막 Phase 로 두는 이유이기도 하다(D9) |
 | **D5** 가드 소비 형태 | `XxxService` 가 `PetAccessGuard` 주입 → 진입 시 `getOwnedPet(petId, userId)` → `species` 로 분기. **`PetRepository`·`Pet` 은 참조하지 않는다** | REQ-09 D3·D4. ArchUnit 예외 3건(`business.pet.service` · `data.pet.dto` · `data.pet.enums`)이 정확히 이 형태만 허용한다 | (REQ-09 에서 기각한 A·B2′·C 안 — 재론하지 않는다) |
 | **D6** 하위 기록의 소유 확인 | 기록 조회는 **`findByIdAndPetId(id, petId)`** — 없으면 `RESOURCE_NOT_FOUND`(404). 펫 소유권은 가드가, 기록↔펫 귀속은 이 조회가 | 남의 펫의 기록 id 를 내 펫 경로로 부르면 가드는 통과한다(내 펫이니까). 기록 쪽에서 `pet_id` 를 함께 걸지 않으면 **남의 기록이 보인다.** 원본에 없어 규약이지만, 없으면 보안 결함이라 결정으로 둔다. 403 이 아니라 404 인 이유 — "그 펫에 그런 기록은 없다"가 사실이고, 존재 여부를 흘리지 않는다 | **`findById` 후 `pet_id` 비교 → 403** — 남의 기록이 존재한다는 정보가 샌다 |
@@ -68,8 +68,8 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 > ⚠️ 원본에 답이 없거나 원본끼리 어긋나는 것들. 추측으로 채우지 않았다. **각 Phase 착수 전에 그 Phase 의 미결을 닫는다** — 안 닫히면 그 부분은 구현하지 않는다.
 
 **Phase 1 (weight) 전**
-- [ ] **체중 경고의 응답 형태.** D3 은 "파생 필드"까지만. 필드명(`change_rate`? `is_warning`?) · 직전 기록의 정의(`measured_at` 직전 1건? 같은 날 2건이면?) · 첫 기록(직전 없음)일 때 값 · 20% 가 "이상"인지 "초과"인지. **Notion 체중 목록·기록 행에 먼저 명시**한 뒤 옮겨 적는다
-- [ ] **목록 API 의 `cursor`/`limit` 파라미터가 명시된 행은 diary·feeding 뿐이다.** activity·weight·shed 목록은 응답에 `next_cursor` 만 있고 Query Parameters 절이 없다. 같은 규약으로 간주하되 **원본 3행에 파라미터 절을 추가**하는 역반영이 필요하다
+- [x] **체중 경고의 응답 형태 — 2026-08-28 확정, D3 에 반영.** Notion 「체중 목록」 행에 파생 필드 절 · 「체중 기록」 행에 201 응답 형태 명시. (원문:) D3 은 "파생 필드"까지만. 필드명(`change_rate`? `is_warning`?) · 직전 기록의 정의(`measured_at` 직전 1건? 같은 날 2건이면?) · 첫 기록(직전 없음)일 때 값 · 20% 가 "이상"인지 "초과"인지. **Notion 체중 목록·기록 행에 먼저 명시**한 뒤 옮겨 적는다
+- [x] **목록 API 의 `cursor`/`limit` — 2026-08-28 역반영 완료.** 활동·체중·탈피 목록 행에 `Query Parameters: cursor / limit (기본 20)` + 정렬키(`logged_at`/`measured_at`/`shed_date` desc, `id` desc) 추가. (원문:) activity·weight·shed 목록은 응답에 `next_cursor` 만 있고 Query Parameters 절이 없다. 같은 규약으로 간주하되 **원본 3행에 파라미터 절을 추가**하는 역반영이 필요하다
 
 **Phase 2 (activity) 전**
 - [ ] **게코가 `distance_km` 를 보내면** — 원본 "선택(게코 미사용)". 무시하고 `null` 저장 vs 400. REQ-09 D5(`PATCH` 의 `species` 무시)와 같은 결로 "무시"가 자연스럽지만 원본이 말하지 않는다
@@ -91,7 +91,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 - [ ] **거꾸리 경고** — 「소스 구조」 §8 에만 있고 `API I/F` 응답에 없다. 어느 엔드포인트에 어떤 형태로 실을지 원본에 먼저 적히기 전엔 만들지 않는다
 
 **전체**
-- [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절 ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제 ⓔ 체중 경고 필드 명시 ~~ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건~~ (2026-08-28 완료 — callout + 스케치 ① 갱신, `fetch` 로 저장 확인)
+- [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ~~ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절~~ (2026-08-28 완료) ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제 ~~ⓔ 체중 경고 필드 명시~~ (2026-08-28 완료) ~~ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건~~ (2026-08-28 완료 — callout + 스케치 ① 갱신, `fetch` 로 저장 확인)
 
 ## 작업 단계
 
@@ -101,7 +101,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
       `DomainBoundaryTest` 에 `ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.business.pet.service.."))` · `data.pet.dto..` · `data.pet.enums..` 추가. REQ-09 프로브에서 검증된 형태.
       완료 기준: 가짜 `business/weight/service` 가 가드를 주입해 통과 · `PetRepository` 직접 주입은 **여전히 FAIL** · `Pet` 엔티티 직접 참조는 **여전히 FAIL** (셋 다 프로브 후 삭제) · ArchUnit 8건 통과 · 「소스 구조」 §13 역반영
 
-- [ ] **Phase 1 — weight (4행)**
+- [ ] **Phase 1 — weight (4행)** — 코드·케이스 20건 완료 (2026-08-28, `acde9ab` · `feat/req10-phase1-weight`). **체크 보류: 로컬 DB 확인 2건 남음** — ① `bootRun` 으로 `WeightLogRepository` 의 `@Query`(`w.id < :id` UUID 비교) 기동 검증 ② 같은 `measured_at` 3건 · `limit=2` 로 페이지 경계 누락·중복 실측
       `WeightLog` 엔티티(`BaseCreatedEntity`) · `WeightLogRepository`(`findByIdAndPetId` · keyset 목록) · `WeightService`(가드 소비, D6, 파생 필드 D3) · `WeightController`. **여기서 확정되는 것**: 가드 소비 코드 모양 · 커서 페이로드 형태 · D6 404 · 목록 응답 = `CursorPage`.
       완료 기준: 4행이 원본 상태코드(201/200/200/204)대로 · 남의 펫 403 · 삭제된 펫 404 · 남의 기록 id 404(D6) · 목록 `has_next`/`next_cursor` 가 keyset 으로 동작(같은 `measured_at` 여러 건에서 누락·중복 없음) · `weight_g` 0 이하 400 · 체중 경고 필드가 미결 답대로 · ArchUnit 통과
 
@@ -125,6 +125,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 
 > 작성: 2026-08-27 · 근거: 이 계획서 (원본은 Notion `API I/F` · 「소스 구조」) · 검증: `/testrun REQ-10`
 > **결과 갱신: 2026-08-28 — 01~03 `✅ 수동` (Phase 0 프로브).** 가짜 `business/weight/service/WeightService` 를 3형태로 심어 `DomainBoundaryTest` 실행(XML 로 8건 실행 확인, 프로브 후 삭제). 01 은 예외 없는 원본 규칙에서 FAIL 인 것까지 대조해 공허하지 않음을 확인. 커밋 `016c692` 본문에 결과를 남겼다. `/testrun` 에는 잡히지 않는다.
+> **결과 갱신: 2026-08-28 — 04~23 전부 `✅` (Phase 1).** `/testrun REQ-10` 32 메서드 실행 · 실패 0 · 표 20행 ↔ 코드 20 ID 일치 · 근거 인용 전건 원문 존재. **Phase 1 완료 기준 중 "keyset 누락·중복 없음"의 실제 DB 경계 동작과 `@Query` JPQL 기동 검증은 이 세션 머신에 DB 가 없어 미확인** — Phase 1 체크는 그 확인 후 켠다.
 > `결과` 열은 `/checkpoint`가 채운다. 케이스 ID는 테스트명에 `[REQ-10-01]` 형태로 박는다.
 > **Phase 0 의 01~03 은 프로브다** — 가짜 클래스를 심었다 지우는 확인이라 영구 테스트로 남지 않는다. `/implement REQ-10 0` 이 실행하고 결과를 커밋 본문에 남기며, `결과` 열은 `REQ-08-11` 처럼 `✅ 수동` 으로 채운다.
 > **테스트 코드는 Phase 별로 들어온다** (Java 는 대상 클래스가 없으면 테스트 소스가 컴파일되지 않는다 — REQ-08·09 실측). Phase 1 코드는 `/implement REQ-10 1` 직전 `/testgen` 재호출로 쓴다. Phase 2~5 행은 각 Phase 착수 전 미결을 닫은 뒤 추가한다.
@@ -135,22 +136,28 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 | REQ-10-01 | `DomainBoundaryTest` | 하위 Service 가 `PetAccessGuard` · `OwnedPetResponse` · `Species` 만 주입 → 통과 | 프로브 | Phase 0 완료 기준 — "가짜 `business/weight/service` 가 가드를 주입해 통과" | 0 | ✅ 수동 |
 | REQ-10-02 | 〃 | 하위 Service 가 `PetRepository` 직접 주입 → 규칙 FAIL | 프로브 | Phase 0 완료 기준 — "`PetRepository` 직접 주입은 **여전히 FAIL**" | 0 | ✅ 수동 |
 | REQ-10-03 | 〃 | 하위 Service 가 `Pet` 엔티티 참조 → 규칙 FAIL | 프로브 | Phase 0 완료 기준 — "`Pet` 엔티티 직접 참조는 **여전히 FAIL**" | 0 | ✅ 수동 |
-| REQ-10-04 | `POST /weight` | **HTTP 왕복** 201 | 정상 | Phase 1 완료 기준 — "4행이 원본 상태코드(201/200/200/204)대로" | 1 | — |
-| REQ-10-05 | `DELETE /weight/{log_id}` | **HTTP 왕복** 204 · 본문 없음 | 정상 | 〃 | 1 | — |
-| REQ-10-06 | `WeightService` 진입 | 남의 펫 → `PET_FORBIDDEN` (가드 위임) | 예외 | Phase 1 완료 기준 — "남의 펫 403" | 1 | — |
-| REQ-10-07 | 〃 | 삭제된 펫 → `PET_NOT_FOUND` | 예외 | Phase 1 완료 기준 — "삭제된 펫 404" | 1 | — |
-| REQ-10-08 | 기록 조회 | 다른 펫에 속한 기록 id → `RESOURCE_NOT_FOUND` | 예외 | D6 — "`findByIdAndPetId(id, petId)`" · 제약·함정 — "기록 조회에 `pet_id` 를 함께 걸지 않으면 남의 기록이 보인다" | 1 | — |
-| REQ-10-09 | `WeightService` | `PetRepository` · `Pet` 을 참조하지 않는다 | 불변식 | D5 — "`PetRepository`·`Pet` 은 참조하지 않는다" | 1 | — |
-| REQ-10-10 | 목록 | 같은 `measured_at` 여러 건이 페이지 경계에 걸려도 누락·중복 없음 | 회귀 | D8 — "`id` desc 타이브레이크" · 제약·함정 — "같은 날짜 여러 건에서 누락·중복" | 1 | — |
-| REQ-10-11 | 목록 응답 | `items` · `next_cursor` · `has_next` 키 (snake_case) | 불변식 | 범위—포함 — "`{items, next_cursor, has_next}` 다(= `CursorPage`)" | 1 | — |
-| REQ-10-12 | `POST /weight` | `weight_g` 0 → 400 | 경계 | 원본 Validation — "`weight_g` 필수 (양의 정수)" | 1 | — |
-| REQ-10-13 | 〃 | `weight_g` 누락 → 400 | 경계 | 〃 | 1 | — |
-| REQ-10-14 | 〃 | `measured_at` 누락 → 400 | 경계 | 원본 Validation — "`measured_at` 필수" | 1 | — |
-| REQ-10-15 | PATCH 요청 DTO | `@NotNull` · `@NotBlank` 가 없다 | 회귀 | 제약·함정 — "PATCH DTO 에 `@NotNull`·`@NotBlank` 금지" | 1 | — |
-| REQ-10-16 | `PATCH /weight/{log_id}` | `memo` 만 보내면 `weight_g` 가 유지된다 | 회귀 | D10 — "병합은 서비스" | 1 | — |
-| REQ-10-17 | 삭제 | 삭제 후 같은 id 조회 → `RESOURCE_NOT_FOUND` (하드 삭제) | 정상 | D7 — "`delete` 는 행 삭제, 204" | 1 | — |
+| REQ-10-04 | `POST /weight` | **HTTP 왕복** 201 | 정상 | Phase 1 완료 기준 — "4행이 원본 상태코드(201/200/200/204)대로" | 1 | ✅ |
+| REQ-10-05 | `DELETE /weight/{log_id}` | **HTTP 왕복** 204 · 본문 없음 | 정상 | 〃 | 1 | ✅ |
+| REQ-10-06 | `WeightService` 진입 | 남의 펫 → `PET_FORBIDDEN` (가드 위임) | 예외 | Phase 1 완료 기준 — "남의 펫 403" | 1 | ✅ |
+| REQ-10-07 | 〃 | 삭제된 펫 → `PET_NOT_FOUND` | 예외 | Phase 1 완료 기준 — "삭제된 펫 404" | 1 | ✅ |
+| REQ-10-08 | 기록 조회 | 다른 펫에 속한 기록 id → `RESOURCE_NOT_FOUND` | 예외 | D6 — "`findByIdAndPetId(id, petId)`" · 제약·함정 — "기록 조회에 `pet_id` 를 함께 걸지 않으면 남의 기록이 보인다" | 1 | ✅ |
+| REQ-10-09 | `WeightService` | `PetRepository` · `Pet` 을 참조하지 않는다 | 불변식 | D5 — "`PetRepository`·`Pet` 은 참조하지 않는다" | 1 | ✅ |
+| REQ-10-10 | 목록 | 같은 `measured_at` 여러 건이 페이지 경계에 걸려도 누락·중복 없음 | 회귀 | D8 — "`id` desc 타이브레이크" · 제약·함정 — "같은 날짜 여러 건에서 누락·중복" | 1 | ✅ |
+| REQ-10-11 | 목록 응답 | `items` · `next_cursor` · `has_next` 키 (snake_case) | 불변식 | 범위—포함 — "`{items, next_cursor, has_next}` 다(= `CursorPage`)" | 1 | ✅ |
+| REQ-10-12 | `POST /weight` | `weight_g` 0 → 400 | 경계 | 원본 Validation — "`weight_g` 필수 (양의 정수)" | 1 | ✅ |
+| REQ-10-13 | 〃 | `weight_g` 누락 → 400 | 경계 | 〃 | 1 | ✅ |
+| REQ-10-14 | 〃 | `measured_at` 누락 → 400 | 경계 | 원본 Validation — "`measured_at` 필수" | 1 | ✅ |
+| REQ-10-15 | PATCH 요청 DTO | `@NotNull` · `@NotBlank` 가 없다 | 회귀 | 제약·함정 — "PATCH DTO 에 `@NotNull`·`@NotBlank` 금지" | 1 | ✅ |
+| REQ-10-16 | `PATCH /weight/{log_id}` | `memo` 만 보내면 `weight_g` 가 유지된다 | 회귀 | D10 — "병합은 서비스" | 1 | ✅ |
+| REQ-10-17 | 삭제 | 삭제 후 같은 id 조회 → `RESOURCE_NOT_FOUND` (하드 삭제) | 정상 | D7 — "`delete` 는 행 삭제, 204" | 1 | ✅ |
+| REQ-10-18 | 체중 경고 | 첫 기록(직전 없음) → `weight_change_rate` `null` · `is_weight_warning` `false` | 경계 | D3 — "첫 기록 `null`" · "첫 기록 `false`" | 1 | ✅ |
+| REQ-10-19 | 〃 | 직전 50g → 60g (정확히 +20%) → `20.0` · `true` | 경계 | D3 — "`\|변화율\| >= 20` → `true`" | 1 | ✅ |
+| REQ-10-20 | 〃 | 직전 50g → 59g (+18%) → `18.0` · `false` | 경계 | 〃 | 1 | ✅ |
+| REQ-10-21 | 〃 | 직전 = `measured_at` desc, `id` desc 정렬의 바로 다음 1건 (그 다음 건이 아니다) | 정상 | D3 — "직전 = `measured_at` desc, `id` desc 정렬에서 바로 다음 1건" | 1 | ✅ |
+| REQ-10-22 | `GET /weight` | `limit` 미지정 → 서비스가 받는 `CursorRequest.limit()` 이 20 | 경계 | 미결 질문(Phase 1) — "`Query Parameters: cursor / limit (기본 20)`" | 1 | ✅ |
+| REQ-10-23 | `GET /weight` | 해석 불가한 `cursor` → `INVALID_CURSOR` | 예외 | D8 — "`CursorCodec` 으로 opaque" · `CursorCodec.decode` 가 `INVALID_CURSOR` 를 던진다 | 1 | ✅ |
 
-**아래 2건은 계획서 미결이라 케이스를 쓰지 않았다** — 체중 경고 파생 필드(Phase 1 미결 ①) · 목록 `cursor`/`limit` 파라미터(Phase 1 미결 ②). 미결이 닫히면 행을 추가한다.
+> **2026-08-28 추가 — 18~23.** Phase 1 미결 2건(체중 경고 형태 · `cursor`/`limit`)이 닫혀 행을 추가했다. **REQ-10-10 은 DB 없이 검증한다** — 이 레포에 DB 테스트 하네스(H2·Testcontainers)가 없어 "누락·중복 없음"을 실제 페이지 경계에서 재지 못한다. 대신 그 성질의 **필요조건 두 가지**를 고정한다: ⓐ `next_cursor` 페이로드에 마지막 항목의 `id` 가 실린다 ⓑ 다음 페이지 조회가 `measured_at` 과 `id` 를 **둘 다** 저장소에 넘긴다. 실제 경계 동작은 Phase 1 완료 시 로컬 DB 로 한 번 수동 확인한다.
 
 ## 제약·함정
 

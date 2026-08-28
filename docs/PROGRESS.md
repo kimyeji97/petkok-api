@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-28 (REQ-10 Phase 0 — ArchUnit 예외 3건 · 프로브 4건 · PR #35·#36 머지)
+> 최종 갱신: 2026-08-28 (REQ-10 Phase 0 완료 · Phase 1 weight 코드 완료 · 미결 2건 확정 · PR #35~#37 머지)
 
 ## 요구사항 인덱스
 
@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0 완료 2026-08-28 · Phase 1 미결 2건) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0 완료 · Phase 1 코드 완료 2026-08-28, 로컬 DB 확인 후 체크) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -57,7 +57,19 @@ REQ-10-01~03 은 계획서대로 심었다 지웠다(가드 주입 PASS · `PetR
 - 브랜치는 `origin/main` 에서 분기했다 — 어제 docs 브랜치 위에 스택하면 AGENTS §4 의 base 함정을 밟는다. 두 PR 모두 base `main` · SHA 대조 일치 · 머지 후 `origin/main..` 빈 것 확인
 - 이 머신에는 `lefthook` 이 없어 pre-commit 훅이 안 걸린다 — 게이트(spotless · build · checkstyle `-PciStrict` · test 114건)를 직접 돌렸다
 
-**남은 것 (REQ-10)** — Phase 1 착수 전 미결 2건(체중 경고 응답 형태 · 목록 3행 `cursor`/`limit` 절) · `/testgen REQ-10` 으로 Phase 1 케이스 14건 코드화.
+**남은 것 (REQ-10)** — ~~Phase 1 착수 전 미결 2건~~ → 같은 날 오후 아래에서 처리.
+
+### 미결 2건을 Notion 에 먼저 쓰고 Phase 1 을 끝까지 돌렸다 (오후)
+
+체중 경고 형태는 사람이 정했다 — `weight_change_rate`(직전 대비 %, 소수 1자리, 첫 기록 `null`) · `is_weight_warning`(`|변화율| >= 20`, 첫 기록 `false`) · 직전 = `measured_at` desc, `id` desc 의 바로 다음 1건. **원본 행 5개에 먼저 쓰고**(「체중 목록」 파생 필드 절 · 「체중 기록」 201 형태 · 활동/체중/탈피 목록 `Query Parameters`) 레포로 옮겼다(PR #38). 그 뒤 `/testgen` → `/implement` → `/testrun` 을 한 세션에 돌려 weight 4행이 들어갔다(`acde9ab`).
+
+- **"직전"의 정의에서 `id` 타이브레이크가 파생 필드까지 규정한다.** `measured_at` 이 `date` 라 같은 날 2건이면 시각 비교가 불가능하다 — 커서 정렬 키를 그대로 "직전" 정의에 썼다. 목록에서는 정렬상 다음 항목이 곧 직전이라 **추가 조회 없이** 계산되고, 마지막 항목만 `limit+1` 번째 행(있으면) 또는 1건 추가 조회로 갚는다
+- **REQ-10-10(keyset 누락·중복 없음)은 DB 없이 필요조건만 고정했다.** 이 레포에 H2·Testcontainers 가 없다. `next_cursor` 에 `id` 가 실리는 것 + 다음 페이지 조회가 두 키를 다 넘기는 것을 목으로 고정하고, 실제 경계는 로컬 DB 수동 확인으로 남겼다. **이 세션 머신에는 `.env` 도 Postgres 도 없어 그 확인을 못 했다** — `@Query` 의 `w.id < :id`(UUID 비교)가 Hibernate 6 HQL 을 통과하는지도 기동해 봐야 안다. `@WebMvcTest` 는 JPA 를 안 띄우므로 32건 초록불이 이걸 보장하지 않는다. Phase 1 체크를 켜지 않은 이유
+- **`WeightCursor` 는 `business/weight/service` 에 뒀다.** `data/weight/dto` 에 두면 ArchUnit `DTO_NAMING`(`*Request`/`*Response`)에 걸리고, 클라이언트에 노출되는 형태도 아니다(opaque). 다음 도메인도 같은 자리
+- **`/testrun` 의 인용 검사가 브랜치 상태에 속을 수 있다.** 코드 브랜치(`origin/main` 분기)에서 돌리자 인용 4건이 1건(표 행 자체)만 매칭됐다 — 원문은 아직 안 머지된 문서 PR(#38)에 있었다. 스펙 변경이 아니라 **문서 브랜치와 코드 브랜치가 갈라진 것**. 검사는 두 브랜치를 합친 상태에서 읽어야 한다
+- `grep` 이 `ugrep` 별칭이면 `-c` 가 빈 출력을 낸다 — 세는 건 `| wc -l` 로. 0건이 아니라 **빈 문자열**로 나와 "0건"으로 오독하기 쉽다
+
+**남은 것 (REQ-10)** — 로컬 DB 확인 2건(→ Phase 1 체크) · Phase 2 착수 전 미결 1건(게코가 `distance_km` 를 보내면).
 
 ## 2026-08-27
 
