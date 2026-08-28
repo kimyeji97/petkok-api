@@ -1,6 +1,6 @@
 # PLAN-REQ-16 · 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 = KST 고정)
 
-> 출처: 2026-08-28 세션 (REQ-10 Phase 2 머지 직후) · 작성: 2026-08-28 · 상태: 📝 초안
+> 출처: 2026-08-28 세션 (REQ-10 Phase 2 머지 직후) · 작성: 2026-08-28 · 상태: 🟡 진행 (Phase 0 완료)
 
 ## 배경
 
@@ -39,7 +39,7 @@
 | 항목 | 결정 | 근거 | 기각한 안 |
 |---|---|---|---|
 | **D1** 저장 형식 | **`timestamptz`** — 순간(instant)을 저장하고, 노출·계산에서 KST 로 변환 | → [ADR-0002](../adr/ADR-0002-time-handling-timestamptz.md) | ↑ |
-| **D2** 엔티티 시각 타입 | **미결 ①** — `OffsetDateTime` / `Instant` / `ZonedDateTime` 중 프로브로 정한다 | 셋 다 `timestamptz` 에 매핑되지만 **Jackson 출력 형태와 `hibernate.jdbc.time_zone` 의 상호작용이 다르다.** 추측으로 고르면 Phase 2 에서 되돌아온다 | — |
+| **D2** 엔티티 시각 타입 | **`OffsetDateTime`** (2026-08-28 Phase 0 프로브로 확정) | `Instant` 는 네 설정 전부 `Z` 로 나가 D3 과 충돌해 탈락. `OffsetDateTime`·`ZonedDateTime` 은 거동·변경량이 같아 측정으로 못 가른다 — `timestamptz` 가 **오프셋만 보존하고 zone id 는 잃으므로** 후자는 저장되지 않는 정보를 담는 척한다 | **`Instant`** — Jackson 이 항상 `Z` 로 낸다(실측). **`ZonedDateTime`** — 위 이유 |
 | **D3** 응답 오프셋 표기 | **`+09:00`** (`2026-06-30T18:00:00+09:00`). `Z` 로 내보내지 않는다 | "KST 고정" 결정과 응답이 일치해야 한다 — 클라이언트가 오프셋을 그대로 렌더할 수 있다. 원본 예시의 `Z` 는 **역반영 대상**(같은 순간의 다른 표기라 계약 위반은 아니다) | **`Z` 유지** — 저장 형식이 UTC 라는 내부 사정을 API 계약에 노출한다. 클라이언트가 KST 변환을 각자 구현하게 되어 목록 소비자마다 갈린다 |
 | **D4** 달력 판정 기준 | **`Asia/Seoul` 고정.** "오늘"·"당일"·"미래"·"일수"는 전부 KST 자정 경계 | 사용자가 전원 국내라는 전제(D1 과 같은 근거). `date` 컬럼은 타임존이 없으므로 **비교하는 쪽이 기준을 정해야** 한다 | **UTC 자정** — 한국 사용자에게 오전 9시 전 기록이 "어제"가 된다. **시스템 기본 TZ** — 컨테이너에 `TZ` 를 안 넣으면 조용히 UTC 가 된다(아래 D5 와 같은 이유) |
 | **D5** `now` 획득 | **`Clock` 빈 주입** (`Clock.system(ZoneId.of("Asia/Seoul"))` 또는 UTC — D2 와 함께 정한다). `LocalDateTime.now()` 직접 호출을 없앤다 | `LocalDateTime.now()` 는 **JVM 기본 TZ 에 암묵 의존**한다 — 배포 환경에 `TZ` 가 없으면 값이 9시간 어긋난 채 에러 없이 저장된다. 이 프로젝트가 반복해서 밟은 "조용한 실패"와 같은 얼굴(`.env` 빈 값 · `db.schema` 한쪽만 배선). 부수 이득으로 **테스트에서 시각을 고정**할 수 있다 | **`ZoneId` 상수만 두고 `now()` 유지** — 상수를 쓰는 것을 강제할 방법이 없어 새 코드가 그냥 `now()` 를 부른다 |
@@ -51,17 +51,21 @@
 
 > ⚠️ 아래는 대화에서 답이 나오지 않았거나 **실측 없이는 고를 수 없는** 것들이다. Phase 0 프로브가 ①②③을 닫는다.
 
-- [ ] **① 엔티티 시각 타입 (D2)** — `OffsetDateTime` vs `Instant` vs `ZonedDateTime`. 판정 기준: ⓐ `timestamptz` 읽기/쓰기가 정확한가 ⓑ Jackson 이 `+09:00` 으로 내보낼 수 있는가 ⓒ 기존 코드 변경량. **`Instant` 는 Jackson 기본이 항상 `Z` 라 D3 과 충돌할 수 있다** — 프로브에서 확인할 것
-- [ ] **② `hibernate.jdbc.time_zone: UTC` 를 유지하는가** — `timestamp` 시절엔 "앱이 UTC 로 쓴다"는 뜻이었지만 `timestamptz` 에서는 의미가 달라진다. 남겨야 하는지, 지워야 하는지, 지우면 무엇이 바뀌는지 실측 필요
-- [ ] **③ Jackson 이 KST 오프셋을 내는 정확한 설정** — `ObjectMapper.setTimeZone` · `WRITE_DATES_AS_TIMESTAMPS` · `ADJUST_DATES_TO_CONTEXT_TIME_ZONE` 의 조합. **추측하지 말고 실제 응답 문자열로 확인한다** (REQ-15 의 "`@Import` 를 빼면 조용히 틀린 계약을 고정한다"와 같은 자리)
+- [x] **① 엔티티 시각 타입 (D2)** → **`OffsetDateTime`.** `Instant` 는 네 설정 전부 `Z`(실측) 라 탈락. 나머지 둘은 동률이라 "저장되지 않는 정보를 담지 않는다"로 갈랐다.
+      원래 질문: — `OffsetDateTime` vs `Instant` vs `ZonedDateTime`. 판정 기준: ⓐ `timestamptz` 읽기/쓰기가 정확한가 ⓑ Jackson 이 `+09:00` 으로 내보낼 수 있는가 ⓒ 기존 코드 변경량. **`Instant` 는 Jackson 기본이 항상 `Z` 라 D3 과 충돌할 수 있다** — 프로브에서 확인할 것
+- [x] **② `hibernate.jdbc.time_zone: UTC` 를 유지하는가** → **유지한다.** `timestamptz` 3컬럼은 `UTC`/`Asia/Seoul` 에서 결과가 **완전히 같다**(무영향). 유일하게 작동하는 곳은 `timestamp`+`LocalDateTime` 쌍(`UTC` → `09:00` / `Asia/Seoul` → `18:00` 저장)이고, 지우면 훗날 `timestamp` 컬럼이 다시 생겼을 때 JVM 기본 TZ 의존이 살아난다. **주석의 근거만 교체한다** — "앱이 UTC 로 쓴다" → "남을지 모를 `timestamp` 컬럼을 JVM TZ 에서 떼어 놓는 안전망".
+      원래 질문: — `timestamp` 시절엔 "앱이 UTC 로 쓴다"는 뜻이었지만 `timestamptz` 에서는 의미가 달라진다. 남겨야 하는지, 지워야 하는지, 지우면 무엇이 바뀌는지 실측 필요
+- [x] **③ Jackson 이 KST 오프셋을 내는 정확한 설정** → **`ObjectMapper.setTimeZone(Asia/Seoul)` 한 줄.** `WRITE_DATES_AS_TIMESTAMPS`·`ADJUST_DATES_TO_CONTEXT_TIME_ZONE` 은 손댈 필요 없고, `WRITE_DATES_WITH_CONTEXT_TIME_ZONE` 은 **켜 둬야 한다**(끄면 `Z` 로 돌아간다). `ObjectMapper` 의 TZ 는 `UTC`·`hasExplicitTimeZone=false` 라 **JVM 기본 TZ 를 따라가지 않는다**.
+      원래 질문: — `ObjectMapper.setTimeZone` · `WRITE_DATES_AS_TIMESTAMPS` · `ADJUST_DATES_TO_CONTEXT_TIME_ZONE` 의 조합. **추측하지 말고 실제 응답 문자열로 확인한다** (REQ-15 의 "`@Import` 를 빼면 조용히 틀린 계약을 고정한다"와 같은 자리)
 - [ ] **④ Notion 역반영의 범위** — `API I/F` 시각 예시가 `…Z` 로 적힌 행이 몇 개인지 세지 않았다. 「소스 구조」 §6 에 시각 규약 절이 없어 신설이 필요한지도 미확인
-- [ ] **⑤ 로컬 DB 없이 어디까지 검증되는가** — 이 세션 머신에는 `.env` 도 Postgres 도 없다. REQ-10 Phase 1·2 의 확인 2건도 같은 이유로 밀려 있다. **`ddl-auto: validate` 통과와 마이그레이션 실행은 DB 없이 확인할 수 없다** — Phase 1 완료 기준이 여기에 걸린다
+- [x] **⑤ 로컬 DB 없이 어디까지 검증되는가** → **전제가 깨졌다.** 2026-08-28 이 머신에 Docker 로 Postgres 17 을 세웠다(`CLAUDE.local.md`). Phase 1 판정 가능. 다만 **`./gradlew test` 는 여전히 DB 를 쓰지 않는다**(Testcontainers 미도입) — DB 왕복은 수동 확인이다.
+      원래 질문: — 이 세션 머신에는 `.env` 도 Postgres 도 없다. REQ-10 Phase 1·2 의 확인 2건도 같은 이유로 밀려 있다. **`ddl-auto: validate` 통과와 마이그레이션 실행은 DB 없이 확인할 수 없다** — Phase 1 완료 기준이 여기에 걸린다
 
 ## 작업 단계
 
 > Phase 1 개 = 커밋 1 개. **Phase 0 을 건너뛰지 않는다** — ①②③이 안 닫힌 채 Phase 1 을 시작하면 엔티티 타입을 두 번 바꾸게 된다.
 
-- [ ] **Phase 0 — 프로브 (엔티티 타입 · Jackson 설정 확정)**
+- [x] **Phase 0 — 프로브 (엔티티 타입 · Jackson 설정 확정)** — 완료 2026-08-28. 프로브 코드·`req16_probe` 스키마 삭제됨. **코드 변경 0건이라 커밋 없음** (결과는 PROGRESS 2026-08-28)
       `timestamptz` 컬럼 하나를 만든 임시 테이블에 세 타입(`OffsetDateTime`·`Instant`·`ZonedDateTime`)을 각각 매핑해 왕복시키고, `@WebMvcTest` 로 **응답 문자열**을 눈으로 확인한다. `hibernate.jdbc.time_zone` 을 켠 상태·끈 상태 둘 다.
       완료 기준: 미결 ①②③이 **실측값과 함께** 닫힘 · 고른 타입으로 `2026-06-30T18:00:00+09:00` 이 실제로 출력되는 것을 확인 · 프로브 코드는 삭제(REQ-10 Phase 0 과 같은 방식, 결과는 커밋 본문에)
 
@@ -80,6 +84,42 @@
 - [ ] **Phase 4 — 문서 역반영**
       Notion 「소스 구조」 시각 규약 절 · `API I/F` 의 `…Z` 예시 · `CLAUDE.md` 계약 승격(신규 시각 컬럼은 `timestamptz`).
       완료 기준: 미결 ④ 가 닫힘 · 원본과 코드가 어긋나는 곳 0건
+
+## 검증 계약
+
+> 작성: 2026-08-28 · 근거: 이 계획서 (원본은 Notion 「소스 구조」 · `API I/F`) · 검증: `/testrun REQ-16`
+> `결과` 열은 `/checkpoint`가 채운다. 케이스 ID는 테스트명에 `[REQ-16-01]` 형태로 박는다.
+> **Phase 0 의 01~03 은 프로브다** — 세 후보 타입을 심었다 지우는 확인이라 영구 테스트로 남지 않는다. `/implement REQ-16 0` 이 실행하고 결과를 커밋 본문에 남기며, `결과` 열은 `REQ-10-01` 처럼 `✅ 수동` 으로 채운다.
+> ⚠️ **테스트 코드는 이번에 쓰지 않았다 — 표만 넣는다.** 미결 ①(엔티티 시각 타입)이 안 닫혀 **단언할 타입이 없고**, Java 는 대상 타입이 없으면 테스트 소스 전체가 컴파일되지 않는다(REQ-08·09·10 실측). 04 이후의 코드는 **각 Phase 착수 직전 `/testgen` 재호출**로 쓴다. 지금 쓰면 `main` 이 빨간불이 되어 REQ-10 작업까지 막힌다.
+> **`message` 를 단언하지 않는다** — `status` 와 `error.code` 만 본다(AGENTS §6).
+
+| ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
+|----|------|--------|:--:|------|:--:|:--:|
+| REQ-16-01 | Jackson 직렬화 | `OffsetDateTime` · `Instant` · `ZonedDateTime` 중 어느 것이 `+09:00` 을 내는가 (DB 불필요) | 프로브 | Phase 0 완료 기준 — "고른 타입으로 `2026-06-30T18:00:00+09:00` 이 실제로 출력되는 것을 확인" | 0 | ✅ 수동 |
+| REQ-16-02 | Hibernate 왕복 | 고른 타입으로 `timestamptz` 컬럼에 쓰고 읽었을 때 순간이 보존된다 (DB 필요) | 프로브 | 미결 ① — "ⓐ `timestamptz` 읽기/쓰기가 정확한가" | 0 | ✅ 수동 |
+| REQ-16-03 | `hibernate.jdbc.time_zone` | 켠 상태와 끈 상태의 저장·조회 결과 차이 (DB 필요) | 프로브 | 미결 ② — "남겨야 하는지, 지워야 하는지, 지우면 무엇이 바뀌는지 실측 필요" | 0 | ✅ 수동 |
+| REQ-16-04 | `V3__time_to_timestamptz.sql` | `timestamptz` 로 바꾸는 컬럼이 **19개**다 (빠뜨린 컬럼 없음) | 회귀 | 범위—포함 — "`timestamp` 19개 → `timestamptz`" | 1 | — |
+| REQ-16-05 | 〃 | 모든 타입 변환에 `USING ... AT TIME ZONE 'UTC'` 가 붙어 있다 | 회귀 | D6 — "`USING <col> AT TIME ZONE 'UTC'`" · 기각안 — "Postgres 가 세션 TZ 로 해석해 배포 환경에 따라 결과가 달라진다" | 1 | — |
+| REQ-16-06 | 엔티티 6필드 | 시각 필드에 `LocalDateTime` 이 남아 있지 않다 (타입 무관 단언) | 불변식 | 범위—포함 — "(6개 필드, `LocalDateTime` → D2 가 정하는 타입)" | 1 | — |
+| REQ-16-07 | 날짜 필드 5개 | `measuredAt` · `entryDate` · `shedDate` · `birthday` · `adoptionDate` 는 여전히 `LocalDate` 다 | 불변식 | 범위—제외 — "날짜만 있는 값이라 타임존 개념이 없다. 타입을 바꾸지 않는다" | 1 | — |
+| REQ-16-08 | 응답 (HTTP 왕복) | 시각 필드가 `+09:00` 오프셋을 달고 나간다 | 정상 | Phase 2 완료 기준 — "응답 시각이 전부 `+09:00` 표기" | 2 | — |
+| REQ-16-09 | 요청 (HTTP 왕복) | `...Z` 로 온 값과 `...+09:00` 으로 온 같은 순간이 동일하게 저장된다 | 회귀 | Phase 2 완료 기준 — "`Z` 로 온 요청과 `+09:00` 으로 온 요청이" | 2 | — |
+| REQ-16-10 | ArchUnit | `LocalDateTime.now()` 를 직접 호출하는 클래스가 없다 | 불변식 | Phase 3 완료 기준 — "`LocalDateTime.now()` 직접 호출이 `business`·`framework` 에 0건" | 3 | — |
+| REQ-16-11 | `ZoneId` 상수 | `framework/constant` 에 있고 값이 `Asia/Seoul` 이다 | 불변식 | 범위—포함 — "`ZoneId` 상수를 `framework/constant` 에 한 곳" | 3 | — |
+| REQ-16-12 | `AuthService` 만료 판정 | 고정 `Clock` 을 주입하면 실행 시각과 무관하게 만료 경계가 재현된다 | 회귀 | Phase 3 완료 기준 — "고정 `Clock` 으로 refresh 만료 경계 테스트가 시각에 의존하지 않고 통과" | 3 | — |
+
+> **결과 갱신: 2026-08-28 — 01~03 `✅ 수동` (Phase 0).** 프로브 3건 실행 · 실패 0 · 코드와 `req16_probe` 스키마는 삭제. 실측값은 PROGRESS 2026-08-28.
+>
+> ⚠️ **REQ-16-03 은 케이스 문구대로 재지 못했다 — 이탈.** 표는 "켠 상태와 **끈 상태**"라고 적었지만 실제로는 `UTC` vs `Asia/Seoul` 두 값으로 대조했다. Spring 에서 이 프로퍼티를 **깨끗하게 "없음"으로 만들 방법이 없어서다**(`=` 빈 값을 주면 Hibernate 가 `GMT` 로 읽어 "끈 상태"가 아니다). 두 값이 `timestamptz` 에서 **완전히 같은 결과**를 냈으므로 "무영향"이라는 ② 의 답은 그대로 성립하지만, **진짜 미설정 상태는 재지 않았다.** 되돌아올 여지가 있으면 여기다.
+>
+> ⚠️ **01 은 첫 시도가 무효였다.** 입력값에 이미 `+09:00` 을 달아 두어 **네 설정이 전부 같은 답**을 냈고, 그대로 읽었으면 "설정 불필요"라는 정반대 결론이 나왔다. 실제 응답 경로는 **DB 에서 읽은 `Z`** 다. 대조군(`America/New_York` → `-04:00`)까지 넣어 설정이 실제로 작동하는 것을 확인한 뒤에야 갈렸다.
+
+**아래 2건은 근거가 없어 케이스를 쓰지 않았다** — 미결이 닫히면 행을 추가한다.
+
+- **오프셋 없는 요청 값의 동작** (Phase 2 완료 기준이 "케이스로 고정됨"이라고만 말한다) — 거부인지 KST 해석인지가 **미결 ①③과 함께 Phase 0 에서 정해진다.** 지금 쓰면 그 결정을 테스트가 먼저 확정해 버린다
+- **`Clock` 빈의 zone** (D5 가 "`Asia/Seoul` 또는 UTC — D2 와 함께 정한다"로 열어 두었다). 또한 Phase 3 완료 기준의 "KST 자정 전후 판정이 케이스로 고정됨"은 **이 REQ 의 범위보다 넓다** — 판정 로직(당일·미래·일수)은 REQ-10 Phase 3 이후에 들어온다. **여기서는 상수·`Clock` 까지만 고정하고, 자정 경계 케이스는 REQ-10 이 가져간다**
+
+**Phase 4(문서 역반영)에는 케이스가 없다** — Notion·`CLAUDE.md` 편집이라 테스트로 고정할 대상이 아니다. 완료 판정은 미결 ④ 를 닫는 것으로 한다.
 
 ## 제약·함정
 

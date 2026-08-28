@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · 시각 처리를 REQ-16 으로 분리 + ADR-0002)
+> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · REQ-16 분리 + ADR-0002 · 로컬 Postgres 구성 · REQ-16 Phase 0 프로브 완료)
 
 ## 요구사항 인덱스
 
@@ -21,11 +21,11 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0~2 완료 2026-08-28 · **Phase 3 이후는 REQ-16 뒤** · 로컬 DB 확인 2건) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0~2 완료 2026-08-28 · **Phase 3 이후는 REQ-16 뒤** · 로컬 DB 확인 **1건 남음** — JPQL 기동은 닫힘) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
-| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (계획 수립 2026-08-28 · Phase 0~4 미착수) |
+| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0 완료 2026-08-28** — 미결 ①②③⑤ 닫힘 · Phase 1~4 미착수) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -117,6 +117,58 @@ Phase 2 에서 올린 "응답 시각 `Z`" 미결이 framework 전역 결정으�
 > **원본 자기모순 1건을 찾았다.** 거식 스트릭 응답 예시가 `current_streak_days: 5` 인데 `level: "DANGER"` 다. 같은 행의 규칙은 `DANGER (7일+)` 이므로 5일이면 `CAUTION` 이어야 한다. 예시를 고치거나 일수를 8 로 바꿔야 하고, **어느 쪽이든 사람이 정할 일**이라 역반영 목록에 올렸다.
 
 **남은 것 (REQ-10)** — 로컬 DB 확인 2건(→ Phase 1·2 체크) · Notion 역반영 4건(Phase 3 결정) + 스트릭 예시 모순 · Phase 3 이후는 **REQ-16 완료 뒤**.
+
+### 로컬 Postgres 를 이 머신에 세웠다 — 미뤄 둔 확인 2건 중 1건이 닫혔다
+
+Docker 로 `postgres:17`(실제 17.11, 운영 Supabase 와 메이저 일치)을 포트 **5433** 에 띄우고 컨테이너 TZ 를 UTC 로 고정했다(Supabase 세션 TZ 와 같은 조건 — REQ-16 프로브의 전제다). Flyway 가 V1·V2 를 `petkok_local` 에 적용해 테이블 11개가 생겼다. 접속 정보와 함정은 `CLAUDE.local.md`(gitignore 대상, 새로 만들면서 `.gitignore` 에 먼저 추가했다 — 무시 대상이 **아니었다**)에 적었다. **비밀번호는 `.env` 한 곳에만 둔다.**
+
+이걸로 REQ-10 Phase 1·2 의 보류 2건 중 **① `@Query` JPQL 기동 검증이 닫혔다.** 다만 "기동 성공 = JPQL 검증됨"은 추정이라 **일부러 깨서 확인**했다 — `w.measuredAt` → `w.measuredAtXX` 로 바꾸자 `UnknownPathException: Could not resolve attribute` 로 **기동 자체가 막혔다.** 즉 초록 기동은 실제 파싱 통과다. ② keyset 경계 수동 확인은 인증 토큰·펫 생성이 선행이라 아직 남아 있다.
+
+> ⚠️ **`./gradlew test` 는 여전히 DB 를 쓰지 않는다.** Testcontainers 가 없어 keyset 경계 같은 것은 수동 확인이다. **DB 가 생겼다고 테스트 커버리지가 넓어진 것이 아니다.**
+
+### `.env.example` 을 그대로 `cp` 하면 기동이 막혔다 — 파일 자신이 경고하는 함정을 본문이 밟고 있었다
+
+`R2_ENDPOINT=` 같은 **빈 값**이 환경변수로 들어가 `application.yml` 의 더미 기본값을 무력화했고 `endpointOverride must not be null` 로 죽었다. `.env.example` 헤더에 "`KEY=`(빈 값)은 미설정이 아니다"라고 **이미 적혀 있는데** 본문 6줄이 그 형태였다(`ff24bfc`). 기본값이 있는 6개를 `#` 로 막고, **고친 템플릿을 다시 `cp` 해 `DB_PASSWORD` 한 줄만 채우고 기동되는 것까지 확인**했다. `DB_PASSWORD` 만 빈 값으로 남긴다 — 어디에도 기본값이 없어 어느 형태든 실패이고 "채워야 할 칸"으로 보이는 편이 낫다. 그 판단 근거를 파일 안에 적었다.
+
+> 헤더의 실행 안내(`set -a && . ./.env`, IntelliJ, direnv)는 **낡았다.** `application.yml` 에 `spring.config.import: optional:file:.env[.properties]` 가 있어 `./gradlew bootRun` 만으로 읽힌다(오늘 두 번 기동해 확인). `CLAUDE.md` 로컬 검증 절도 같은 낡은 명령을 담고 있다 — **다음 세션에서 고칠 것.**
+
+### REQ-16 Phase 0 — 미결 ①②③ 을 실측으로 닫았다
+
+프로브 3건을 `req16_probe` 스키마(**Flyway 소유 밖** — `petkok_local` 에 수동 DDL 을 치면 AGENTS §5 를 어긴다)에 임시 표를 만들어 돌리고, 끝나고 코드·스키마를 지웠다.
+
+| 미결 | 실측 결과 | 결정 |
+|---|---|---|
+| ① 엔티티 시각 타입 | `Instant` 는 **네 설정 전부 `Z`** 로 나가 D3(`+09:00`)와 충돌 → 탈락. `OffsetDateTime`·`ZonedDateTime` 은 거동·변경량이 **완전히 같다** | **`OffsetDateTime`** — `timestamptz` 는 오프셋만 보존하고 zone id 는 잃는다. `ZonedDateTime` 은 저장되지 않는 정보를 담는 척한다 |
+| ② `hibernate.jdbc.time_zone` | `timestamptz` 3컬럼은 `UTC`/`Asia/Seoul` 에서 **결과가 완전히 같다**(무영향). 유일하게 작동하는 곳은 `timestamp`+`LocalDateTime` 쌍 — `UTC` 면 `09:00`, `Asia/Seoul` 이면 `18:00` 저장 | **유지.** 지우면 훗날 누가 `timestamp` 컬럼을 추가했을 때 JVM 기본 TZ 의존이 되살아난다. 주석의 근거만 "앱이 UTC 로 쓴다" → "남을지 모를 `timestamp` 컬럼을 JVM TZ 에서 떼어 놓는 안전망"으로 바꾼다 |
+| ③ Jackson 설정 | `ObjectMapper.setTimeZone(Asia/Seoul)` **한 줄이면 된다.** `WRITE_DATES_AS_TIMESTAMPS`·`ADJUST_DATES_TO_CONTEXT_TIME_ZONE` 은 손댈 필요 없고, `WRITE_DATES_WITH_CONTEXT_TIME_ZONE` 은 **켜 둬야 한다**(끄면 `Z` 로 돌아간다) | 그대로 Phase 2 에서 적용 |
+
+> ⚠️ **③ 은 케이스 문구대로 재지 못했다.** 계획서는 `hibernate.jdbc.time_zone` 을 "켠 상태와 **끈 상태**"로 대조하라고 했는데, Spring 에서 이 프로퍼티를 깨끗하게 "없음"으로 만들 방법이 없어(`=` 빈 값은 Hibernate 가 `GMT` 로 읽는다) `UTC` vs `Asia/Seoul` 두 값으로 갈음했다. `timestamptz` 에서 **결과가 완전히 같다**는 답은 그대로 성립하지만 **진짜 미설정 상태는 재지 않았다.**
+
+부수로 **D6 의 전제가 실측으로 확인됐다** — KST 벽시계 `18:00` 을 넣으면 현행 설정에서 `09:00`(UTC)이 저장된다. 앱이 UTC 로 써 왔다는 뜻이고 `USING … AT TIME ZONE 'UTC'` 가 맞다.
+
+또 하나 — `ObjectMapper` 의 TZ 는 `UTC`, `hasExplicitTimeZone = false` 다. **JVM 기본 TZ 를 따라가지 않는다.** 명시하지 않으면 어디서 돌든 `Z`, 명시하면 그 값. 이 프로젝트가 반복해 밟은 "환경에 따라 조용히 갈리는" 형태가 **여기엔 없다.**
+
+### ⭐ 프로브 입력이 결과를 미리 정해 버렸다 — 네 설정이 전부 같은 답을 냈다
+
+첫 프로브는 입력값에 **이미 `+09:00` 을 달아** 두었다. 그러자 네 설정이 모두 `+09:00` 을 냈고, 그대로 읽었으면 **"Jackson 설정이 필요 없다"는 정반대 결론**이 나왔을 것이다. 실제 응답 경로는 그게 아니다 — `timestamptz` 는 원래 오프셋을 저장하지 않아 **DB 에서 읽으면 항상 `Z`** 다. 그 모양으로 다시 재자 ⓐ·ⓒ 는 `Z`, ⓑ 만 `+09:00` 으로 갈렸다.
+
+여기에 대조군으로 `America/New_York` 을 하나 더 넣었다 — `-04:00` 이 나와야 "설정이 실제로 작동한다"가 성립한다. **역프로브 없이는 ⓑ 의 초록불이 우연인지 알 수 없다.** 구조 규칙에 일부러 위반을 심는 것과 같은 자리다.
+
+> 교훈은 "프로브를 돌렸다"가 아니라 **"프로브의 입력이 답을 가르는가"** 를 먼저 봐야 한다는 것이다. 모든 후보가 같은 답을 내면 그건 합의가 아니라 **측정 실패**일 수 있다.
+
+### 조용한 무동작 3건 — 전부 에러 없이 그럴듯한 결과를 냈다
+
+| 무엇이 | 어떻게 보였나 |
+|---|---|
+| `docker exec` 에 `-i` 누락 | heredoc 이 전달되지 않아 **테이블이 안 만들어졌는데** 명령은 성공. 컬럼 확인이 0줄인 것으로 잡았다 |
+| BSD `sed` 의 `0,/re/` 미지원 | GNU 용법이라 **치환이 안 됐고**, 원본 코드가 정상 기동한 것을 "프로브 통과"로 읽을 뻔했다 |
+| `grep -F ""` (빈 패턴) | 주석 처리된 `JWT_SECRET` 을 뽑아 변수가 비었고, 시크릿 유출 검사가 **168건**을 보고했다(실제 0건). 세 번째만 `CLAUDE.md` 계약으로 승격했다(`d872d45`) — 나머지 둘은 머신 종속이라 `CLAUDE.local.md` 에 넣었다 |
+
+### 관찰 — Lombok 이 테스트 소스에 없다
+
+`build.gradle.kts` 에 `compileOnly`/`annotationProcessor` 만 있고 `testCompileOnly`/`testAnnotationProcessor` 가 없다. 프로브 엔티티에 `@Getter` 를 붙였다가 컴파일이 깨져 손으로 접근자를 썼다. **REQ-16 Phase 1·2 에서 시각 타입을 다루는 테스트를 쓸 때 다시 걸린다** — 의존성 추가는 제안·승인 대상이라 손대지 않았다.
+
+**남은 것 (REQ-16)** — Phase 1(`V3` 19컬럼 + 엔티티 6필드) 착수 가능. `D5` 의 `Clock` zone 과 "오프셋 없는 요청 값의 동작"은 아직 미결이다.
 
 ## 2026-08-27
 

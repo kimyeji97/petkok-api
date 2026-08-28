@@ -103,11 +103,11 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
       `DomainBoundaryTest` 에 `ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.business.pet.service.."))` · `data.pet.dto..` · `data.pet.enums..` 추가. REQ-09 프로브에서 검증된 형태.
       완료 기준: 가짜 `business/weight/service` 가 가드를 주입해 통과 · `PetRepository` 직접 주입은 **여전히 FAIL** · `Pet` 엔티티 직접 참조는 **여전히 FAIL** (셋 다 프로브 후 삭제) · ArchUnit 8건 통과 · 「소스 구조」 §13 역반영
 
-- [ ] **Phase 1 — weight (4행)** — 코드·케이스 20건 완료 (2026-08-28, `acde9ab` · `feat/req10-phase1-weight`). **체크 보류: 로컬 DB 확인 2건 남음** — ① `bootRun` 으로 `WeightLogRepository` 의 `@Query`(`w.id < :id` UUID 비교) 기동 검증 ② 같은 `measured_at` 3건 · `limit=2` 로 페이지 경계 누락·중복 실측
+- [ ] **Phase 1 — weight (4행)** — 코드·케이스 20건 완료 (2026-08-28, `acde9ab` · `feat/req10-phase1-weight`). **체크 보류: 로컬 DB 확인 1건 남음** — ~~① `bootRun` 으로 `@Query` 기동 검증~~ **2026-08-28 닫힘** (Docker Postgres 17 구성 후 기동 성공. `w.measuredAt` → `w.measuredAtXX` 로 일부러 깨자 `UnknownPathException` 으로 기동이 막히는 것까지 확인해 "초록 기동 = 실제 파싱 통과"를 성립시켰다) · ② 같은 `measured_at` 3건 · `limit=2` 로 페이지 경계 누락·중복 실측 — **인증 토큰·펫 생성이 선행이라 아직 남음**
       `WeightLog` 엔티티(`BaseCreatedEntity`) · `WeightLogRepository`(`findByIdAndPetId` · keyset 목록) · `WeightService`(가드 소비, D6, 파생 필드 D3) · `WeightController`. **여기서 확정되는 것**: 가드 소비 코드 모양 · 커서 페이로드 형태 · D6 404 · 목록 응답 = `CursorPage`.
       완료 기준: 4행이 원본 상태코드(201/200/200/204)대로 · 남의 펫 403 · 삭제된 펫 404 · 남의 기록 id 404(D6) · 목록 `has_next`/`next_cursor` 가 keyset 으로 동작(같은 `measured_at` 여러 건에서 누락·중복 없음) · `weight_g` 0 이하 400 · 체중 경고 필드가 미결 답대로 · ArchUnit 통과
 
-- [ ] **Phase 2 — activity (4행)** — 코드·케이스 19건 완료 (2026-08-28, `47cf630`). **체크 보류: Phase 1 과 같은 로컬 DB 확인 2건**(`@Query` 기동 · keyset 경계) — Phase 1 확인 시 같이 본다
+- [ ] **Phase 2 — activity (4행)** — 코드·케이스 19건 완료 (2026-08-28, `47cf630`). **체크 보류: Phase 1 과 같은 로컬 DB 확인 1건**(keyset 경계) — `@Query` 기동은 2026-08-28 닫혔다(Phase 1 참조) · keyset 경계는 Phase 1 확인 시 같이 본다
       Phase 1 형태 복제 + `ActivityType` enum + 종별 검증(`INVALID_SPECIES_ACTIVITY`).
       완료 기준: 게코가 `WALK` → 400 `INVALID_SPECIES_ACTIVITY` · 개가 `HANDLING` → 400 · 개가 `WALK` → 201 · 게코가 `HANDLING` → 201 · PATCH 로 `activity_type` 을 바꿔도 종 검증이 다시 걸린다 · 나머지는 Phase 1 과 동일 기준
 
