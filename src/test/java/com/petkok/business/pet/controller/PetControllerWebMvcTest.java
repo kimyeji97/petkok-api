@@ -19,7 +19,7 @@ import com.petkok.framework.security.AuthPrincipal;
 import com.petkok.framework.security.UserStatusChecker;
 import com.petkok.framework.security.jwt.JwtTokenProvider;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -80,7 +80,7 @@ class PetControllerWebMvcTest {
                 LocalDate.of(2023, 3, 15),
                 null,
                 null,
-                LocalDateTime.now()));
+                OffsetDateTime.now()));
 
     mockMvc
         .perform(
@@ -145,7 +145,7 @@ class PetControllerWebMvcTest {
                 LocalDate.of(2023, 3, 15),
                 LocalDate.of(2023, 5, 1),
                 "https://img.example.com/a.png",
-                LocalDateTime.now()));
+                OffsetDateTime.now()));
 
     mockMvc
         .perform(MockMvcRequestBuilders.get("/api/v1/pets/" + PET_ID).with(asUser()))
@@ -158,7 +158,7 @@ class PetControllerWebMvcTest {
     when(petService.findOne(any(), any()))
         .thenReturn(
             new PetResponse(
-                PET_ID, "두부", Species.DOG, null, null, null, null, null, LocalDateTime.now()));
+                PET_ID, "두부", Species.DOG, null, null, null, null, null, OffsetDateTime.now()));
 
     mockMvc
         .perform(MockMvcRequestBuilders.get("/api/v1/pets/" + PET_ID).with(asUser()))

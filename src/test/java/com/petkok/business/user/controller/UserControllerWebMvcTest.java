@@ -16,7 +16,7 @@ import com.petkok.framework.config.JacksonConfig;
 import com.petkok.framework.config.SecurityConfig;
 import com.petkok.framework.security.AuthPrincipal;
 import com.petkok.framework.security.jwt.JwtTokenProvider;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -76,7 +76,7 @@ class UserControllerWebMvcTest {
     when(userService.getMe(any()))
         .thenReturn(
             new UserResponse(
-                USER_ID, "게코집사", null, "https://img.example.com/a.png", LocalDateTime.now()));
+                USER_ID, "게코집사", null, "https://img.example.com/a.png", OffsetDateTime.now()));
   }
 
   @Test
@@ -217,7 +217,7 @@ class UserControllerWebMvcTest {
     // 병합("null = 변경 없음")은 REQ-08-05 가 서비스에서 고정한다. 여기서는 명시적 null 이
     // 다른 값(예: 빈 문자열)으로 변형되지 않고 그대로 도달하는지를 본다.
     when(userService.updateMe(any(), any()))
-        .thenReturn(new UserResponse(USER_ID, "게코집사", null, null, LocalDateTime.now()));
+        .thenReturn(new UserResponse(USER_ID, "게코집사", null, null, OffsetDateTime.now()));
 
     mockMvc
         .perform(

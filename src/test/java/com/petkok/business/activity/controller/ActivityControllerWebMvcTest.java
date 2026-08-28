@@ -17,7 +17,7 @@ import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.security.AuthPrincipal;
 import com.petkok.framework.security.UserStatusChecker;
 import com.petkok.framework.security.jwt.JwtTokenProvider;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -69,8 +69,8 @@ class ActivityControllerWebMvcTest {
                 30,
                 null,
                 null,
-                LocalDateTime.now(),
-                LocalDateTime.now()));
+                OffsetDateTime.now(),
+                OffsetDateTime.now()));
 
     mockMvc
         .perform(

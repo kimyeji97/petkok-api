@@ -1,7 +1,7 @@
 package com.petkok.data.user.dto;
 
 import com.petkok.data.user.entity.User;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -16,4 +16,4 @@ import java.util.UUID;
  * <p>응답 필드는 전역 snake_case 로 나간다({@code profile_image_url}, {@code created_at}).
  */
 public record UserResponse(
-    UUID id, String nickname, String email, String profileImageUrl, LocalDateTime createdAt) {}
+    UUID id, String nickname, String email, String profileImageUrl, OffsetDateTime createdAt) {}

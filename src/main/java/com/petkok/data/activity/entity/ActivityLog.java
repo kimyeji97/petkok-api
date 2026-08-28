@@ -10,7 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -50,7 +50,7 @@ public class ActivityLog extends BaseCreatedEntity {
   private String memo;
 
   @Column(name = "logged_at", nullable = false)
-  private LocalDateTime loggedAt;
+  private OffsetDateTime loggedAt;
 
   private ActivityLog(
       UUID petId,
@@ -58,7 +58,7 @@ public class ActivityLog extends BaseCreatedEntity {
       Integer durationMinutes,
       BigDecimal distanceKm,
       String memo,
-      LocalDateTime loggedAt) {
+      OffsetDateTime loggedAt) {
     this.petId = petId;
     this.activityType = activityType;
     this.durationMinutes = durationMinutes;
@@ -73,7 +73,7 @@ public class ActivityLog extends BaseCreatedEntity {
       Integer durationMinutes,
       BigDecimal distanceKm,
       String memo,
-      LocalDateTime loggedAt) {
+      OffsetDateTime loggedAt) {
     return new ActivityLog(petId, activityType, durationMinutes, distanceKm, memo, loggedAt);
   }
 
@@ -83,7 +83,7 @@ public class ActivityLog extends BaseCreatedEntity {
       Integer durationMinutes,
       BigDecimal distanceKm,
       String memo,
-      LocalDateTime loggedAt) {
+      OffsetDateTime loggedAt) {
     this.activityType = activityType;
     this.durationMinutes = durationMinutes;
     this.distanceKm = distanceKm;

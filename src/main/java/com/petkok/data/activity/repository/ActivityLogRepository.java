@@ -1,7 +1,7 @@
 package com.petkok.data.activity.repository;
 
 import com.petkok.data.activity.entity.ActivityLog;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,7 +27,7 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, UUID> 
           + " order by a.loggedAt desc, a.id desc")
   List<ActivityLog> findPageAfter(
       @Param("petId") UUID petId,
-      @Param("loggedAt") LocalDateTime loggedAt,
+      @Param("loggedAt") OffsetDateTime loggedAt,
       @Param("id") UUID id,
       Pageable pageable);
 }

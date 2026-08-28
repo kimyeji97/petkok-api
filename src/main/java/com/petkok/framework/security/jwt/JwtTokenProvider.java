@@ -5,8 +5,8 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.UUID;
 import javax.crypto.SecretKey;
@@ -79,9 +79,8 @@ public class JwtTokenProvider {
    * <p>{@code refresh_tokens.expires_at} 을 이 값으로 채운다. TTL 을 저장 쪽에서 다시 계산하면 JWT 의 {@code exp} 와 어긋날
    * 수 있어, <b>토큰 자신이 들고 있는 값</b>을 그대로 쓴다.
    */
-  public LocalDateTime getExpiresAt(String token) {
-    return LocalDateTime.ofInstant(
-        parse(token).getExpiration().toInstant(), ZoneId.systemDefault());
+  public OffsetDateTime getExpiresAt(String token) {
+    return parse(token).getExpiration().toInstant().atOffset(ZoneOffset.UTC);
   }
 
   public boolean validate(String token) {

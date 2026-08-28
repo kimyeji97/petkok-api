@@ -25,7 +25,8 @@ import com.petkok.framework.pagination.CursorCodec;
 import com.petkok.framework.pagination.CursorPage;
 import com.petkok.framework.pagination.CursorRequest;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,14 +46,15 @@ class ActivityServiceTest {
   private static final UUID LOG_A = UUID.fromString("bbbbbbbb-0000-0000-0000-000000000003");
   private static final UUID LOG_B = UUID.fromString("bbbbbbbb-0000-0000-0000-000000000002");
   private static final UUID LOG_C = UUID.fromString("bbbbbbbb-0000-0000-0000-000000000001");
-  private static final LocalDateTime AT = LocalDateTime.of(2026, 6, 30, 9, 0);
+  private static final OffsetDateTime AT =
+      OffsetDateTime.of(2026, 6, 30, 9, 0, 0, 0, ZoneOffset.UTC);
 
   private final PetAccessGuard guard = mock(PetAccessGuard.class);
   private final ActivityLogRepository repository = mock(ActivityLogRepository.class);
   private final CursorCodec codec = new CursorCodec(new ObjectMapper().findAndRegisterModules());
   private final ActivityService service = new ActivityService(guard, repository, codec);
 
-  private static ActivityLog log(UUID id, ActivityType type, LocalDateTime at) {
+  private static ActivityLog log(UUID id, ActivityType type, OffsetDateTime at) {
     ActivityLog log = ActivityLog.of(PET_ID, type, 30, null, null, at);
     ReflectionTestUtils.setField(log, "id", id);
     return log;

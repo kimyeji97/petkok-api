@@ -4,7 +4,7 @@ import com.petkok.data.activity.enums.ActivityType;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * {@code POST /pets/{pet_id}/activity} 요청. 원본 Validation — "`activity_type` 필수 / `distance_km` 선택 /
@@ -16,4 +16,4 @@ public record ActivityCreateRequest(
     Integer durationMinutes,
     @Digits(integer = 4, fraction = 2) BigDecimal distanceKm,
     String memo,
-    @NotNull LocalDateTime loggedAt) {}
+    @NotNull OffsetDateTime loggedAt) {}

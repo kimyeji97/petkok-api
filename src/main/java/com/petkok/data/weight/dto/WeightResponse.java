@@ -1,7 +1,7 @@
 package com.petkok.data.weight.dto;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -22,4 +22,4 @@ public record WeightResponse(
     String memo,
     Double weightChangeRate,
     boolean isWeightWarning,
-    LocalDateTime createdAt) {}
+    OffsetDateTime createdAt) {}

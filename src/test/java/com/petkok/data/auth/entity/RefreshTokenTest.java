@@ -4,7 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.persistence.Column;
 import java.lang.reflect.Field;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,8 @@ import org.junit.jupiter.api.Test;
  */
 class RefreshTokenTest {
 
-  private static final LocalDateTime REVOKED_AT = LocalDateTime.of(2026, 7, 30, 10, 0);
+  private static final OffsetDateTime REVOKED_AT =
+      OffsetDateTime.of(2026, 7, 30, 10, 0, 0, 0, ZoneOffset.UTC);
 
   private static RefreshToken token() {
     return RefreshToken.of(UUID.randomUUID(), "0".repeat(64), REVOKED_AT.plusDays(14));
