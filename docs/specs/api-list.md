@@ -118,7 +118,7 @@
 
 | Method | Path | 설명 |
 | --- | --- | --- |
-| GET | `/weight` | 목록 (커서, `measured_at` desc) |
+| GET | `/weight` | 목록 (커서, `measured_at` desc · `id` desc) |
 | POST | `/weight` | 기록 |
 | PATCH | `/weight/{log_id}` | 수정 |
 | DELETE | `/weight/{log_id}` | 삭제 |
@@ -126,6 +126,7 @@
 단위는 그램(g)으로 통일한다 (게코 수십g ~ 대형견 수십kg).
 
 > 이전 판에 있던 `GET /weights/chart`(기간별 추이)는 Notion API I/F에 없어 제거했다.
+> **파생 필드 (2026-08-28, Notion 「체중 목록」 행 확정)** — 목록 항목·201 응답에 `weight_change_rate`(직전 대비 %, 소수 1자리, 첫 기록 `null`) · `is_weight_warning`(`|변화율| >= 20`, 첫 기록 `false`). 직전 = `measured_at` desc, `id` desc 정렬의 바로 다음 1건. 저장하지 않고 조회 시 계산.
 
 ## 8. Shed `/api/v1/pets/{pet_id}/shed` 🦎
 
