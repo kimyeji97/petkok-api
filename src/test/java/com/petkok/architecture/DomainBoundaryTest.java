@@ -31,7 +31,8 @@ final class DomainBoundaryTest {
   private DomainBoundaryTest() {}
 
   /**
-   * 예외 4건. <b>전부 "설계상 옳다"로 확정된 것이며 임시 완화가 아니다</b> (2026-07-31 정리, REQ-08 Phase 0).
+   * 예외 4건 + 소유권 앵커 3건. <b>전부 "설계상 옳다"로 확정된 것이며 임시 완화가 아니다</b> (2026-07-31 정리, REQ-08 Phase 0 ·
+   * 2026-08-28 추가, REQ-10 Phase 0).
    *
    * <ul>
    *   <li>{@code data.common} — 베이스 엔티티 등 도메인 공용. 누구나 참조할 수 있다
@@ -39,9 +40,12 @@ final class DomainBoundaryTest {
    *       <b>대상 코드가 아직 0개라 REQ-12 까지는 공허하다</b> — 알고 두는 것과 모르고 두는 것은 다르므로 남긴다
    *   <li>{@code framework} — <b>도메인이 아니다.</b> 아래 참고
    *   <li>{@code business.auth → data.user} — 소셜 자동가입. 아래 참고
+   *   <li>{@code * → business.pet.service · data.pet.dto · data.pet.enums} — {@code PetAccessGuard}
+   *       소비 (PLAN-REQ-09 D3). 하위 도메인이 가드·{@code OwnedPetResponse}·{@code Species} 만 보게 <b>좁게</b>
+   *       연다. 규칙 정의부 주석 참고
    * </ul>
    *
-   * <p><b>REQ-08 은 이 목록을 늘리지 않는다.</b> 탈퇴 시 refresh revoke 를 생략한 것(D5)도, 필터의 활성 검사를 직참조가 아닌 {@code
+   * <p><b>REQ-08 은 이 목록을 늘리지 않았다.</b> 탈퇴 시 refresh revoke 를 생략한 것(D5)도, 필터의 활성 검사를 직참조가 아닌 {@code
    * UserStatusChecker} 포트로 만든 것(D2)도 예외를 늘리지 않기 위한 선택이다. 여기에 5번째 줄이 생기면 그 선택들의 근거가 무너진 것이므로, 추가 전에
    * PLAN-REQ-08 「결정」을 다시 볼 것.
    *
@@ -74,6 +78,16 @@ final class DomainBoundaryTest {
           .ignoreDependency(
               resideInAPackage("com.petkok.business.auth.."),
               resideInAPackage("com.petkok.data.user.."))
+          // ⬇️ 설계 결정 (2026-08-28 추가, PLAN-REQ-09 D3 · PLAN-REQ-10 Phase 0). 소유권 앵커.
+          //    /pets/{petId}/... 하위 도메인(weight·activity·feeding·shed·diary·gallery)은 진입 시
+          //    PetAccessGuard 를 통과해야 하므로 business.pet.service 와, 가드가 돌려주는
+          //    OwnedPetResponse(data.pet.dto)·Species(data.pet.enums) 를 누구나 참조할 수 있다.
+          //    ⚠️ 일부러 좁게 열었다 — data.pet 전체가 아니라 세 패키지만이다. entity·repository 는
+          //    여전히 닫혀 있어 PetRepository 직접 주입(우회)과 Pet 엔티티 누출이 둘 다 위반으로 잡힌다
+          //    (2026-08-10 · 2026-08-28 프로브 실측, REQ-10-01~03). 넓히면 가드를 두는 이유가 사라진다.
+          .ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.business.pet.service.."))
+          .ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.data.pet.dto.."))
+          .ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.data.pet.enums.."))
           .as("도메인 간 참조 금지 (business/{d} 와 data/{d} 는 같은 슬라이스)")
           .allowEmptyShould(false);
 }
