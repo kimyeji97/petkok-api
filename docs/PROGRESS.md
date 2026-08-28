@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · ADR-0002 · 로컬 Postgres 구성 · **REQ-16 Phase 0~2 완료** — timestamptz 전환 · 노출 KST)
+> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · ADR-0002 · 로컬 Postgres 구성 · **REQ-16 Phase 0~2 완료 + 미결 6건 전부 확정**)
 
 ## 요구사항 인덱스
 
@@ -25,7 +25,7 @@
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
-| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0~2 완료 2026-08-28** · Phase 3~4 남음 · 미결 3건) |
+| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0~2 완료 2026-08-28** · Phase 3~4 남음 · **미결 0건**) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -226,6 +226,32 @@ Docker 로 `postgres:17`(실제 17.11, 운영 Supabase 와 메이저 일치)을 
 **`JacksonConfig` 는 전역이라 전건을 돌려야 한다.** `@WebMvcTest` 슬라이스 전부가 이것을 `@Import` 하고 응답 시각 표기가 모든 도메인에서 바뀐다. 깨진 것은 없었는데, 이유는 **시각 값을 단언하는 기존 케이스가 애초에 없어서**다(`created_at` 은 `exists()` 만 본다). 그래서 Phase 2 서술의 "기존 REQ 컨트롤러 테스트 갱신"은 **안 한 게 아니라 할 것이 없었다** — Phase 1 의 기계적 타입 변경으로 이미 끝나 있었다.
 
 > ⚠️ **`Asia/Seoul` 이 지금 두 파일에 하드코딩돼 있다** (`JacksonConfig` · `OffsetDateTimeDeserializer`). Phase 3 의 REQ-16-11 이 `framework/constant` 상수로 합치는 케이스인데, **한 곳만 바꾸면 조용히 갈린다.** 양쪽 javadoc 에 "Phase 3 에서 옮긴다 · 늘리지 말 것"을 적어 두었다.
+
+### REQ-16 미결 6건 정리 — Phase 3 을 막던 것이 풀렸다
+
+**Phase 3 은 지금까지 달성 불가능한 상태였다.** 완료 기준이 "`LocalDateTime.now()` 직접 호출 0건"인데 `framework/util/date/LocalDateTimeUtil` 에 2건이 있었기 때문이다. 이걸 안 풀고 시작했으면 유틸을 뜯어고치거나 케이스를 몰래 약화시키게 된다.
+
+**결정을 바꾼 사실 하나 — 그 유틸은 사용처가 0건이다.** 그래서 문제가 "쓰고 있는 코드를 어떻게 하나"가 아니라 "안 쓰는 코드가 규칙을 막고 있다"로 바뀌었고, 세 안(규칙에서 제외 / 두 메서드 수정 / 파일 삭제) 중 **수정**을 골랐다(D10).
+
+> ⭐ **`framework.util` 을 규칙에서 제외하는 안을 버린 이유가 이 결정의 핵심이다.** 예외를 두면 **우회 경로가 열린 채 남는다** — 누가 `LocalDateTimeUtil.isNowBetween(...)` 을 부르면 그 호출부는 `now()` 를 **직접** 부르지 않으므로 규칙이 못 잡는다. 규칙이 "직접 호출"만 보는 형태라 한 겹 감싸면 통과한다. 파일 삭제는 30개 이식 유틸 중 하나를 "지금 안 쓴다"는 이유로 버리는 것이라 과했다.
+
+**`Clock` 의 zone 은 `Asia/Seoul`.** zone 은 **저장에 영향을 주지 않는다**(순간은 동일). 갈리는 곳은 벽시계 파생 하나뿐인데 — `LocalDate.now(clock)` · `LocalDateTime.now(clock)` — 그게 정확히 D4(달력 판정 = KST)의 자리다. UTC 로 두면 KST 00:00\~09:00 에 "어제"가 **에러 없이** 나온다.
+
+**미결 ⑥(엔티티↔DB 타입 대조)은 계약으로만 남긴다.** `범위 — 제외` 에 이미 *"`timestamptz` 를 쓰지 않는 신규 컬럼 금지 규칙의 자동 강제 — ArchUnit 은 SQL 을 보지 않는다. 계약으로만 남긴다"* 가 있었다. **뿌리가 같은 결정**이라 따로 정할 것이 아니었다 — SQL 과 코드를 맞대볼 수단이 없다는 하나의 사실이 두 얼굴로 나타난 것이다. Testcontainers 를 도입하면 REQ-10 의 keyset 경계·`@Transactional` 롤백까지 함께 닫히므로 **별건으로 묶어 그때 한꺼번에** 다룬다.
+
+### ⭐ Notion `API I/F` 40행 전수 조사 — "전부 바꾼다"가 틀렸다
+
+미결 ④ 는 정할 성격이 아니라 **셀 성격**이라 40행을 전부 열어 봤다. **시각 예시가 있는 행은 14개**(리터럴 20개)다. 나머지 26행은 시각 예시가 아예 없다 — DELETE 10건, 응답을 "…객체"로만 적은 행, `date` 필드만 쓰는 행.
+
+**여기서 나온 것이 조사의 값이다 — 요청 예시 2행(급여 기록 `fed_at` · 활동 기록 `logged_at`)은 고칠 의무가 없다.** D9 가 `Z`·`+09:00`·오프셋 없음을 **모두 받으므로** 요청의 `Z` 는 여전히 유효하다. D3(응답 `+09:00`)에 걸리는 것은 **응답 12행뿐**이다.
+
+> "`…Z` 를 전부 `+09:00` 으로 바꾼다"고 뭉뚱그렸으면 **계약이 아닌 것을 계약으로 만들 뻔했다.** 세어 보지 않았으면 그 차이가 보이지 않는다 — 미결 ④ 를 "조사"로 분류한 이유가 이것이다.
+
+`date` 필드 7종(`measured_at`·`shed_date`·`entry_date`·`taken_at`·`birthday`·`adoption_date`·`predicted_date`)은 전부 `"2026-06-30"` 형태로 **균일**했다. 손댈 것이 없다.
+
+**「소스 구조」 §6 에 시각 규약 절이 없다** — 신설이 필요하다. 함께 갱신할 곳도 확인했다: §5 표의 `JacksonConfig` 행(지금은 "SNAKE_CASE 전역 적용"만), §2 패키지 트리(`processor/converter/ ⏸ (예정)` 이 실재하게 됐고 `db/migration` 이 `V1·V2` 까지만 적혀 있다). 레포 파생 요약은 `docs/specs/api-list.md` 한 줄뿐이고 `db-schema.md` 는 0건.
+
+**Phase 4 는 이제 목록이 곧 작업 지시서다.** 조사 결과를 계획서 미결 ④ 항목에 그대로 적어 두었다.
 
 ## 2026-08-27
 
