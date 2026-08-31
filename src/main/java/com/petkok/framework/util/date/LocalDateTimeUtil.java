@@ -20,8 +20,6 @@ public class LocalDateTimeUtil {
 
   private LocalDateTimeUtil() {}
 
-  public static final ZoneId ZONE_ASIA_SEOUL = ZoneId.of("Asia/Seoul");
-
   /**
    * 해당 날짜의 Month int 값 반환
    *
@@ -125,7 +123,7 @@ public class LocalDateTimeUtil {
     if (exception != null) {
       throw exception;
     }
-    return LocalDateTime.now();
+    throw new IllegalArgumentException("해석할 패턴이 하나도 주어지지 않았다: value=" + value);
   }
 
   /**
@@ -285,16 +283,5 @@ public class LocalDateTimeUtil {
   public static boolean isBetween(LocalDateTime target, LocalDateTime start, LocalDateTime end) {
     return (start == null || target.isEqual(start) || target.isAfter(start))
         && (end == null || target.isEqual(end) || target.isBefore(end));
-  }
-
-  /**
-   * 오늘이 두날짜 사이에 있는지 확인
-   *
-   * @param start 시작
-   * @param end 끝
-   * @return 사이 여부
-   */
-  public static boolean isNowBetween(LocalDateTime start, LocalDateTime end) {
-    return LocalDateTimeUtil.isBetween(LocalDateTime.now(), start, end);
   }
 }

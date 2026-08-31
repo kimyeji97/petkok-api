@@ -15,12 +15,14 @@ import com.petkok.data.auth.entity.RefreshToken;
 import com.petkok.data.auth.repository.RefreshTokenRepository;
 import com.petkok.data.user.repository.UserRepository;
 import com.petkok.data.user.repository.UserSocialAccountRepository;
+import com.petkok.framework.constant.TimeConstant;
 import com.petkok.framework.exception.BusinessException;
 import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.security.jwt.JwtProperties;
 import com.petkok.framework.security.jwt.JwtTokenProvider;
 import com.petkok.framework.util.encrypt.SHA256Util;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,13 +53,21 @@ class AuthServiceRefreshTest {
   private final JwtTokenProvider jwtTokenProvider =
       new JwtTokenProvider(new JwtProperties(SECRET, 60_000L, 600_000L));
 
-  private final AuthService authService =
-      new AuthService(
-          kakaoOAuthClient,
-          userRepository,
-          socialAccountRepository,
-          refreshTokenRepository,
-          jwtTokenProvider);
+  private final AuthService authService = authServiceOn(Clock.system(TimeConstant.KST));
+
+  /**
+   * 기존 케이스(REQ-07-*)는 시스템 {@code Clock} 을 그대로 쓴다 — 만료 경계를 다루지 않아 시각을 고정할 이유가 없고, 고정하면 픽스처의 {@code
+   * OffsetDateTime.now()} 와 어긋나 <b>기존 단언의 뜻이 바뀐다</b>.
+   */
+  private AuthService authServiceOn(Clock clock) {
+    return new AuthService(
+        kakaoOAuthClient,
+        userRepository,
+        socialAccountRepository,
+        refreshTokenRepository,
+        jwtTokenProvider,
+        clock);
+  }
 
   private static String hash(String token) {
     try {
@@ -206,5 +216,52 @@ class AuthServiceRefreshTest {
     RefreshToken row = RefreshToken.of(USER_ID, hash(token), jwtTokenProvider.getExpiresAt(token));
     when(refreshTokenRepository.findByTokenHash(hash(token))).thenReturn(Optional.of(row));
     return row;
+  }
+
+  /**
+   * 고정 {@code Clock} 만료 경계. 검증 계약 REQ-16-12 · 17 (PLAN-REQ-16 § 검증 계약).
+   *
+   * <p>기준 시각을 <b>리터럴로</b> 고정한다 — {@code now()} 로 상대 계산하면 "실행 시각과 무관하게 재현된다"는 것 자체를 검증할 수 없다.
+   * REQ-07-21 이 {@code OffsetDateTime.now().minusMinutes(1)} 을 쓰는 것과 갈리는 지점이 여기다.
+   */
+  private static final OffsetDateTime EXPIRY = OffsetDateTime.parse("2026-06-30T18:00:00+09:00");
+
+  /** 만료 시각을 지정해 행을 등록한다. {@link #stored} 는 토큰의 {@code exp} 를 쓰므로 경계를 못 고정한다. */
+  private RefreshToken storedWithExpiry(String token, OffsetDateTime expiresAt) {
+    RefreshToken row = RefreshToken.of(USER_ID, hash(token), expiresAt);
+    when(refreshTokenRepository.findByTokenHash(hash(token))).thenReturn(Optional.of(row));
+    return row;
+  }
+
+  private AuthService authServiceAt(OffsetDateTime now) {
+    return authServiceOn(Clock.fixed(now.toInstant(), TimeConstant.KST));
+  }
+
+  @Test
+  @DisplayName("[REQ-16-12] 만료 시각 이후로 고정한 Clock 에서는 INVALID_TOKEN 이다")
+  void req_16_12_expiredUnderFixedClockIsInvalidToken() {
+    String token = jwtTokenProvider.createRefreshToken(USER_ID);
+    storedWithExpiry(token, EXPIRY);
+
+    assertThatThrownBy(() -> authServiceAt(EXPIRY.plusSeconds(1)).refresh(token))
+        .isInstanceOf(BusinessException.class)
+        .extracting(thrown -> ((BusinessException) thrown).getErrorCode())
+        .isEqualTo(ErrorCode.INVALID_TOKEN);
+  }
+
+  /**
+   * 12 의 반대쪽이다. <b>12 만 있으면 만료 판정을 통째로 {@code true} 로 뒤집어도 통과한다</b> — 경계는 양쪽을 재야 고정된다.
+   *
+   * <p>로테이션 발생을 단언한다. 반환값이 비지 않았다는 것만 보면 "발급은 됐지만 같은 토큰"인 경우를 놓친다.
+   */
+  @Test
+  @DisplayName("[REQ-16-17] 만료 시각 이전으로 고정한 Clock 에서는 정상 재발급된다")
+  void req_16_17_beforeExpiryUnderFixedClockRotates() {
+    String token = jwtTokenProvider.createRefreshToken(USER_ID);
+    storedWithExpiry(token, EXPIRY);
+
+    TokenResponse response = authServiceAt(EXPIRY.minusSeconds(1)).refresh(token);
+
+    assertThat(response.refreshToken()).isNotEqualTo(token);
   }
 }

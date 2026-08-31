@@ -1,6 +1,7 @@
 package com.petkok.framework.config;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.petkok.framework.constant.TimeConstant;
 import com.petkok.framework.processor.converter.OffsetDateTimeDeserializer;
 import java.time.OffsetDateTime;
 import java.util.TimeZone;
@@ -11,14 +12,6 @@ import org.springframework.context.annotation.Configuration;
 /** 응답/요청 필드는 전역 snake_case. (DTO 필드는 camelCase 로 두고 직렬화 시 변환) */
 @Configuration
 public class JacksonConfig {
-
-  /**
-   * 시각의 노출 기준 타임존 (REQ-16 · ADR-0002).
-   *
-   * <p>⚠️ <b>Phase 3 에서 {@code framework/constant} 의 {@code ZoneId} 상수로 옮긴다</b> (REQ-16-11). 그 상수가
-   * 아직 없어 여기 문자열로 둔다 — 늘리지 말 것.
-   */
-  private static final String EXPOSED_ZONE = "Asia/Seoul";
 
   /**
    * ⚠️ <b>{@code timeZone(...)} 을 빼면 응답이 {@code Z} 로 나간다.</b> {@code timestamptz} 는 원래 오프셋을 저장하지 않아
@@ -35,7 +28,7 @@ public class JacksonConfig {
     return builder ->
         builder
             .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
-            .timeZone(TimeZone.getTimeZone(EXPOSED_ZONE))
+            .timeZone(TimeZone.getTimeZone(TimeConstant.KST))
             .deserializerByType(OffsetDateTime.class, new OffsetDateTimeDeserializer());
   }
 }

@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · ADR-0002 · 로컬 Postgres 구성 · **REQ-16 Phase 0~2 완료 + 미결 6건 전부 확정**)
+> 최종 갱신: 2026-08-31 (PR #41 머지로 REQ-16 Phase 0~2 가 `main` 에 안착 · **REQ-16 Phase 3 완료** — `Clock` 주입 · 존 상수 통합 · 무인자 `now()` 금지 규칙)
 
 ## 요구사항 인덱스
 
@@ -25,7 +25,7 @@
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
-| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0~2 완료 2026-08-28** · Phase 3~4 남음 · **미결 0건**) |
+| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0~3 완료 2026-08-31** · **Phase 4(문서 역반영)만 남음** · 미결 2건 신설 — 둘 다 이 REQ 밖 판단) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -34,6 +34,65 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-08-31
+
+> 3일 만의 재개. 한 일은 둘이다 — **`main` 밖에 있던 REQ-16 Phase 0~2 를 머지**하고, **Phase 3(계산 기준 KST 고정)을 끝냈다.** 코드는 작지만(6파일) 기록할 것은 **검증 계약 문구가 낡아 규칙이 공허해질 뻔한 것**과 **프로브 되돌리기로 작업을 날린 사고** 둘이다.
+
+### 커밋 9건이 사흘간 `main` 밖에 있었다 — PR 을 안 만들었기 때문이다
+
+`docs/req16-workplan` 브랜치가 원격에 **푸시까지 돼 있었는데 PR 이 없었다.** Phase 0~2 전체(`V3` 마이그레이션 · 엔티티 타입 전환 · Jackson 규약)와 진행 기록 4건이 여기 묶여 있었다. AGENTS §4 가 적어 둔 것은 "로컬 전용 브랜치는 다음 세션에서 없는 것과 구별되지 않는다"였는데, **푸시했어도 PR 이 없으면 인덱스만 보고는 알 수 없다** — `PROGRESS.md` 인덱스가 "Phase 0~2 완료"라고 말하고 있어 `main` 에 있다고 읽힌다. 실제로 이번 `/progress` 조회에서 그 불일치로 드러났다.
+
+> **CI 초록불 판정에서 도구 두 개가 갈렸다.** `gh pr checks 41` 은 `pass`, `gh run list` 는 같은 SHA 를 `in_progress` 로 보고했다. AGENTS §4 의 "이전 실행분 결과를 그대로 보여줄 수 있다"와 방향이 반대인 경우다(이번엔 목록 쪽이 낡았다). `gh run view <id> --json headSha,status,conclusion` 으로 **run 자체를 열어** `e43be94` · completed · success 를 확인하고 머지했다. **어느 쪽이 낡았는지는 미리 알 수 없으므로 SHA 를 들고 run 을 직접 여는 것이 유일하게 안전하다.**
+
+### ⭐ 검증 계약 문구가 Phase 1 에서 낡아 있었다 — 그대로 썼으면 통과하는 가짜 규칙
+
+REQ-16-10 은 "`LocalDateTime.now()` 직접 호출이 `business`·`framework` 에 0건"이었다. 그런데 **Phase 1 이 대상을 전부 `OffsetDateTime` 으로 바꿨다.** 문구대로 규칙을 쓰면 —
+
+| 대상 | 문구대로면 |
+|---|---|
+| `LocalDateTimeUtil` 의 `LocalDateTime.now()` 2건 (D10 대상) | 걸린다 |
+| **`AuthService` 의 `OffsetDateTime.now()` 2건 (Phase 3 본 목표)** | **안 걸린다** |
+
+즉 **D10 만 하고 `Clock` 주입을 아예 안 해도 REQ-16-10 은 초록불**이었다. 무인자 `now()` 5종(`LocalDateTime`·`OffsetDateTime`·`LocalDate`·`Instant`·`ZonedDateTime`)으로 넓히고 `now(Clock)` 오버로드만 열어 뒀다.
+
+> **이것이 "계획서 열거가 어긋났다"의 네 번째 얼굴이다.** 앞의 셋은 `date` 컬럼 개수 · `now()` 호출 곳 수 · `LocalDateTimeUtil` 의 존재였고, 이번은 **타입 이름**이다. 공통점은 전부 *Phase 1 이 실제로 코드를 바꾼 뒤에도 계획서 문장이 그대로 남아 있었다*는 것 — **계획서는 착수 시점의 사실을 적고, 코드가 바뀌어도 스스로 갱신되지 않는다.** 그래서 Phase 착수 때마다 열거를 다시 세야 한다.
+
+### `Asia/Seoul` 은 두 곳이 아니라 세 곳이었다
+
+계획서 함정 절이 `JacksonConfig` · `OffsetDateTimeDeserializer` 둘만 셌는데 **`LocalDateTimeUtil.ZONE_ASIA_SEOUL` 이 빠져 있었다.** 하필 D10 이 어차피 건드리는 파일이다. 셋을 `TimeConstant.KST` 한 곳으로 합쳤고, **"늘리지 말 것"이라는 사람이 읽는 경고를 REQ-16-16 케이스로 바꿨다** — 소스 텍스트를 훑어 상수 클래스 밖의 리터럴을 잡는다.
+
+> ⚠️ **REQ-16-16 은 0건이 "깨끗함"인지 "스캐너 고장"인지 구별되지 않는 종류다**(CLAUDE.md — 빈 패턴은 전건 매치). 그래서 단언 앞에 **역프로브를 내장했다** — 훑은 파일이 비지 않았고 `TimeConstant.java` 자신은 리터럴을 갖고 있어야 통과한다.
+
+### 프로브 3건 — 규칙이 실제로 무는지 실측했다
+
+CLAUDE.md 의 "구조 규칙을 고치면 일부러 위반을 심어 잡히는지 확인할 것"을 그대로 돌렸다.
+
+| 프로브 | 결과 |
+|---|---|
+| `AuthService` 를 `Clock` 이전으로 되돌림 | REQ-16-10 이 **2곳을 모두 지목하며 FAIL** — 규칙이 공허하지 않다 |
+| `JacksonConfig` 에 `Asia/Seoul` 재삽입 | REQ-16-16 이 **파일명까지 지목하며 FAIL** |
+| `isExpired` 를 항상 `true` | **REQ-16-17 만 FAIL** — REQ-07-21·REQ-16-12 는 통과 |
+| `isExpired` 를 항상 `false` | REQ-16-12·REQ-07-21 FAIL |
+
+> ⭐ **세 번째가 REQ-16-17 을 추가한 이유를 사후에 증명했다.** 만료 판정이 **전부 거절로** 고장 나도 기존 스위트(REQ-07-21)와 신규 REQ-16-12 는 **둘 다 초록불**이다. 둘 다 "만료면 거절"만 보기 때문이다. 경계는 한쪽만 재면 고정되지 않는다.
+
+### ⚠️ 프로브를 되돌리다 작업을 날렸다 — `git checkout <파일>`
+
+프로브 1 을 되돌리려고 `git checkout src/.../AuthService.java` 를 썼는데, **그 파일의 변경이 스테이지되지 않은 상태였다.** 이 명령은 인덱스(=HEAD)에서 복원하므로 프로브로 심은 것뿐 아니라 **그 Phase 의 구현 전체(`Clock` 주입)가 함께 사라졌다.** 재작성해 복구했고 이후 프로브 2·3 은 백업 복사본(`cp`)으로 되돌렸다.
+
+> **이 레포는 프로브를 "심었다 지우는" 방식으로 상시 돌린다**(REQ-09·10·16 전부). 그 워크플로가 `git checkout` 과 만나면 **아직 커밋 안 한 구현을 조용히 삼킨다** — 에러도 경고도 없고, 되돌린 파일이 "원래대로"로 보인다. 프로브 되돌리기는 **커밋 전이면 `cp` 백업**으로 한다. CLAUDE.md 계약 승격 대상이다.
+
+### Phase 3 완료 기준 셋 중 하나는 채운 게 아니라 넘겼다
+
+완료 기준의 "KST 자정 전후 판정이 케이스로 고정됨"은 **케이스가 없다.** 검증 계약 절이 이미 *"판정 로직(당일·미래·일수)은 REQ-10 Phase 3 이후에 들어온다. 여기서는 상수·`Clock` 까지만 고정하고, 자정 경계 케이스는 REQ-10 이 가져간다"*고 적어 둔 대로다. 계획서에 취소선과 이유를 남기고 체크했다 — **케이스 5건 전부 녹색인 것과 완료 기준 충족은 같지 않다.**
+
+### 미결 2건이 새로 생겼다 (둘 다 이 REQ 밖 판단)
+
+- **⑦ `BaseSoftDeleteEntity.softDelete()`** — 계획서가 자기 자신과 어긋났다. `범위 — 포함` 은 "`AuthService` 2곳", `제약·함정` 은 "3곳 · `Clock` 주입은 Phase 3 몫". **전자를 따랐다** — JPA 엔티티라 빈 주입이 불가능하고, `deleted_at` 은 벽시계 파생이 아니라 **순간**이라 D4 의 자리가 아니다. TZ 위험은 Phase 1 의 `OffsetDateTime` 전환에서 이미 사라졌고 **남는 이득은 테스트 고정 하나뿐**이라 엔티티 시그니처를 바꿀 값을 못 했다
+- **⑧ `JwtTokenProvider.create()` 의 `new Date()`** — 계획서 어디에도 없다. `java.time` 이 아니라 규칙에 안 걸리고 순간이라 TZ 위험도 없지만, **발급 시각을 고정할 수 없다**
+
+**남은 것 (REQ-16)** — **Phase 4(문서 역반영) 하나.** 케이스가 없고, 2026-08-28 의 `API I/F` 40행 전수 조사 결과가 그대로 작업 지시서다(응답 12행 · 「소스 구조」 §2·§5·§6 · `CLAUDE.md` 계약 2건). 미결 ⑦⑧ 은 Phase 4 를 막지 않는다.
 
 ## 2026-08-28
 
