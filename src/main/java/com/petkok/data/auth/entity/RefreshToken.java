@@ -7,7 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -44,13 +44,13 @@ public class RefreshToken extends BaseCreatedEntity {
   private String tokenHash;
 
   @Column(name = "expires_at", nullable = false, updatable = false)
-  private LocalDateTime expiresAt;
+  private OffsetDateTime expiresAt;
 
   /** 로테이션·로그아웃·재사용 감지로 무효화된 시각. {@code null} = 유효. */
   @Column(name = "revoked_at")
-  private LocalDateTime revokedAt;
+  private OffsetDateTime revokedAt;
 
-  private RefreshToken(UUID userId, String tokenHash, LocalDateTime expiresAt) {
+  private RefreshToken(UUID userId, String tokenHash, OffsetDateTime expiresAt) {
     this.userId = userId;
     this.tokenHash = tokenHash;
     this.expiresAt = expiresAt;
@@ -59,7 +59,7 @@ public class RefreshToken extends BaseCreatedEntity {
   /**
    * @param tokenHash 토큰 <b>원문이 아니라</b> SHA-256 hex 64자
    */
-  public static RefreshToken of(UUID userId, String tokenHash, LocalDateTime expiresAt) {
+  public static RefreshToken of(UUID userId, String tokenHash, OffsetDateTime expiresAt) {
     return new RefreshToken(userId, tokenHash, expiresAt);
   }
 
@@ -67,12 +67,12 @@ public class RefreshToken extends BaseCreatedEntity {
     return revokedAt != null;
   }
 
-  public boolean isExpired(LocalDateTime now) {
+  public boolean isExpired(OffsetDateTime now) {
     return expiresAt.isBefore(now);
   }
 
   /** 이미 revoke 된 토큰을 다시 revoke 해도 최초 시각을 유지한다 — 재사용 감지 시점을 덮어쓰지 않기 위해서다. */
-  public void revoke(LocalDateTime now) {
+  public void revoke(OffsetDateTime now) {
     if (revokedAt == null) {
       this.revokedAt = now;
     }

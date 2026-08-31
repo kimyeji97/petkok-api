@@ -21,7 +21,7 @@ import com.petkok.framework.security.jwt.JwtProperties;
 import com.petkok.framework.security.jwt.JwtTokenProvider;
 import com.petkok.framework.util.encrypt.SHA256Util;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -123,18 +123,18 @@ class AuthServiceRefreshTest {
   @DisplayName("[REQ-07-16] revoke 된 토큰이 다시 제시되면 해당 사용자의 토큰을 전부 revoke 한다")
   void req_07_16_reusedTokenRevokesAllForUser() {
     String token = jwtTokenProvider.createRefreshToken(USER_ID);
-    stored(token).revoke(LocalDateTime.now());
+    stored(token).revoke(OffsetDateTime.now());
 
     catchThrowable(() -> authService.refresh(token));
 
-    verify(refreshTokenRepository).revokeAllByUserId(eq(USER_ID), any(LocalDateTime.class));
+    verify(refreshTokenRepository).revokeAllByUserId(eq(USER_ID), any(OffsetDateTime.class));
   }
 
   @Test
   @DisplayName("[REQ-07-17] revoke 된 토큰이 다시 제시되면 INVALID_TOKEN 이다")
   void req_07_17_reusedTokenIsInvalidToken() {
     String token = jwtTokenProvider.createRefreshToken(USER_ID);
-    stored(token).revoke(LocalDateTime.now());
+    stored(token).revoke(OffsetDateTime.now());
 
     assertThatThrownBy(() -> authService.refresh(token))
         .isInstanceOf(BusinessException.class)
@@ -147,7 +147,7 @@ class AuthServiceRefreshTest {
   void req_07_18_logoutRevokesAllForUser() {
     authService.logout(USER_ID);
 
-    verify(refreshTokenRepository).revokeAllByUserId(eq(USER_ID), any(LocalDateTime.class));
+    verify(refreshTokenRepository).revokeAllByUserId(eq(USER_ID), any(OffsetDateTime.class));
   }
 
   /**
@@ -164,7 +164,7 @@ class AuthServiceRefreshTest {
     when(refreshTokenRepository.findByTokenHash(hash(token)))
         .thenReturn(
             Optional.of(
-                RefreshToken.of(USER_ID, hash(token), LocalDateTime.now().minusMinutes(1))));
+                RefreshToken.of(USER_ID, hash(token), OffsetDateTime.now().minusMinutes(1))));
 
     assertThatThrownBy(() -> authService.refresh(token))
         .isInstanceOf(BusinessException.class)

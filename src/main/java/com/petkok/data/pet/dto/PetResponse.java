@@ -3,7 +3,7 @@ package com.petkok.data.pet.dto;
 import com.petkok.data.pet.enums.Gender;
 import com.petkok.data.pet.enums.Species;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -24,4 +24,4 @@ public record PetResponse(
     LocalDate birthday,
     LocalDate adoptionDate,
     String profileImageUrl,
-    LocalDateTime createdAt) {}
+    OffsetDateTime createdAt) {}

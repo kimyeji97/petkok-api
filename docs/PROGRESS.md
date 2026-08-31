@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-28 (REQ-10 Phase 0 완료 · Phase 1 weight · Phase 2 activity 코드 완료 · PR #35~#39 머지)
+> 최종 갱신: 2026-08-28 (REQ-10 Phase 0~2 완료 · PR #35~#40 머지 · ADR-0002 · 로컬 Postgres 구성 · **REQ-16 Phase 0~2 완료 + 미결 6건 전부 확정**)
 
 ## 요구사항 인덱스
 
@@ -21,10 +21,11 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0 완료 · Phase 1·2 코드 완료 2026-08-28, 로컬 DB 확인 후 체크) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0~2 완료 2026-08-28 · **Phase 3 이후는 REQ-16 뒤** · 로컬 DB 확인 **1건 남음** — JPQL 기동은 닫힘) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
+| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0~2 완료 2026-08-28** · Phase 3~4 남음 · **미결 0건**) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -81,6 +82,176 @@ REQ-10-01~03 은 계획서대로 심었다 지웠다(가드 주입 PASS · `PetR
 - 응답의 `logged_at` 은 `Z` 없이 나간다(`2026-06-30T09:00:00`) — Jackson 에 시각 포맷 설정이 없어 기존 엔티티(`created_at`)와 같다. D12 가 "응답은 ISO-8601 `Z`"라 적었지만 framework 전역 사항이라 이 Phase 에서 손대지 않았다. **REQ-10 미결로 올린다** — 요청 `…Z` 는 jsr310 기본(lenient)이 UTC 로 읽어 문제없다
 
 **남은 것 (REQ-10)** — 로컬 DB 확인 2건(→ Phase 1·2 체크) · 응답 시각 `Z` 표기(미결) · Phase 3(feeding) 착수 전 미결 4건(`fed_at` "당일" · 스트릭 규칙 · 게코 외 종의 스트릭 · `food_size` 처리 — 마지막은 D13 과 같은 결이 자연스럽다).
+
+### 시각 처리를 REQ-16 으로 떼어냈다 — 결정이 세 번 뒤집혔다 (밤)
+
+Phase 2 에서 올린 "응답 시각 `Z`" 미결이 framework 전역 결정으로 번져 별도 REQ 가 됐다. **기록할 것은 결론이 아니라 뒤집힌 경로다** — 결론만 보면 왜 이 형식인지 알 수 없다.
+
+1. "날짜는 전부 KST" → 처음엔 **계산만 KST · 저장은 UTC 유지**(현행 유지, 비용 0)로 답이 나왔다
+2. 곧바로 **계정별 타임존**(기본 KST)으로 확대 — `users.timezone` · `PATCH /users/me` 확장 · 요청 스코프로 TZ 를 나르는 framework 포트가 따라오는 별건이라 REQ 를 새로 잡아야 했다
+3. 다시 **KST 고정으로 축소**되면서 "저장은 KST 가 나은가 UTC 가 나은가"라는 원래 질문으로 돌아왔고, **`timestamptz`**(순간 저장)로 확정됐다 → [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md)
+
+**저장을 KST 로 바꾸는 안이 왜 기각됐는지가 이 REQ 의 핵심이다.** 변환이 없어 깔끔해 보이지만 "JVM 기본 TZ = KST" · "DB 세션 TZ = KST"라는 **암묵 전제** 위에 서고, 컨테이너에 `TZ` 를 안 넣거나 Supabase 세션 TZ(UTC)를 만나면 **에러 없이** 9시간 어긋난다. `.env` 의 빈 값이 기본값을 무력화한 건 · `db.schema` 를 한쪽만 배선한 건과 **같은 얼굴**이다. 반대로 `timestamptz` 는 **타입이 규약을 대신 기억한다** — "이 값이 어느 타임존인가"를 사람이 알 필요가 없어진다.
+
+> **계정별 타임존은 기각이 아니라 연기다.** `timestamptz` 는 이미 순간을 저장하므로 나중에 열어도 **재마이그레이션이 필요 없다**(경계의 변환 대상만 KST 고정에서 사용자 값으로 바꾸면 된다). ADR-0002 의 재검토 조건에 그렇게 적었고, 이게 채택 근거의 절반이다. 나머지 절반은 "배포 전인 지금이 전환 비용이 가장 싸다"는 것.
+
+- ⚠️ **컬럼을 두 번 셌다 — 처음 보고한 "17개"가 틀렸고 실제는 19개**(V1 16 · V2 3). `grep -c 'timestamp '` 가 줄 끝 `deleted_at timestamp`(뒤에 공백 없음) 2건과 `revoked_at timestamp,`(쉼표) 1건을 놓쳤다. **패턴 끝에 공백을 붙여 세면 컬럼 정의가 조용히 빠진다** — 0건이 아니라 "그럴듯하게 적은 수"로 나와서 더 위험하다
+- **`V3` 를 REQ-16 이 가져간다** → REQ-10 Phase 3 의 `feeding_logs.food_size` 는 **`V4`** 다. 적용된 마이그레이션은 한 글자도 못 고치므로 번호를 먼저 확정했다
+- ⚠️ **07-30 픽스처 규칙(`now() at time zone 'UTC'`)은 전환과 함께 폐기해야 한다.** `timestamptz` 에서 `now()` 는 세션 TZ 와 무관하게 올바른 순간을 반환하므로, 규칙을 남겨 두면 이번엔 **반대 방향으로** 9시간 어긋난다. 함정이 사라지는 게 아니라 **뒤집힌다**
+- Phase 0(프로브)의 미결 ①②③ 중 **③(Jackson 이 `+09:00` 을 내는 설정)과 ① 일부는 DB 없이 닫힌다** — `ObjectMapper` 왕복만으로 확인된다. DB 가 필요한 것은 `timestamptz` 왕복 정확성과 `hibernate.jdbc.time_zone` 의 영향뿐이다
+- `date` 컬럼 5개(`entry_date`·`measured_at`·`shed_date`·`birthday`·`adoption_date`)는 **타입을 바꾸지 않는다.** 날짜만 있는 값에는 타임존이 없고, 바꾸면 커서 정렬(REQ-10 D8)과 체중 파생 필드 정의(D3)가 전부 흔들린다
+
+### REQ-10 Phase 3 미결 4건 — 답은 나왔고 Notion 역반영이 남았다
+
+네 건 모두 "원본에 없는 거부 규약을 만들지 않는다"(REQ-09 D5 · D13)와 같은 결로 정해졌다.
+
+| 미결 | 결정 |
+|---|---|
+| `fed_at` "당일 시간만 허용" | **미래 시각만 거부** — 서버 현재 시각 이전이면 과거 소급 허용. 순간 비교라 타임존 논쟁이 사라진다("오늘 날짜만" 안은 자정 직후 입력과 어제 급여 소급을 막는다) |
+| 거식 스트릭 | **일수 기준** — 마지막 `is_refused = false` 급여(`last_eaten_at`)부터 기준 시각까지의 KST 달력 일수. `>= 7` DANGER · `>= 3` CAUTION · 나머지 NONE. 게코는 며칠에 한 번 먹는 게 정상이라 "연속 거식 **건수**" 안은 "7일"과 맞지 않는다 |
+| 게코 외 종의 스트릭 호출 | **`FEATURE_NOT_SUPPORTED_SPECIES` 신설** — 게코 전용 기능 공통 코드. 문구가 탈피 전용인 `SHED_NOT_SUPPORTED_SPECIES` 는 아직 소비자가 없으므로 제거하고 shed 도 이 코드로 간다 |
+| 개/고양이의 `food_size` | **그대로 저장** (D13 과 동일). 거부하는 것은 enum 밖의 값뿐 |
+
+> ⚠️ **넷 다 아직 Notion 에 안 적었다.** 이 프로젝트의 원칙은 "원본에 먼저 쓰고 레포로 옮긴다"인데 시각 논의로 갈라지면서 순서가 끊겼다. 계획서에는 결론을 `[x]` 로 남기되 **역반영 대기**를 명시했다 — **Phase 3 착수 전에 Notion 부터 고칠 것.**
+
+> **원본 자기모순 1건을 찾았다.** 거식 스트릭 응답 예시가 `current_streak_days: 5` 인데 `level: "DANGER"` 다. 같은 행의 규칙은 `DANGER (7일+)` 이므로 5일이면 `CAUTION` 이어야 한다. 예시를 고치거나 일수를 8 로 바꿔야 하고, **어느 쪽이든 사람이 정할 일**이라 역반영 목록에 올렸다.
+
+**남은 것 (REQ-10)** — 로컬 DB 확인 2건(→ Phase 1·2 체크) · Notion 역반영 4건(Phase 3 결정) + 스트릭 예시 모순 · Phase 3 이후는 **REQ-16 완료 뒤**.
+
+### 로컬 Postgres 를 이 머신에 세웠다 — 미뤄 둔 확인 2건 중 1건이 닫혔다
+
+Docker 로 `postgres:17`(실제 17.11, 운영 Supabase 와 메이저 일치)을 포트 **5433** 에 띄우고 컨테이너 TZ 를 UTC 로 고정했다(Supabase 세션 TZ 와 같은 조건 — REQ-16 프로브의 전제다). Flyway 가 V1·V2 를 `petkok_local` 에 적용해 테이블 11개가 생겼다. 접속 정보와 함정은 `CLAUDE.local.md`(gitignore 대상, 새로 만들면서 `.gitignore` 에 먼저 추가했다 — 무시 대상이 **아니었다**)에 적었다. **비밀번호는 `.env` 한 곳에만 둔다.**
+
+이걸로 REQ-10 Phase 1·2 의 보류 2건 중 **① `@Query` JPQL 기동 검증이 닫혔다.** 다만 "기동 성공 = JPQL 검증됨"은 추정이라 **일부러 깨서 확인**했다 — `w.measuredAt` → `w.measuredAtXX` 로 바꾸자 `UnknownPathException: Could not resolve attribute` 로 **기동 자체가 막혔다.** 즉 초록 기동은 실제 파싱 통과다. ② keyset 경계 수동 확인은 인증 토큰·펫 생성이 선행이라 아직 남아 있다.
+
+> ⚠️ **`./gradlew test` 는 여전히 DB 를 쓰지 않는다.** Testcontainers 가 없어 keyset 경계 같은 것은 수동 확인이다. **DB 가 생겼다고 테스트 커버리지가 넓어진 것이 아니다.**
+
+### `.env.example` 을 그대로 `cp` 하면 기동이 막혔다 — 파일 자신이 경고하는 함정을 본문이 밟고 있었다
+
+`R2_ENDPOINT=` 같은 **빈 값**이 환경변수로 들어가 `application.yml` 의 더미 기본값을 무력화했고 `endpointOverride must not be null` 로 죽었다. `.env.example` 헤더에 "`KEY=`(빈 값)은 미설정이 아니다"라고 **이미 적혀 있는데** 본문 6줄이 그 형태였다(`ff24bfc`). 기본값이 있는 6개를 `#` 로 막고, **고친 템플릿을 다시 `cp` 해 `DB_PASSWORD` 한 줄만 채우고 기동되는 것까지 확인**했다. `DB_PASSWORD` 만 빈 값으로 남긴다 — 어디에도 기본값이 없어 어느 형태든 실패이고 "채워야 할 칸"으로 보이는 편이 낫다. 그 판단 근거를 파일 안에 적었다.
+
+> 헤더의 실행 안내(`set -a && . ./.env`, IntelliJ, direnv)는 **낡았다.** `application.yml` 에 `spring.config.import: optional:file:.env[.properties]` 가 있어 `./gradlew bootRun` 만으로 읽힌다(오늘 두 번 기동해 확인). `CLAUDE.md` 로컬 검증 절도 같은 낡은 명령을 담고 있다 — **다음 세션에서 고칠 것.**
+
+### REQ-16 Phase 0 — 미결 ①②③ 을 실측으로 닫았다
+
+프로브 3건을 `req16_probe` 스키마(**Flyway 소유 밖** — `petkok_local` 에 수동 DDL 을 치면 AGENTS §5 를 어긴다)에 임시 표를 만들어 돌리고, 끝나고 코드·스키마를 지웠다.
+
+| 미결 | 실측 결과 | 결정 |
+|---|---|---|
+| ① 엔티티 시각 타입 | `Instant` 는 **네 설정 전부 `Z`** 로 나가 D3(`+09:00`)와 충돌 → 탈락. `OffsetDateTime`·`ZonedDateTime` 은 거동·변경량이 **완전히 같다** | **`OffsetDateTime`** — `timestamptz` 는 오프셋만 보존하고 zone id 는 잃는다. `ZonedDateTime` 은 저장되지 않는 정보를 담는 척한다 |
+| ② `hibernate.jdbc.time_zone` | `timestamptz` 3컬럼은 `UTC`/`Asia/Seoul` 에서 **결과가 완전히 같다**(무영향). 유일하게 작동하는 곳은 `timestamp`+`LocalDateTime` 쌍 — `UTC` 면 `09:00`, `Asia/Seoul` 이면 `18:00` 저장 | **유지.** 지우면 훗날 누가 `timestamp` 컬럼을 추가했을 때 JVM 기본 TZ 의존이 되살아난다. 주석의 근거만 "앱이 UTC 로 쓴다" → "남을지 모를 `timestamp` 컬럼을 JVM TZ 에서 떼어 놓는 안전망"으로 바꾼다 |
+| ③ Jackson 설정 | `ObjectMapper.setTimeZone(Asia/Seoul)` **한 줄이면 된다.** `WRITE_DATES_AS_TIMESTAMPS`·`ADJUST_DATES_TO_CONTEXT_TIME_ZONE` 은 손댈 필요 없고, `WRITE_DATES_WITH_CONTEXT_TIME_ZONE` 은 **켜 둬야 한다**(끄면 `Z` 로 돌아간다) | 그대로 Phase 2 에서 적용 |
+
+> ⚠️ **③ 은 케이스 문구대로 재지 못했다.** 계획서는 `hibernate.jdbc.time_zone` 을 "켠 상태와 **끈 상태**"로 대조하라고 했는데, Spring 에서 이 프로퍼티를 깨끗하게 "없음"으로 만들 방법이 없어(`=` 빈 값은 Hibernate 가 `GMT` 로 읽는다) `UTC` vs `Asia/Seoul` 두 값으로 갈음했다. `timestamptz` 에서 **결과가 완전히 같다**는 답은 그대로 성립하지만 **진짜 미설정 상태는 재지 않았다.**
+
+부수로 **D6 의 전제가 실측으로 확인됐다** — KST 벽시계 `18:00` 을 넣으면 현행 설정에서 `09:00`(UTC)이 저장된다. 앱이 UTC 로 써 왔다는 뜻이고 `USING … AT TIME ZONE 'UTC'` 가 맞다.
+
+또 하나 — `ObjectMapper` 의 TZ 는 `UTC`, `hasExplicitTimeZone = false` 다. **JVM 기본 TZ 를 따라가지 않는다.** 명시하지 않으면 어디서 돌든 `Z`, 명시하면 그 값. 이 프로젝트가 반복해 밟은 "환경에 따라 조용히 갈리는" 형태가 **여기엔 없다.**
+
+### ⭐ 프로브 입력이 결과를 미리 정해 버렸다 — 네 설정이 전부 같은 답을 냈다
+
+첫 프로브는 입력값에 **이미 `+09:00` 을 달아** 두었다. 그러자 네 설정이 모두 `+09:00` 을 냈고, 그대로 읽었으면 **"Jackson 설정이 필요 없다"는 정반대 결론**이 나왔을 것이다. 실제 응답 경로는 그게 아니다 — `timestamptz` 는 원래 오프셋을 저장하지 않아 **DB 에서 읽으면 항상 `Z`** 다. 그 모양으로 다시 재자 ⓐ·ⓒ 는 `Z`, ⓑ 만 `+09:00` 으로 갈렸다.
+
+여기에 대조군으로 `America/New_York` 을 하나 더 넣었다 — `-04:00` 이 나와야 "설정이 실제로 작동한다"가 성립한다. **역프로브 없이는 ⓑ 의 초록불이 우연인지 알 수 없다.** 구조 규칙에 일부러 위반을 심는 것과 같은 자리다.
+
+> 교훈은 "프로브를 돌렸다"가 아니라 **"프로브의 입력이 답을 가르는가"** 를 먼저 봐야 한다는 것이다. 모든 후보가 같은 답을 내면 그건 합의가 아니라 **측정 실패**일 수 있다.
+
+### 조용한 무동작 3건 — 전부 에러 없이 그럴듯한 결과를 냈다
+
+| 무엇이 | 어떻게 보였나 |
+|---|---|
+| `docker exec` 에 `-i` 누락 | heredoc 이 전달되지 않아 **테이블이 안 만들어졌는데** 명령은 성공. 컬럼 확인이 0줄인 것으로 잡았다 |
+| BSD `sed` 의 `0,/re/` 미지원 | GNU 용법이라 **치환이 안 됐고**, 원본 코드가 정상 기동한 것을 "프로브 통과"로 읽을 뻔했다 |
+| `grep -F ""` (빈 패턴) | 주석 처리된 `JWT_SECRET` 을 뽑아 변수가 비었고, 시크릿 유출 검사가 **168건**을 보고했다(실제 0건). 세 번째만 `CLAUDE.md` 계약으로 승격했다(`d872d45`) — 나머지 둘은 머신 종속이라 `CLAUDE.local.md` 에 넣었다 |
+
+### 관찰 — Lombok 이 테스트 소스에 없다
+
+`build.gradle.kts` 에 `compileOnly`/`annotationProcessor` 만 있고 `testCompileOnly`/`testAnnotationProcessor` 가 없다. 프로브 엔티티에 `@Getter` 를 붙였다가 컴파일이 깨져 손으로 접근자를 썼다. **REQ-16 Phase 1·2 에서 시각 타입을 다루는 테스트를 쓸 때 다시 걸린다** — 의존성 추가는 제안·승인 대상이라 손대지 않았다.
+
+**남은 것 (REQ-16)** — Phase 1(`V3` 19컬럼 + 엔티티 6필드) 착수 가능. `D5` 의 `Clock` zone 과 "오프셋 없는 요청 값의 동작"은 아직 미결이다.
+
+### REQ-16 Phase 1 — `V3` 19컬럼 + 엔티티·DTO 를 `OffsetDateTime` 으로
+
+케이스 6건(04·05·06·07·13·14) 전부 통과 · 전건 174/0. `petkok_local` 은 v3 이고 `timestamptz` 19개다.
+
+**적용 전에 버리는 DB 로 예행했다.** 적용된 마이그레이션은 한 글자도 못 고치므로(`CLAUDE.md`) `v3check` 데이터베이스를 만들어 V1~V3 를 처음부터 돌려 보고, 컬럼 타입과 기동을 확인한 뒤에야 `petkok_local` 에 넣었다. DB 를 갈아엎을 수 있는 지금이 이 예행의 값이 가장 싼 시점이다.
+
+계획서가 열거하지 않았지만 **타입이 묶여 있어 함께 바뀐 곳이 3개** 나왔다 — `ActivityCursor`(keyset 페이로드) · 두 Repository 의 `@Query` 파라미터 · `JwtTokenProvider.getExpiresAt`. 마지막 것은 `refresh_tokens.expires_at` 을 채우는 값이라 따라올 수밖에 없고, 이 참에 `ZoneId.systemDefault()` 를 `ZoneOffset.UTC` 로 바꿨다 — **순간은 그대로이고 JVM TZ 의존만 사라진다.**
+
+> **테스트 7파일은 `/implement` 가 고쳤다 — 사용자 승인을 받고서다.** 타입을 바꾸면 컴파일이 통째로 깨져 `/testrun` 이 실행조차 못 하기 때문이다(REQ-10 Phase 0 의 "이 Phase 한정"과 같은 자리). 범위는 **기계적 타입 치환만**으로 못박았고, 단언 문구·기대값은 건드리지 않았다. 애초에 **시각 값을 단언하는 케이스가 없다는 것을 먼저 확인**하고 들어갔다 — `created_at` 은 `exists()` 만 보고, `logged_at` 은 요청 본문에만 나온다. 있었다면 그건 Phase 2 영역이라 손대면 안 됐다.
+
+### ⚠️ `ddl-auto: validate` 는 타입을 보지 않는다 — 계획서 제약이 틀렸다
+
+계획서 「제약·함정」이 *"`ddl-auto: validate` 는 타입까지 본다 … 기동 시점에 터진다. 이건 좋은 실패다"* 라고 적어 두었고, **Phase 1 완료 기준의 "엔티티 ↔ 스키마 대조"가 이 문장 위에 서 있었다.** 실측은 반대다.
+
+- 엔티티를 `OffsetDateTime` 으로 두고 컬럼을 `timestamp` 로 남긴 채(`SPRING_FLYWAY_TARGET=2` 로 Flyway 를 V2 에서 정지) 기동 → **그대로 떴다**
+- 검사기 자체는 살아 있다 — `users.email` 을 지우자 `Schema-validation: missing column [email] in table [users]` 로 막혔다
+
+즉 **컬럼 존재만 보고 타입은 안 본다.** 엔티티만 바꾸고 마이그레이션을 빠뜨리면(또는 그 반대) **조용히 통과한다.** 이 프로젝트가 반복해 밟은 얼굴이 하나 더 늘었다.
+
+그래서 이번 Phase 의 실제 방어선은 `validate` 가 아니라 **REQ-16-04·05(마이그레이션 텍스트 검사)** 다. 다만 그건 *SQL 에 19개가 적혀 있는가* 를 볼 뿐 **DB 의 실제 컬럼 타입과 엔티티를 맞대보지는 않는다.** 그 구멍을 메우려면 DB 를 조회하는 케이스가 필요한데, **DB 가 있는 환경에서만 돌아 CI 에서 깨진다** — 미결로 올렸다(⑥).
+
+> 계획서 제약 문장은 **실측대로 고쳤다.** 조용히 고친 게 아니라 여기 남기는 이유는, 저 문장이 완료 기준의 근거였기 때문이다. "계획과 실제가 어긋났으면 그게 가장 중요한 기록"이라는 규칙이 정확히 이 경우다.
+
+### 계획서 열거가 셋 어긋났다 — 전부 동작은 옳고 문서만 틀렸다
+
+| 계획서 | 실제 | 영향 |
+|---|---|---|
+| `date` 컬럼 **5개** | **6개** — `photos.taken_at` 이 빠졌다 | 동작은 옳다(안 건드림). REQ-16-07 이 "5개 중 3개"가 아니라 **"6개 중 3개"** 를 덮는다 |
+| `now()` 호출부 **`AuthService` 2곳** | **3곳** — `BaseSoftDeleteEntity.softDelete()` | 이번엔 `OffsetDateTime.now()` 로만 바꿨다. `Clock` 주입은 Phase 3 이므로 넘기지 않았다 |
+| — | `framework/util/date/LocalDateTimeUtil` 에 `LocalDateTime.now()` **2건** | ⭐ **REQ-16-10("`business`·`framework` 에 0건")과 정면 충돌.** 이식한 범용 유틸이라 없앨 수 없다 — Phase 3 착수 전에 예외를 둘지 정해야 한다 |
+
+세 번째가 특히 중요하다. **Phase 3 완료 기준이 지금 상태로는 달성 불가능**하고, 그걸 모른 채 Phase 3 을 시작하면 유틸을 뜯어고치거나 케이스를 몰래 약화시키게 된다.
+
+### 프로브가 두 번 무효였다 — 둘 다 "통과"로 보였다
+
+`validate` 가 타입을 보는지 재려고 엔티티 한 필드만 `LocalDateTime` 으로 되돌렸더니 **컴파일이 깨졌다**(DTO 가 같은 타입으로 묶여 있다). 결과 grep 패턴에 `BUILD FAILED` 를 안 넣어 두어 **아무 줄도 출력되지 않았고**, 하마터면 "실패 신호 없음 = 통과"로 읽을 뻔했다. 방향을 바꿔 **DB 쪽을 V2 에 멈추는** 방식으로 다시 쟀다.
+
+> 교훈: **프로브가 무효였음을 알려 주는 것은 출력의 존재이지 부재가 아니다.** 결과 grep 은 성공 패턴과 실패 패턴을 **둘 다** 넣어야 하고, 어느 쪽도 안 걸리면 그건 "판정 불가"이지 통과가 아니다. 오늘 세 번째로 밟은 조용한 무동작이다.
+
+`REQ-16-14` 는 처음부터 초록이라 **성립 조건을 따로 쟀다** — `application.yml` 에서 `time_zone: UTC` 를 지우니 1건 실행 · 1건 실패. 회귀 방어 케이스는 이 역프로브 없이는 "지워도 통과하는 테스트"와 구별되지 않는다.
+
+### REQ-16 Phase 2 — 응답은 `+09:00`, 오프셋 없는 요청은 KST
+
+케이스 3건(08·09·15) 통과 · 전건 177/0.
+
+**계획서는 이 Phase 를 "`JacksonConfig` 한 곳"으로 잡았는데 두 곳이 됐다.** 계획이 틀린 게 아니라 **D9 가 Phase 2 착수 직전에 추가되면서** 범위가 늘어난 것이다 — "오프셋 없는 요청 값의 동작"이 Phase 0 에서 정해졌어야 했는데 프로브가 그걸 재지 않아, Phase 2 를 시작하기 직전 대화에서 "오프셋 없으면 KST" 로 정했다.
+
+**⭐ 설정 한 줄로는 절반만 된다.** Phase 0 이 고른 `setTimeZone(Asia/Seoul)` 은 **직렬화**의 렌더 기준일 뿐이다. 오프셋 없는 입력은 **Jackson 이 아예 거부해** 컨트롤러에 도달조차 못 하고 400 이 된다(실측 — 서비스 호출 0회, 목이 "zero interactions" 로 신고했다). `ISO_OFFSET_DATE_TIME` 이 오프셋을 필수로 요구하기 때문이라, `ISO_DATE_TIME` + `parseBest` 로 읽고 오프셋이 없을 때만 KST 를 채우는 `OffsetDateTimeDeserializer` 를 `processor/converter` 에 추가했다(AGENTS §3 이 이미 자리를 잡아 둔 패키지다 — 새 관례가 아니다).
+
+> **응답 쪽과 요청 쪽은 서로 다른 두 장치다.** 한쪽만 보고 "설정 하나로 끝났다"고 읽으면 다른 쪽이 조용히 400 이 된다. 양쪽 javadoc 에 서로를 가리키는 경고를 남겼다.
+
+**09 는 이 커밋 전에도 통과했다.** 회귀 방어 케이스라 정상이지만, 그대로 두면 "지워도 통과하는 테스트"와 구별되지 않는다. 성립 조건을 따로 쟀다 — `parseBest` 의 후보 순서를 뒤집어 `LocalDateTime` 을 먼저 시도하게 하면 `Z` 와 `+09:00` 이 **다른 순간**이 되어 빨간불이 난다. 실수로 충분히 일어날 만한 형태를 골랐다.
+
+**`JacksonConfig` 는 전역이라 전건을 돌려야 한다.** `@WebMvcTest` 슬라이스 전부가 이것을 `@Import` 하고 응답 시각 표기가 모든 도메인에서 바뀐다. 깨진 것은 없었는데, 이유는 **시각 값을 단언하는 기존 케이스가 애초에 없어서**다(`created_at` 은 `exists()` 만 본다). 그래서 Phase 2 서술의 "기존 REQ 컨트롤러 테스트 갱신"은 **안 한 게 아니라 할 것이 없었다** — Phase 1 의 기계적 타입 변경으로 이미 끝나 있었다.
+
+> ⚠️ **`Asia/Seoul` 이 지금 두 파일에 하드코딩돼 있다** (`JacksonConfig` · `OffsetDateTimeDeserializer`). Phase 3 의 REQ-16-11 이 `framework/constant` 상수로 합치는 케이스인데, **한 곳만 바꾸면 조용히 갈린다.** 양쪽 javadoc 에 "Phase 3 에서 옮긴다 · 늘리지 말 것"을 적어 두었다.
+
+### REQ-16 미결 6건 정리 — Phase 3 을 막던 것이 풀렸다
+
+**Phase 3 은 지금까지 달성 불가능한 상태였다.** 완료 기준이 "`LocalDateTime.now()` 직접 호출 0건"인데 `framework/util/date/LocalDateTimeUtil` 에 2건이 있었기 때문이다. 이걸 안 풀고 시작했으면 유틸을 뜯어고치거나 케이스를 몰래 약화시키게 된다.
+
+**결정을 바꾼 사실 하나 — 그 유틸은 사용처가 0건이다.** 그래서 문제가 "쓰고 있는 코드를 어떻게 하나"가 아니라 "안 쓰는 코드가 규칙을 막고 있다"로 바뀌었고, 세 안(규칙에서 제외 / 두 메서드 수정 / 파일 삭제) 중 **수정**을 골랐다(D10).
+
+> ⭐ **`framework.util` 을 규칙에서 제외하는 안을 버린 이유가 이 결정의 핵심이다.** 예외를 두면 **우회 경로가 열린 채 남는다** — 누가 `LocalDateTimeUtil.isNowBetween(...)` 을 부르면 그 호출부는 `now()` 를 **직접** 부르지 않으므로 규칙이 못 잡는다. 규칙이 "직접 호출"만 보는 형태라 한 겹 감싸면 통과한다. 파일 삭제는 30개 이식 유틸 중 하나를 "지금 안 쓴다"는 이유로 버리는 것이라 과했다.
+
+**`Clock` 의 zone 은 `Asia/Seoul`.** zone 은 **저장에 영향을 주지 않는다**(순간은 동일). 갈리는 곳은 벽시계 파생 하나뿐인데 — `LocalDate.now(clock)` · `LocalDateTime.now(clock)` — 그게 정확히 D4(달력 판정 = KST)의 자리다. UTC 로 두면 KST 00:00\~09:00 에 "어제"가 **에러 없이** 나온다.
+
+**미결 ⑥(엔티티↔DB 타입 대조)은 계약으로만 남긴다.** `범위 — 제외` 에 이미 *"`timestamptz` 를 쓰지 않는 신규 컬럼 금지 규칙의 자동 강제 — ArchUnit 은 SQL 을 보지 않는다. 계약으로만 남긴다"* 가 있었다. **뿌리가 같은 결정**이라 따로 정할 것이 아니었다 — SQL 과 코드를 맞대볼 수단이 없다는 하나의 사실이 두 얼굴로 나타난 것이다. Testcontainers 를 도입하면 REQ-10 의 keyset 경계·`@Transactional` 롤백까지 함께 닫히므로 **별건으로 묶어 그때 한꺼번에** 다룬다.
+
+### ⭐ Notion `API I/F` 40행 전수 조사 — "전부 바꾼다"가 틀렸다
+
+미결 ④ 는 정할 성격이 아니라 **셀 성격**이라 40행을 전부 열어 봤다. **시각 예시가 있는 행은 14개**(리터럴 20개)다. 나머지 26행은 시각 예시가 아예 없다 — DELETE 10건, 응답을 "…객체"로만 적은 행, `date` 필드만 쓰는 행.
+
+**여기서 나온 것이 조사의 값이다 — 요청 예시 2행(급여 기록 `fed_at` · 활동 기록 `logged_at`)은 고칠 의무가 없다.** D9 가 `Z`·`+09:00`·오프셋 없음을 **모두 받으므로** 요청의 `Z` 는 여전히 유효하다. D3(응답 `+09:00`)에 걸리는 것은 **응답 12행뿐**이다.
+
+> "`…Z` 를 전부 `+09:00` 으로 바꾼다"고 뭉뚱그렸으면 **계약이 아닌 것을 계약으로 만들 뻔했다.** 세어 보지 않았으면 그 차이가 보이지 않는다 — 미결 ④ 를 "조사"로 분류한 이유가 이것이다.
+
+`date` 필드 7종(`measured_at`·`shed_date`·`entry_date`·`taken_at`·`birthday`·`adoption_date`·`predicted_date`)은 전부 `"2026-06-30"` 형태로 **균일**했다. 손댈 것이 없다.
+
+**「소스 구조」 §6 에 시각 규약 절이 없다** — 신설이 필요하다. 함께 갱신할 곳도 확인했다: §5 표의 `JacksonConfig` 행(지금은 "SNAKE_CASE 전역 적용"만), §2 패키지 트리(`processor/converter/ ⏸ (예정)` 이 실재하게 됐고 `db/migration` 이 `V1·V2` 까지만 적혀 있다). 레포 파생 요약은 `docs/specs/api-list.md` 한 줄뿐이고 `db-schema.md` 는 0건.
+
+**Phase 4 는 이제 목록이 곧 작업 지시서다.** 조사 결과를 계획서 미결 ④ 항목에 그대로 적어 두었다.
 
 ## 2026-08-27
 

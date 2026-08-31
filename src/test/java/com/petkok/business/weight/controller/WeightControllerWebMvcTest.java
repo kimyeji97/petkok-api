@@ -19,7 +19,7 @@ import com.petkok.framework.security.AuthPrincipal;
 import com.petkok.framework.security.UserStatusChecker;
 import com.petkok.framework.security.jwt.JwtTokenProvider;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -64,7 +64,7 @@ class WeightControllerWebMvcTest {
 
   private static WeightResponse sample() {
     return new WeightResponse(
-        LOG_ID, PET_ID, 62, LocalDate.of(2026, 6, 30), null, null, false, LocalDateTime.now());
+        LOG_ID, PET_ID, 62, LocalDate.of(2026, 6, 30), null, null, false, OffsetDateTime.now());
   }
 
   @Test

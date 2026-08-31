@@ -10,3 +10,6 @@ build/
 .env
 .env.*
 !.env.example
+
+# 에이전트 개인 메모 (머신마다 다른 로컬 환경 — 커밋하지 않음)
+CLAUDE.local.md

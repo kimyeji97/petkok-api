@@ -16,7 +16,7 @@ import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.security.jwt.JwtTokenProvider;
 import com.petkok.framework.util.encrypt.SHA256Util;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -124,7 +124,7 @@ public class AuthService {
             .findByTokenHash(hash(refreshToken))
             .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
 
-    LocalDateTime now = LocalDateTime.now();
+    OffsetDateTime now = OffsetDateTime.now();
     if (stored.isRevoked()) {
       // 재사용 감지. 여기서 조용히 거절만 하면 공격자가 쥔 다른 토큰은 계속 살아 있다.
       log.warn("Revoked refresh token reused. userId={}", stored.getUserId());
@@ -150,7 +150,7 @@ public class AuthService {
    */
   @Transactional
   public void logout(UUID userId) {
-    refreshTokenRepository.revokeAllByUserId(userId, LocalDateTime.now());
+    refreshTokenRepository.revokeAllByUserId(userId, OffsetDateTime.now());
   }
 
   /**
