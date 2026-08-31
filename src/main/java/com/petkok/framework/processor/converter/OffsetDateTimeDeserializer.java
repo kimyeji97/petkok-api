@@ -3,10 +3,10 @@ package com.petkok.framework.processor.converter;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.petkok.framework.constant.TimeConstant;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 
@@ -24,9 +24,6 @@ import java.time.temporal.TemporalAccessor;
  */
 public class OffsetDateTimeDeserializer extends JsonDeserializer<OffsetDateTime> {
 
-  /** ⚠️ Phase 3 에서 {@code framework/constant} 의 {@code ZoneId} 상수로 옮긴다 (REQ-16-11). */
-  private static final ZoneId FALLBACK_ZONE = ZoneId.of("Asia/Seoul");
-
   @Override
   public OffsetDateTime deserialize(JsonParser parser, DeserializationContext context)
       throws IOException {
@@ -40,6 +37,6 @@ public class OffsetDateTimeDeserializer extends JsonDeserializer<OffsetDateTime>
     if (parsed instanceof OffsetDateTime offsetDateTime) {
       return offsetDateTime;
     }
-    return ((LocalDateTime) parsed).atZone(FALLBACK_ZONE).toOffsetDateTime();
+    return ((LocalDateTime) parsed).atZone(TimeConstant.KST).toOffsetDateTime();
   }
 }

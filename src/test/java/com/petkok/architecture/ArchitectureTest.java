@@ -9,6 +9,11 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.library.Architectures;
 import jakarta.persistence.Entity;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 
 /**
  * 구조 규칙을 테스트로 고정한다. 산문 규칙(AGENTS.md §3·§5)은 시간이 지나면 깨지므로 여기서 강제한다.
@@ -145,5 +150,42 @@ final class ArchitectureTest {
           .should()
           .resideInAPackage(ROOT + ".data..entity..")
           .as("@Entity 는 data/{도메인}/entity 에만 둔다")
+          .allowEmptyShould(false);
+
+  /**
+   * 시각 획득 경로 통일 — 무인자 {@code now()} 직접 호출 금지. 검증 계약 REQ-16-10 (PLAN-REQ-16 § 검증 계약, D5).
+   *
+   * <p>{@code now()} 는 <b>JVM 기본 타임존에 암묵 의존</b>한다. 배포 환경에 {@code TZ} 가 없으면 값이 9시간 어긋난 채 <b>에러
+   * 없이</b> 저장된다 — 이 프로젝트가 반복해 밟은 "조용한 실패"와 같은 얼굴이다({@code .env} 빈 값 · {@code db.schema} 한쪽만 배선).
+   * {@code Clock} 을 주입하면 테스트에서 시각을 고정할 수도 있다.
+   *
+   * <p>⚠️ <b>다섯 타입을 전부 거는 이유.</b> 계획서 문구는 {@code LocalDateTime.now()} 하나였는데, Phase 1 이 대상을 전부
+   * {@code OffsetDateTime} 으로 바꿔 <b>그 문구대로 쓰면 이 규칙이 공허해진다</b> — {@code AuthService} 두 곳이 규칙 밖으로 빠져
+   * {@code Clock} 주입을 안 해도 초록불이 된다(2026-08-31 실측). {@code LocalDate} · {@code Instant} · {@code
+   * ZonedDateTime} 은 아직 호출부가 없지만 D4(달력 판정 = KST)가 REQ-10 에서 {@code LocalDate} 를 쓰게 되므로 미리 막는다.
+   *
+   * <p><b>{@code now(Clock)} 오버로드는 걸리지 않는다</b> — 파라미터 없는 시그니처만 지정했기 때문이고, 그게 이 규칙이 열어 두려는 정확한 통로다.
+   *
+   * <p><b>{@code data} 는 범위 밖이다</b>(2026-08-31 결정). {@code BaseSoftDeleteEntity.softDelete()} 가
+   * {@code OffsetDateTime.now()} 를 부르지만 JPA 엔티티라 빈을 주입할 수 없고, {@code deleted_at} 은 벽시계 파생이 아니라
+   * <b>순간</b>이라 D4 의 자리가 아니다 — Phase 1 이 {@code OffsetDateTime} 으로 바꾼 시점에 TZ 위험은 이미 사라졌다. 남는 이득은
+   * 테스트 고정 하나뿐이라 엔티티 시그니처를 바꿀 값을 못 한다.
+   */
+  @ArchTest
+  static final ArchRule REQ_16_10_NO_DIRECT_NOW =
+      noClasses()
+          .that()
+          .resideInAnyPackage(BUSINESS, FRAMEWORK)
+          .should()
+          .callMethod(LocalDateTime.class, "now")
+          .orShould()
+          .callMethod(OffsetDateTime.class, "now")
+          .orShould()
+          .callMethod(LocalDate.class, "now")
+          .orShould()
+          .callMethod(Instant.class, "now")
+          .orShould()
+          .callMethod(ZonedDateTime.class, "now")
+          .as("[REQ-16-10] business·framework 는 무인자 now() 를 직접 부르지 않는다 (Clock 주입)")
           .allowEmptyShould(false);
 }

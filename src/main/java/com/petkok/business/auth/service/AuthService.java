@@ -11,11 +11,13 @@ import com.petkok.data.user.entity.UserSocialAccount;
 import com.petkok.data.user.enums.SocialProvider;
 import com.petkok.data.user.repository.UserRepository;
 import com.petkok.data.user.repository.UserSocialAccountRepository;
+import com.petkok.framework.constant.TimeConstant;
 import com.petkok.framework.exception.BusinessException;
 import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.security.jwt.JwtTokenProvider;
 import com.petkok.framework.util.encrypt.SHA256Util;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,17 +44,27 @@ public class AuthService {
   private final RefreshTokenRepository refreshTokenRepository;
   private final JwtTokenProvider jwtTokenProvider;
 
+  /**
+   * 시각은 주입받는다 — 무인자 {@code now()} 를 부르지 않는다 (D5 · 검증 계약 REQ-16-10).
+   *
+   * <p>존은 {@link TimeConstant#KST} 다. 만료 판정에는 존이 영향을 주지 않지만(순간 비교), 고정 {@code Clock} 으로 <b>경계를 실행
+   * 시각과 무관하게 재현</b>할 수 있게 된다 (REQ-16-12 · 17).
+   */
+  private final Clock clock;
+
   public AuthService(
       KakaoOAuthClient kakaoOAuthClient,
       UserRepository userRepository,
       UserSocialAccountRepository socialAccountRepository,
       RefreshTokenRepository refreshTokenRepository,
-      JwtTokenProvider jwtTokenProvider) {
+      JwtTokenProvider jwtTokenProvider,
+      Clock clock) {
     this.kakaoOAuthClient = kakaoOAuthClient;
     this.userRepository = userRepository;
     this.socialAccountRepository = socialAccountRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.jwtTokenProvider = jwtTokenProvider;
+    this.clock = clock;
   }
 
   /**
@@ -124,7 +136,7 @@ public class AuthService {
             .findByTokenHash(hash(refreshToken))
             .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
 
-    OffsetDateTime now = OffsetDateTime.now();
+    OffsetDateTime now = OffsetDateTime.now(clock);
     if (stored.isRevoked()) {
       // 재사용 감지. 여기서 조용히 거절만 하면 공격자가 쥔 다른 토큰은 계속 살아 있다.
       log.warn("Revoked refresh token reused. userId={}", stored.getUserId());
@@ -150,7 +162,7 @@ public class AuthService {
    */
   @Transactional
   public void logout(UUID userId) {
-    refreshTokenRepository.revokeAllByUserId(userId, OffsetDateTime.now());
+    refreshTokenRepository.revokeAllByUserId(userId, OffsetDateTime.now(clock));
   }
 
   /**
