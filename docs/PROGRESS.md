@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-08-31 (PR #41·#42 머지 · **REQ-16 Phase 3 완료** · **Phase 4 문서 역반영 — 탭 2곳만 사람 손으로 남음**)
+> 최종 갱신: 2026-09-01 (PR #43·#44 머지 · **REQ-16 완료** — Notion 탭 2곳 반영 확인)
 
 ## 요구사항 인덱스
 
@@ -21,11 +21,11 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0~2 완료 2026-08-28 · **Phase 3 이후는 REQ-16 뒤** · 로컬 DB 확인 **1건 남음** — JPQL 기동은 닫힘) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0~2 완료 2026-08-28 · **REQ-16 완료로 Phase 3 선행 조건 충족 — Notion 역반영 ⓖ~ⓙ는 별도로 남음** · 로컬 DB 확인 **1건 남음** — JPQL 기동은 닫힘) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
-| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | — | 🟡 (**Phase 0~3 완료 · Phase 4 역반영 완료 2026-08-31** · ⏸ **Notion 탭 2곳은 API 로 못 고쳐 사람 손 대기** — 그래서 아직 ✅ 가 아니다 · 미결 2건) |
+| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-01 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 ⑦⑧은 이 REQ 밖 판단으로 별건) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -34,6 +34,42 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-01
+
+> **REQ-16 완결.** Notion 탭 2곳(API "날짜 포맷" 행·DB DDL 코드블록)까지 사람 손으로 반영되며 미결 ④가 완전히 닫혔다. 그 과정에서 새로 드러난 것 셋 — **ERD 페이지가 전수 조사에서 또 빠져 있었다**(여섯 번째 열거 오류), **DDL 붙여넣기가 한 번 깨졌다가 재확인으로 잡혔다**, **머지·삭제된 로컬 브랜치 위에 커밋하는 사고**.
+
+### PR #43 머지 — REQ-16 Phase 4 문서 역반영이 `main`에 들어갔다
+
+전날 `docs/req16-phase4-backfill`이 로컬에만 있던 것을 PR로 만들어 CI 확인(SHA 대조) 후 머지, 브랜치 삭제까지 정상 처리했다.
+
+### ⭐ 「ERD 설계」 페이지가 전수 조사 범위 밖이었다 — 여섯 번째 열거 오류
+
+2026-08-28 미결④ 전수 조사는 `API I/F` 응답 12행·「소스 구조」·「테이블 정의서」까지는 잡았지만 **「ERD 설계」 페이지의 테이블 스키마 코드블록 9개**를 놓쳤다. 사용자가 직접 지적해 드러났다 — `timestamp`가 9개 코드블록(19곳) + 산문 2곳에 그대로 남아 있었다. ERD 페이지는 DB 탭 본문과 달리 **일반 페이지 객체**라 `notion-update-page`로 정상 반영됐다.
+
+> 앞선 다섯 번(날짜 컬럼 개수 · `now()` 호출 곳 수 · `LocalDateTimeUtil` 존재 · 타입 이름 · 테이블 정의서)과 같은 패턴이다. **"전수 조사"라고 부른 것이 실제로는 전수가 아니었다** — Notion 설계 트리 안에서 시각 리터럴이 있을 수 있는 위치를 사람이 나열하는 방식 자체가 계속 새는 지점을 만든다. 이 REQ 안에서만 여섯 번이면, 다음에 비슷한 전수 조사를 할 때는 "나열이 아니라 순회"로 방법을 바꿀 필요가 있다.
+
+### DB 탭 DDL 붙여넣기가 한 번 깨졌다 — 재조회로 잡았다
+
+사용자가 1차로 DDL 코드블록(레포 V1+V2+V3 병합본)을 Notion에 붙여넣었으나, **10개 테이블 중 8개에서 줄 중간이 잘려나가 있었다** — `references us`(`ers (id),` 유실), `-- 앱 검증T`(코멘트 전체 유실), `created_at ... now()` 뒤 쉼표 누락(다음 줄과 붙어 문법 깨짐), `idx_photos_diary_entry_id on photos (diary_e_id is not null;`(단어 중간이 뭉개짐) 등. 붙여넣기 소스의 줄바꿈 폭이 원인으로 추정된다. 다시 붙여넣도록 안내했고, 재조회에서 10개 테이블 전부 정상 확인됐다.
+
+> ⚠️ **Notion에 사람이 붙여넣은 긴 코드블록은 "붙여넣었다"는 보고만으로 믿지 말 것.** 반드시 `fetch`로 재조회해 실제 저장된 텍스트를 확인한다 — 이번처럼 절반 넘는 줄이 조용히 잘려나가도 Notion 쪽에서 에러를 내지 않는다.
+
+### ⚠️ 머지·삭제된 로컬 브랜치 위에 커밋했다 — `git fetch --prune` 전에는 안 보인다
+
+`docs/req16-phase4-backfill`은 PR #43로 머지되고 원격 브랜치도 삭제된 상태였는데, **로컬 브랜치는 그대로 남아 있었고 그 위에 `db-schema.md` 수정을 그대로 커밋해버렸다.** `git status`·`git branch --show-current` 어디에도 이상 신호가 없었다 — `git fetch --prune`으로 원격 추적이 `gone`으로 바뀐 뒤에야 드러났다. 복구는 `origin/main` 기준 새 브랜치를 파서 해당 커밋만 `cherry-pick`, 낡은 로컬 브랜치는 삭제. PR #44로 다시 만들어 CI 확인(SHA 대조) 후 머지했다.
+
+> AGENTS §4에 이미 있는 "로컬 전용 브랜치는 다음 세션에서 안 보인다" · "스택 PR base 자동 재지정" · "CI 초록불은 SHA로 확인" 항목과 같은 결이다 — **PR이 머지되고 원격 브랜치가 삭제된 뒤에도 로컬 브랜치는 스스로 없어지지 않고, git은 그 위에 이어지는 커밋을 경고 없이 받아준다.** AGENTS.md §4 승격을 제안한다(아래 "계약 승격 제안" 참고).
+
+### `docs/specs/db-schema.md`가 V3 이후로 한 번도 갱신되지 않았었다
+
+전날 Phase 4 실행 기록은 "개요 표에 두 행 신설"이라고 적었지만 실제 커밋 diff에는 이 파일이 없었다 — 기록과 코드가 어긋난 사례. 오늘 시각 컬럼 19개 `timestamp` → `timestamptz`, 개요 표 2행 신설(시각 컬럼 타입/날짜만 있는 컬럼), 대조 이력 갱신까지 마치고 PR #44로 머지했다.
+
+### REQ-16 Phase 4 완료 기준 충족 — 체크 켬, REQ-16 ✅
+
+미결④의 남은 ⏸ 항목(탭 2곳)이 모두 닫혀 Phase 4 완료 기준 "원본과 코드가 어긋나는 곳 0건"을 충족했다. REQ-16 상태를 ✅로 올린다. **미결 ⑦⑧**(`BaseSoftDeleteEntity.softDelete()`의 `Clock` 주입 여부 · `JwtTokenProvider.create()`의 `new Date()` 규약 포함 여부)은 이 REQ 밖 판단으로 계획서에 열린 채 남아 있다.
+
+**계약 승격 제안** — 위 "머지·삭제된 로컬 브랜치" 함정을 AGENTS.md §4에 추가할 것을 제안한다. 다음 세션에서 확인·승인 필요.
 
 ## 2026-08-31
 
