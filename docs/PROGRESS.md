@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-01 (PR #43·#44 머지 · **REQ-16 완료** — Notion 탭 2곳 반영 확인)
+> 최종 갱신: 2026-09-01 (PR #43·#44 머지 · **REQ-16 완료** · **REQ-10 Phase 3(feeding) 케이스 25건 통과** — 로컬 DB 확인 남아 체크 보류)
 
 ## 요구사항 인덱스
 
@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0~2 완료 2026-08-28 · **REQ-16 완료로 Phase 3 선행 조건 충족 — Notion 역반영 ⓖ~ⓙ는 별도로 남음** · 로컬 DB 확인 **1건 남음** — JPQL 기동은 닫힘) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0~2 완료 2026-08-28 · **Phase 3(feeding) 케이스 25건 전부 통과 2026-09-01** — `feat/req10-phase3-feeding` 미푸시, V4 로컬 DB 확인 남아 체크 보류) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -70,6 +70,26 @@
 미결④의 남은 ⏸ 항목(탭 2곳)이 모두 닫혀 Phase 4 완료 기준 "원본과 코드가 어긋나는 곳 0건"을 충족했다. REQ-16 상태를 ✅로 올린다. **미결 ⑦⑧**(`BaseSoftDeleteEntity.softDelete()`의 `Clock` 주입 여부 · `JwtTokenProvider.create()`의 `new Date()` 규약 포함 여부)은 이 REQ 밖 판단으로 계획서에 열린 채 남아 있다.
 
 **계약 승격 제안** — 위 "머지·삭제된 로컬 브랜치" 함정을 AGENTS.md §4에 추가할 것을 제안한다. 다음 세션에서 확인·승인 필요.
+
+> ✅ **계약 승격 완료 (같은 날 오후).** 사용자 승인 후 AGENTS.md §4에 반영(`87c1188`).
+
+### Notion 역반영 ⓖ~ⓙ 완료 — REQ-10 Phase 3 착수 전 원본 정리
+
+REQ-10 Phase 3(feeding) 착수 전 선행 조건이던 Notion 역반영 4건(급여 기록 callout·food_size 절, 거식 스트릭 응답 예시 자기모순, 「소스 구조」 §10 `FEATURE_NOT_SUPPORTED_SPECIES`)을 API로 직접 반영했다(`016a0ca`) — 이번엔 REQ-16 때와 달리 개별 행(row)·일반 페이지라 쓰기가 됐다. **ⓘ의 전제가 틀렸었다** — "`SHED_NOT_SUPPORTED_SPECIES` 제거" 대상이 Notion 어디에도 없었다(`notion-search`로 확인, 레포 자체 명명이었다). 제거할 게 없어 추가만 했고 `api-list.md`도 맞췄다 — REQ-16에서 반복된 "열거가 실제 원본과 어긋난다" 패턴과 같은 종류.
+
+### REQ-10 Phase 3(feeding) — `/testgen` → `/implement` → `/testrun`, 케이스 25건 전부 통과
+
+**`/testgen`** — 계획서 완료 기준·미결 질문에서 케이스 25건(REQ-10-43~67)을 뽑아 표를 승인받고 테스트 코드까지 썼다. 대상 클래스가 없어 컴파일 안 되는 상태(Phase 1·2 와 같은 순서)로 남겨 뒀다. 설계로 정한 것 — `AnorexiaStreakCalculator.calculate(lastEatenAt, now)` 는 급여 기록 List 가 아니라 "마지막 정상 급여 시각(nullable)"만 받는 순수 정적 메서드다. **이 시그니처 자체가 "일수냐 건수냐" 미결을 답한다** — 건수는 파라미터에 아예 없어 계산에 들어올 수가 없다.
+
+**`/implement REQ-10 3`** — `main`이 보호 브랜치라 `feat/req10-phase3-feeding`을 새로 팠다. `FeedingLog`(`Pet`과 같은 이유로 필드 8개 → `@Builder`+`@AllArgsConstructor(PRIVATE)` 필요, AGENTS §5) · `FeedingService` · `FeedingController` · `V4__feeding_food_size.sql` · `ErrorCode.FEATURE_NOT_SUPPORTED_SPECIES` 신설까지 구현. 자체 실행 26/28 통과, `REQ-10-51` 2건 실패로 `wip` 커밋(`9e148df`) 후 미푸시.
+
+**`/testrun REQ-10`** — 실패 2건을 근거(D8 "`id` desc 타이브레이크", 시간대 표기와 무관)와 대조해 **(a) 테스트 결함**으로 분류하고 고쳤다.
+
+> ⭐ **테스트가 만드는 `CursorCodec`이 오프셋을 조용히 뭉갠다.** `FeedingServiceTest`는 `NOW`를 `2026-07-07T12:00:00+09:00`으로 선언했는데, 이 테스트가 직접 만든 `CursorCodec`(`new ObjectMapper().findAndRegisterModules()`)은 앱의 `JacksonConfig`(KST 존 설정)를 안 거친 무설정 매퍼다 — 인코드 시 Jackson jsr310 기본값(`ADJUST_DATES_TO_CONTEXT_TIME_ZONE`)이 `+09:00`을 `Z`로 정규화해, **순간은 같은데 레코드 동등성 비교(`OffsetDateTime.equals`)만 깨진다.** `WeightServiceTest`는 `LocalDate`라 애초에 무관했고 `ActivityServiceTest`는 우연히 `ZoneOffset.UTC` 리터럴을 써서 드러나지 않았다 — feeding이 KST 리터럴을 쓴 첫 케이스라 처음 노출됐다. `NOW`를 `Z` 표기(같은 순간)로 바꿔 해결.
+
+수정 후 `/testrun`을 다시 돌려 REQ-10 전체(weight·activity·feeding) 82케이스 전부 통과 확인. 검증 계약 표의 `결과` 열을 채우고 Phase 3 절 갱신 — 단 **완료 기준의 "V4 로컬 DB 적용·`ddl-auto: validate` 통과"는 여전히 미확인**이라 체크는 켜지 않았다(Phase 1·2 와 같은 성격의 보류).
+
+**계약 승격 제안** — "테스트에서 `CursorCodec`을 직접 만들 때 `OffsetDateTime` 리터럴은 `ZoneOffset.UTC`(또는 `Z`)를 쓴다 — 비-UTC 오프셋을 쓰면 인코드 후 레코드 동등성 비교가 조용히 깨진다"를 AGENTS.md에 승격할 것을 제안한다. shed·diary Phase에서 같은 함정을 또 밟을 수 있다.
 
 ## 2026-08-31
 
