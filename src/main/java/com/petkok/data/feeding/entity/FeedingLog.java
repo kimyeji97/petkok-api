@@ -19,8 +19,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 급여 기록 ({@code feeding_logs}). {@code ActivityLog} 와 같은 형태 — {@code deleted_at} 없음(D7) ·
- * {@code petId} 는 UUID 컬럼({@code @ManyToOne} 아님).
+ * 급여 기록 ({@code feeding_logs}). {@code ActivityLog} 와 같은 형태 — {@code deleted_at} 없음(D7) · {@code
+ * petId} 는 UUID 컬럼({@code @ManyToOne} 아님).
  *
  * <p>{@code foodSize} 는 <b>종과 무관하게 받은 값을 그대로 둔다</b> — "개/고양이 미사용"은 UI 규약이지 서버 거부 규약이 아니다
  * (PLAN-REQ-10 미결 질문 Phase 3, D13 과 같은 결).

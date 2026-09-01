@@ -36,11 +36,10 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * 급여 기록의 <b>HTTP 계약</b>. 검증 계약 REQ-10-43 · 44 · 48 · 52 · 53 · 58 · 66 · 67 (PLAN-REQ-10 § 검증
- * 계약). 구성은 AGENTS §6 관례.
+ * 급여 기록의 <b>HTTP 계약</b>. 검증 계약 REQ-10-43 · 44 · 48 · 52 · 53 · 58 · 66 · 67 (PLAN-REQ-10 § 검증 계약).
+ * 구성은 AGENTS §6 관례.
  *
- * <p>⚠️ 이 파일은 {@code FeedingController} 등이 아직 없어 컴파일되지 않는다 — {@code /implement REQ-10 3} 이
- * 만든다.
+ * <p>⚠️ 이 파일은 {@code FeedingController} 등이 아직 없어 컴파일되지 않는다 — {@code /implement REQ-10 3} 이 만든다.
  */
 @WebMvcTest(FeedingController.class)
 @Import({SecurityConfig.class, JacksonConfig.class})

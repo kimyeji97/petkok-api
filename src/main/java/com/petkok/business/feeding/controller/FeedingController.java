@@ -25,9 +25,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 급여 기록 엔드포인트 (Notion {@code API I/F} Feeding 5행). <b>전부 인증이 필요하다.</b> 상태코드는 원본 그대로 — {@code
- * POST} 201 · {@code GET} 200 · {@code PATCH} 200 · {@code DELETE} 204. 검증 계약 REQ-10-43 · 44 · 48 ·
- * 52 · 53 · 58 · 66 · 67.
+ * 급여 기록 엔드포인트 (Notion {@code API I/F} Feeding 5행). <b>전부 인증이 필요하다.</b> 상태코드는 원본 그대로 — {@code POST}
+ * 201 · {@code GET} 200 · {@code PATCH} 200 · {@code DELETE} 204. 검증 계약 REQ-10-43 · 44 · 48 · 52 ·
+ * 53 · 58 · 66 · 67.
  */
 @RestController
 @RequestMapping("/api/v1/pets/{petId}/feeding")

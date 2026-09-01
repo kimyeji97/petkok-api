@@ -13,8 +13,8 @@ import java.time.temporal.ChronoUnit;
  *
  * <p>마지막 정상 급여 시각(없으면 {@code null})부터 기준 시각까지의 <b>KST 달력 일수</b>로 판정한다 — {@code >= 7} {@link
  * StreakLevel#DANGER}, {@code >= 3} {@link StreakLevel#CAUTION}, 나머지 {@link StreakLevel#NONE}. 거식
- * "시도 건수"는 파라미터에 없다 — 일수 기준이라 건수가 계산에 들어올 자리가 없다(PLAN-REQ-10 미결 질문 Phase 3, "연속 거식 건수 안은
- * 기각"). "기록은 있지만 전부 거식"인 경우도 {@code lastEatenAt = null} 로 들어와 0건과 같은 결과가 된다.
+ * "시도 건수"는 파라미터에 없다 — 일수 기준이라 건수가 계산에 들어올 자리가 없다(PLAN-REQ-10 미결 질문 Phase 3, "연속 거식 건수 안은 기각"). "기록은
+ * 있지만 전부 거식"인 경우도 {@code lastEatenAt = null} 로 들어와 0건과 같은 결과가 된다.
  */
 public final class AnorexiaStreakCalculator {
 

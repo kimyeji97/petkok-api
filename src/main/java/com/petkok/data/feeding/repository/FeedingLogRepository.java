@@ -11,8 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * 급여 기록 저장소. 정렬은 {@code fed_at desc, id desc} (D8) — 인덱스 {@code idx_feeding_pet_fed_at}. ⚠️
- * 기록 조회는 반드시 {@code pet_id} 를 함께 건다 (D6). {@code ActivityLogRepository} 와 같은 형태.
+ * 급여 기록 저장소. 정렬은 {@code fed_at desc, id desc} (D8) — 인덱스 {@code idx_feeding_pet_fed_at}. ⚠️ 기록 조회는
+ * 반드시 {@code pet_id} 를 함께 건다 (D6). {@code ActivityLogRepository} 와 같은 형태.
  */
 public interface FeedingLogRepository extends JpaRepository<FeedingLog, UUID> {
 

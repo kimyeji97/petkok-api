@@ -9,15 +9,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 거식 스트릭 계산기 — <b>I/O 없는 순수 클래스</b>(「소스 구조」 §1-4·§8). 검증 계약 REQ-10-59 ~ 65 (PLAN-REQ-10 §
- * 검증 계약).
+ * 거식 스트릭 계산기 — <b>I/O 없는 순수 클래스</b>(「소스 구조」 §1-4·§8). 검증 계약 REQ-10-59 ~ 65 (PLAN-REQ-10 § 검증 계약).
  *
- * <p>⚠️ 이 파일은 {@code AnorexiaStreakCalculator} 가 아직 없어 컴파일되지 않는다 — {@code /implement REQ-10
- * 3} 이 만든다.
+ * <p>⚠️ 이 파일은 {@code AnorexiaStreakCalculator} 가 아직 없어 컴파일되지 않는다 — {@code /implement REQ-10 3} 이
+ * 만든다.
  *
  * <p>가정한 계약 — {@code AnorexiaStreakCalculator.calculate(OffsetDateTime lastEatenAt, OffsetDateTime
- * now)} 는 마지막 정상 급여 시각(없으면 {@code null})과 기준 시각만 받는 <b>순수 정적 메서드</b>다. 거식 시도 건수는 아예 파라미터로
- * 받지 않는다 — "일수" 정의(미결 질문)가 "건수" 정의와 애초에 갈릴 수 없는 시그니처다. 날짜 변환은 {@code TimeConstant.KST} 를 쓴다.
+ * now)} 는 마지막 정상 급여 시각(없으면 {@code null})과 기준 시각만 받는 <b>순수 정적 메서드</b>다. 거식 시도 건수는 아예 파라미터로 받지 않는다 —
+ * "일수" 정의(미결 질문)가 "건수" 정의와 애초에 갈릴 수 없는 시그니처다. 날짜 변환은 {@code TimeConstant.KST} 를 쓴다.
  */
 class AnorexiaStreakCalculatorTest {
 
@@ -29,8 +28,7 @@ class AnorexiaStreakCalculatorTest {
   void req_10_59_noRecordsReturnsZeroNoneNull() {
     AnorexiaStreakResponse response = AnorexiaStreakCalculator.calculate(null, NOW);
 
-    assertThat(response)
-        .isEqualTo(new AnorexiaStreakResponse(0, StreakLevel.NONE, null));
+    assertThat(response).isEqualTo(new AnorexiaStreakResponse(0, StreakLevel.NONE, null));
   }
 
   @Test

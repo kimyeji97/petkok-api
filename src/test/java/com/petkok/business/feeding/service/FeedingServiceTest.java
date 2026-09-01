@@ -36,15 +36,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * 급여 기록의 <b>가드 위임 · D6 · 커서 · 병합 · fed_at 미래 거부 · food_size 종 무관 저장</b>. 검증 계약 REQ-10-45 ~ 47 · 50 · 51
- * · 54 ~ 57 (PLAN-REQ-10 § 검증 계약). {@code WeightServiceTest} · {@code ActivityServiceTest} 와 같은 구성.
+ * 급여 기록의 <b>가드 위임 · D6 · 커서 · 병합 · fed_at 미래 거부 · food_size 종 무관 저장</b>. 검증 계약 REQ-10-45 ~ 47 · 50
+ * · 51 · 54 ~ 57 (PLAN-REQ-10 § 검증 계약). {@code WeightServiceTest} · {@code ActivityServiceTest} 와
+ * 같은 구성.
  *
- * <p>⚠️ <b>이 파일은 {@code FeedingService} 등 Phase 3 대상 클래스가 아직 없어 컴파일되지 않는다.</b> {@code
- * /testgen} 은 케이스를 코드로 고정하는 역할까지만 하고, 대상 클래스는 {@code /implement REQ-10 3} 이 만든다(REQ-08·09·10
- * Phase 1·2 와 같은 순서 — PLAN-REQ-10 § 작업 단계 안내 참고).
+ * <p>⚠️ <b>이 파일은 {@code FeedingService} 등 Phase 3 대상 클래스가 아직 없어 컴파일되지 않는다.</b> {@code /testgen} 은
+ * 케이스를 코드로 고정하는 역할까지만 하고, 대상 클래스는 {@code /implement REQ-10 3} 이 만든다(REQ-08·09·10 Phase 1·2 와 같은 순서
+ * — PLAN-REQ-10 § 작업 단계 안내 참고).
  *
- * <p>가정한 계약 — {@code FeedingService(PetAccessGuard, FeedingLogRepository, CursorCodec, Clock)}. {@code
- * fed_at} 이 미래면 {@code ErrorCode.INVALID_INPUT}(REQ-10-54) — 계획서·원본 어디에도 전용 코드가 없어 기존 범용 코드를
+ * <p>가정한 계약 — {@code FeedingService(PetAccessGuard, FeedingLogRepository, CursorCodec, Clock)}.
+ * {@code fed_at} 이 미래면 {@code ErrorCode.INVALID_INPUT}(REQ-10-54) — 계획서·원본 어디에도 전용 코드가 없어 기존 범용 코드를
  * 그대로 썼다. {@code food_size} 는 종을 검증하지 않고 그대로 저장한다(D13 과 같은 결).
  */
 class FeedingServiceTest {
@@ -70,8 +71,7 @@ class FeedingServiceTest {
   private final FeedingService service = new FeedingService(guard, repository, codec, CLOCK);
 
   private static FeedingLog log(UUID id, boolean isRefused, OffsetDateTime fedAt) {
-    FeedingLog log =
-        FeedingLog.builder().petId(PET_ID).isRefused(isRefused).fedAt(fedAt).build();
+    FeedingLog log = FeedingLog.builder().petId(PET_ID).isRefused(isRefused).fedAt(fedAt).build();
     ReflectionTestUtils.setField(log, "id", id);
     return log;
   }
@@ -107,7 +107,8 @@ class FeedingServiceTest {
   @Test
   @DisplayName("[REQ-10-46] 삭제된 펫이면 가드의 PET_NOT_FOUND 가 그대로 나간다")
   void req_10_46_deletedPetGetsNotFoundFromGuard() {
-    when(guard.getOwnedPet(PET_ID, OWNER)).thenThrow(new BusinessException(ErrorCode.PET_NOT_FOUND));
+    when(guard.getOwnedPet(PET_ID, OWNER))
+        .thenThrow(new BusinessException(ErrorCode.PET_NOT_FOUND));
 
     assertThatThrownBy(() -> service.list(OWNER, PET_ID, new CursorRequest(null, 20)))
         .isInstanceOf(BusinessException.class)
