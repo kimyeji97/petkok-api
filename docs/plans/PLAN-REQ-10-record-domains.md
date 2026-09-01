@@ -1,6 +1,6 @@
 # PLAN-REQ-10 · 기록 도메인 5종 (weight · activity · feeding · shed · diary)
 
-> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0 완료 2026-08-28)
+> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0~2 완료 2026-08-28 · Phase 3 케이스 완료 2026-09-01 — 로컬 DB 확인 남아 체크 보류)
 
 ## 배경
 
@@ -76,10 +76,11 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 - [x] **게코가 `distance_km` 를 보내면 — 거부하지 않고 그대로 저장 (D13 확정, 2026-08-28).** Notion 「활동 기록」 행에 먼저 명시했다. (원문:) 원본 "선택(게코 미사용)". 무시하고 `null` 저장 vs 400. REQ-09 D5(`PATCH` 의 `species` 무시)와 같은 결로 "무시"가 자연스럽지만 원본이 말하지 않는다
 
 **Phase 3 (feeding) 전**
-- [x] **`fed_at` — 미래 시각만 거부 (2026-08-28 확정 · ⚠️ Notion 역반영 대기).** 서버 현재 시각 이전이면 과거 소급을 허용한다. **순간 비교라 타임존 논쟁이 사라진다** — "오늘 날짜만" 안은 자정 직후 입력과 "어제 급여를 오늘 입력"을 막아 기각. (원문:) **`fed_at` "당일 시간만 허용"의 뜻.** ① 오늘 날짜만(어제 기록 불가?) ② 미래만 불가 ③ 서버 현재 시각 이전만. "당일"의 기준 타임존(KST? 클라이언트?)도 없다
-- [x] **거식 스트릭 = 일수 기준 (2026-08-28 확정 · ⚠️ Notion 역반영 대기).** 마지막 `is_refused = false` 급여(`last_eaten_at`)부터 기준 시각까지의 **KST 달력 일수**. `>= 7` DANGER · `>= 3` CAUTION · 나머지 NONE(원본 "3일+"은 3 포함). 기록 0건이면 `{0, NONE, null}`. **연속 거식 건수 안은 기각** — 게코는 며칠에 한 번 먹는 것이 정상이라 급여 시도 횟수에 의존하면 "7일"과 맞지 않는다. (원문:) **거식 스트릭 계산 규칙.** `current_streak_days` 의 정의 — 마지막 `is_refused = false` 급여(`last_eaten_at`) 이후 **일수**인가, 연속 `is_refused = true` 기록 **건수**인가. 기준 시각(요청 시각 KST? UTC?). 기록이 0건일 때 응답. `CAUTION (3일+)` 가 `>= 3` 인지. **계산기의 검증 계약은 이 답이 있어야 쓸 수 있다**
-- [x] **게코 외 종의 스트릭 호출 → `FEATURE_NOT_SUPPORTED_SPECIES` 신설 (2026-08-28 확정 · ⚠️ Notion 역반영 대기).** 게코 전용 기능의 **공통** 코드다. 문구가 탈피 전용인 `SHED_NOT_SUPPORTED_SPECIES` 는 아직 소비자가 없으므로 **제거하고 shed(Phase 4)도 이 코드로 간다** — 기능마다 코드를 늘리는 안은 기각. (원문:) **거식 스트릭을 게코 외 종이 부르면** — 원본 "🦎 게코 전용"인데 **ErrorCode 가 없다**(shed 의 `SHED_NOT_SUPPORTED_SPECIES` 는 shed 전용 문구). 새 코드를 만들지, `SHED_…` 를 일반화할지
-- [x] **`food_size` 는 종과 무관하게 그대로 저장 (2026-08-28 확정 · ⚠️ Notion 역반영 대기).** D13(`distance_km`)과 같은 결 — "개/고양이 미사용"은 입력 UI 규약이지 서버 거부 규약이 아니다. 거부하는 것은 enum 밖의 값뿐(400). (원문:) **`food_size` 를 개/고양이가 보내면** — "개/고양이 미사용". 무시 vs 400 (activity `distance_km` 와 같은 질문)
+- [x] **`fed_at` — 미래 시각만 거부 (2026-08-28 확정 · 2026-09-01 Notion 역반영 완료 — 「급여 기록」 callout·Validation).** 서버 현재 시각 이전이면 과거 소급을 허용한다. **순간 비교라 타임존 논쟁이 사라진다** — "오늘 날짜만" 안은 자정 직후 입력과 "어제 급여를 오늘 입력"을 막아 기각. (원문:) **`fed_at` "당일 시간만 허용"의 뜻.** ① 오늘 날짜만(어제 기록 불가?) ② 미래만 불가 ③ 서버 현재 시각 이전만. "당일"의 기준 타임존(KST? 클라이언트?)도 없다
+- [x] **거식 스트릭 = 일수 기준 (2026-08-28 확정 · 2026-09-01 Notion 역반영 완료 — 「🦎 거식 스트릭 조회」 응답 예시의 `level` 을 `DANGER`(자기모순)에서 `CAUTION` 으로 정정).** 마지막 `is_refused = false` 급여(`last_eaten_at`)부터 기준 시각까지의 **KST 달력 일수**. `>= 7` DANGER · `>= 3` CAUTION · 나머지 NONE(원본 "3일+"은 3 포함). 기록 0건이면 `{0, NONE, null}`. **연속 거식 건수 안은 기각** — 게코는 며칠에 한 번 먹는 것이 정상이라 급여 시도 횟수에 의존하면 "7일"과 맞지 않는다. (원문:) **거식 스트릭 계산 규칙.** `current_streak_days` 의 정의 — 마지막 `is_refused = false` 급여(`last_eaten_at`) 이후 **일수**인가, 연속 `is_refused = true` 기록 **건수**인가. 기준 시각(요청 시각 KST? UTC?). 기록이 0건일 때 응답. `CAUTION (3일+)` 가 `>= 3` 인지. **계산기의 검증 계약은 이 답이 있어야 쓸 수 있다**
+- [x] **게코 외 종의 스트릭 호출 → `FEATURE_NOT_SUPPORTED_SPECIES` 신설 (2026-08-28 확정 · 2026-09-01 Notion 역반영 완료 — 「소스 구조」 §10 ErrorCode 예시에 `400 FEATURE_NOT_SUPPORTED_SPECIES` 추가).** 게코 전용 기능의 **공통** 코드다. (원문:) **거식 스트릭을 게코 외 종이 부르면** — 원본 "🦎 게코 전용"인데 **ErrorCode 가 없다**. 새 코드를 만들지, `SHED_…` 를 일반화할지
+      ⚠️ **"제거" 대상이 애초에 Notion에 없었다.** `SHED_NOT_SUPPORTED_SPECIES` 는 `docs/specs/api-list.md`·이 계획서에만 있던 **레포 자체 명명**이고, API I/F 의 탈피 기록/목록/예측 행 어디에도 이 문자열이 적힌 적이 없다(2026-09-01 `notion-search` 로 확인 — 원문은 전부 "🦎 게코 전용"만 적혀 있고 ErrorCode 이름이 없었다). **"제거"가 아니라 처음부터 "추가"뿐이었다** — 역반영 대상이라고 적은 항목의 전제 자체가 계획서 안에서만 존재했던 경우로, 앞서 REQ-16 에서 반복된 "열거가 실제 원본과 어긋난다" 패턴과 같은 결이다. `api-list.md:144` 도 `FEATURE_NOT_SUPPORTED_SPECIES` 로 맞췄다
+- [x] **`food_size` 는 종과 무관하게 그대로 저장 (2026-08-28 확정 · 2026-09-01 Notion 역반영 완료 — 「급여 기록」 Validation 문구 정정).** D13(`distance_km`)과 같은 결 — "개/고양이 미사용"은 입력 UI 규약이지 서버 거부 규약이 아니다. 거부하는 것은 enum 밖의 값뿐(400). (원문:) **`food_size` 를 개/고양이가 보내면** — "개/고양이 미사용". 무시 vs 400 (activity `distance_km` 와 같은 질문)
 
 **Phase 4 (shed) 전**
 - [ ] **"완료일은 시작일 이후여야 함"** — `shed_records` 에는 `shed_date` 하나뿐이다. 낡은 문구로 보이며 **원본 행에서 지우는 역반영**이 필요하다. 지우지 않으면 검증 계약이 존재하지 않는 컬럼을 가리킨다
@@ -93,7 +94,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 
 **전체**
 - [x] **응답 시각의 `Z` 표기 → REQ-16 으로 이관 (2026-08-28).** framework 전역 결정으로 번져 별도 REQ 가 됐다 — 저장을 `timestamptz` 로 바꾸고 응답은 `+09:00`, 달력 판정은 KST 고정([ADR-0002](../adr/ADR-0002-time-handling-timestamptz.md) · [PLAN-REQ-16](PLAN-REQ-16-time-handling-timestamptz.md)). **REQ-10 Phase 3 이후는 REQ-16 완료 뒤에 진행한다** — "당일"·스트릭 일수가 달력 기준을 요구하기 때문이다. (원문:) **응답 시각의 `Z` 표기** (2026-08-28 등록) — D12 는 "요청·응답은 ISO-8601 `Z`"인데 Jackson 에 시각 포맷 설정이 없어 응답 `logged_at`·`created_at` 이 `2026-06-30T09:00:00`(Z 없음)으로 나간다. 기존 엔티티 전부 같은 상태라 framework 전역 결정이다 — `JacksonConfig` 에 `LocalDateTime` 직렬화 포맷을 두거나 D12 문구를 현실에 맞추거나. Phase 3 전에 정한다
-- [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ~~ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절~~ (2026-08-28 완료) ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제 ~~ⓔ 체중 경고 필드 명시~~ (2026-08-28 완료) ~~ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건~~ (2026-08-28 완료 — callout + 스케치 ① 갱신, `fetch` 로 저장 확인) **ⓖ 급여 기록 callout "당일 시간만 허용" → "미래 시각 불가" ⓗ 거식 스트릭 응답 예시의 자기모순(`current_streak_days: 5` 인데 `level: "DANGER"` — 같은 행 규칙은 `DANGER (7일+)`) ⓘ 「소스 구조」 §10 에 `FEATURE_NOT_SUPPORTED_SPECIES` 추가 · `SHED_NOT_SUPPORTED_SPECIES` 제거 ⓙ 급여 기록 행에 `food_size` 처리 절 — ⓖ~ⓙ 는 2026-08-28 결정분이고 Phase 3 착수 전에 원본부터 고친다.** (시각 예시 `…Z` → `+09:00` 은 REQ-16 Phase 4 소관)
+- [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ~~ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절~~ (2026-08-28 완료) ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제 ~~ⓔ 체중 경고 필드 명시~~ (2026-08-28 완료) ~~ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건~~ (2026-08-28 완료 — callout + 스케치 ① 갱신, `fetch` 로 저장 확인) ~~ⓖ 급여 기록 callout "당일 시간만 허용" → "미래 시각 불가" ⓗ 거식 스트릭 응답 예시의 자기모순 ⓘ 「소스 구조」 §10 에 `FEATURE_NOT_SUPPORTED_SPECIES` 추가 ⓙ 급여 기록 행에 `food_size` 처리 절~~ (2026-09-01 완료 — `fetch` 재조회로 4곳 전부 확인. ⓘ의 "`SHED_NOT_SUPPORTED_SPECIES` 제거"는 대상이 애초에 Notion에 없어 추가만 했다, 위 미결 참고) — Phase 3 착수 전 원본 정리 끝. (시각 예시 `…Z` → `+09:00` 은 REQ-16 Phase 4 소관, 완료됨)
 
 ## 작업 단계
 
@@ -111,9 +112,9 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
       Phase 1 형태 복제 + `ActivityType` enum + 종별 검증(`INVALID_SPECIES_ACTIVITY`).
       완료 기준: 게코가 `WALK` → 400 `INVALID_SPECIES_ACTIVITY` · 개가 `HANDLING` → 400 · 개가 `WALK` → 201 · 게코가 `HANDLING` → 201 · PATCH 로 `activity_type` 을 바꿔도 종 검증이 다시 걸린다 · 나머지는 Phase 1 과 동일 기준
 
-- [ ] **Phase 3 — feeding (5행) + V4** — ⚠️ **선행: REQ-16 완료** (달력 기준·`timestamptz`). `V3` 는 REQ-16 이 가져갔다
-      `V3__feeding_food_size.sql` · `FeedingLog` · `FoodSize` enum(S/M/L) · CRUD 4행 · `AnorexiaStreakCalculator`(순수) + `GET /feeding/anorexia-streak`.
-      완료 기준: V4 가 로컬 DB 에 적용되고 `ddl-auto: validate` 통과 · `is_refused` 누락 400 · 계산기 단위 테스트가 미결 답(스트릭 정의·경계·0건)을 케이스로 고정 · `level` 경계값(2일/3일/6일/7일) · 게코 외 종의 스트릭 호출이 미결 답대로 · 나머지는 Phase 1 기준
+- [ ] **Phase 3 — feeding (5행) + V4** — 코드·케이스 25건 완료 (2026-09-01, `9e148df` · `feat/req10-phase3-feeding`, 미푸시). **체크 보류: 로컬 DB 확인 1건 남음** — `V4__feeding_food_size.sql` 적용·`ddl-auto: validate` 통과가 미확인이다(Phase 1·2 와 같은 성격). ⚠️ **선행이었던 REQ-16 은 완료됨**(2026-09-01) · `V3` 는 REQ-16 이 가져갔다
+      `V4__feeding_food_size.sql` · `FeedingLog` · `FoodSize` enum(S/M/L) · CRUD 4행 · `AnorexiaStreakCalculator`(순수) + `GET /feeding/anorexia-streak`.
+      완료 기준: V4 가 로컬 DB 에 적용되고 `ddl-auto: validate` 통과 **⏸ 미확인** · `is_refused` 누락 400 ✅ · 계산기 단위 테스트가 미결 답(스트릭 정의·경계·0건)을 케이스로 고정 ✅ · `level` 경계값(2일/3일/6일/7일) ✅ · 게코 외 종의 스트릭 호출이 미결 답대로 ✅ · 나머지는 Phase 1 기준 ✅
 
 - [ ] **Phase 4 — shed (5행)**
       `ShedRecord` · CRUD 4행(게코 외 종은 **네 행 전부** `SHED_NOT_SUPPORTED_SPECIES`) · `ShedPredictionCalculator`(순수) + `GET /shed/prediction`.
@@ -182,6 +183,41 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 > **결과 갱신: 2026-08-28 — 24~42 전부 `✅` (Phase 2).** `/testrun` 22 메서드 실행 · 실패 0 · 표 19행 ↔ 코드 19 ID 일치 · 인용 전건 원문 존재. Phase 1 과 같은 이유(로컬 DB 기동·keyset 경계 미확인)로 Phase 2 체크는 보류.
 > **2026-08-28 추가 — 24~42 (Phase 2, activity).** D13 확정 후 추가. Phase 1 과 같은 형태의 케이스(가드 위임·D6·커서·PATCH 병합)는 도메인마다 한 번씩 다시 고정한다 — 복제 과정에서 빠뜨리는 것이 이 REQ 의 주 실패 모드다.
 > **2026-08-28 추가 — 18~23.** Phase 1 미결 2건(체중 경고 형태 · `cursor`/`limit`)이 닫혀 행을 추가했다. **REQ-10-10 은 DB 없이 검증한다** — 이 레포에 DB 테스트 하네스(H2·Testcontainers)가 없어 "누락·중복 없음"을 실제 페이지 경계에서 재지 못한다. 대신 그 성질의 **필요조건 두 가지**를 고정한다: ⓐ `next_cursor` 페이로드에 마지막 항목의 `id` 가 실린다 ⓑ 다음 페이지 조회가 `measured_at` 과 `id` 를 **둘 다** 저장소에 넘긴다. 실제 경계 동작은 Phase 1 완료 시 로컬 DB 로 한 번 수동 확인한다.
+
+| REQ-10-43 | `POST /feeding` | **HTTP 왕복** 201 | 정상 | Phase 3 완료 기준 — "나머지는 Phase 1 기준" · Phase 1 완료 기준 — "4행이 원본 상태코드(201/200/200/204)대로" | 3 | ✅ |
+| REQ-10-44 | `DELETE /feeding/{log_id}` | **HTTP 왕복** 204 · 본문 없음 | 정상 | 〃 | 3 | ✅ |
+| REQ-10-45 | `FeedingService` 진입 | 남의 펫 → `PET_FORBIDDEN` | 예외 | Phase 1 완료 기준 — "남의 펫 403" (Phase 3 "나머지는 Phase 1 기준") | 3 | ✅ |
+| REQ-10-46 | 〃 | 삭제된 펫 → `PET_NOT_FOUND` | 예외 | Phase 1 완료 기준 — "삭제된 펫 404" | 3 | ✅ |
+| REQ-10-47 | 기록 조회 | 다른 펫에 속한 기록 id → `RESOURCE_NOT_FOUND` | 예외 | D6 — "`findByIdAndPetId(id, petId)`" | 3 | ✅ |
+| REQ-10-48 | 목록 응답 | `items`·`next_cursor`·`has_next` 키 | 불변식 | 범위—포함 — "`{items, next_cursor, has_next}` 다(= `CursorPage`)" | 3 | ✅ |
+| REQ-10-49 | PATCH 요청 DTO | `@NotNull`·`@NotBlank` 가 없다 | 회귀 | 제약·함정 — "PATCH DTO 에 `@NotNull`·`@NotBlank` 금지" | 3 | ✅ |
+| REQ-10-50 | `PATCH /feeding/{log_id}` | `memo` 만 보내면 `amount` 가 유지된다 | 회귀 | D10 — "병합은 서비스" | 3 | ✅ |
+| REQ-10-51 | 목록 | `next_cursor` 에 마지막 항목 `id` · 다음 페이지 조회가 `fed_at`·`id` 둘 다 전달 | 회귀 | D8 — "`id` desc 타이브레이크" | 3 | ✅ |
+| REQ-10-52 | `POST /feeding` | `is_refused` 누락 → 400 | 경계 | 원본 Validation — "`is_refused` 필수" | 3 | ✅ |
+| REQ-10-53 | 〃 | `fed_at` 누락 → 400 | 경계 | 원본 Validation — "`fed_at` 필수" | 3 | ✅ |
+| REQ-10-54 | 〃 | `fed_at` 이 서버 현재 시각보다 미래 → 400 | 예외 | 미결 질문(Phase 3) — "`fed_at` — 미래 시각만 거부" | 3 | ✅ |
+| REQ-10-55 | 〃 | `fed_at` 이 어제(과거) → 201 정상 저장 | 정상 | 미결 질문(Phase 3) — "서버 현재 시각 이전이면 과거 소급을 허용한다" | 3 | ✅ |
+| REQ-10-56 | 〃 | `food_size` 없이 요청 → 정상 저장(`null`) | 경계 | 원본 Validation — "`food_size` 선택" | 3 | ✅ |
+| REQ-10-57 | 〃 | 개 펫이 `food_size` 를 보내도 그대로 저장, 400 아님 | 정상 | 미결 질문(Phase 3) — "`food_size` 는 종과 무관하게 그대로 저장" | 3 | ✅ |
+| REQ-10-58 | 〃 | `food_size` 가 enum 밖 값(`"XL"`) → 400 | 경계 | 제약·함정 — "정의되지 않은 enum 값은 400" | 3 | ✅ |
+| REQ-10-59 | `AnorexiaStreakCalculator` | 기록 0건 → `{current_streak_days:0, level:NONE, last_eaten_at:null}` | 경계 | 미결 질문(Phase 3) — "기록 0건이면 `{0, NONE, null}`" | 3 | ✅ |
+| REQ-10-60 | 〃 | 마지막 정상급여 후 2일 경과 → `NONE` | 경계 | Phase 3 완료 기준 — "level 경계값(2일/3일/6일/7일)" | 3 | ✅ |
+| REQ-10-61 | 〃 | 마지막 정상급여 후 3일 경과 → `CAUTION` | 경계 | 미결 질문(Phase 3) — "`>= 3` CAUTION" | 3 | ✅ |
+| REQ-10-62 | 〃 | 마지막 정상급여 후 6일 경과 → `CAUTION` | 경계 | Phase 3 완료 기준 — "level 경계값(2일/3일/6일/7일)" | 3 | ✅ |
+| REQ-10-63 | 〃 | 마지막 정상급여 후 7일 경과 → `DANGER` | 경계 | 미결 질문(Phase 3) — "`>= 7` DANGER" | 3 | ✅ |
+| REQ-10-64 | 〃 | 마지막 급여 23:30(KST)·기준 시각 익일 00:30(KST) → `current_streak_days = 1` | 회귀 | 미결 질문(Phase 3) — "KST 달력 일수" | 3 | ✅ |
+| REQ-10-65 | 〃 | 경과일 0일이면(건수 아님) `NONE` 유지 | 회귀 | 미결 질문(Phase 3) — "연속 거식 건수 안은 기각" | 3 | ✅ |
+| REQ-10-66 | `GET /feeding/anorexia-streak` | 개 펫 호출 → **HTTP 왕복** 400 · `error.code` = `FEATURE_NOT_SUPPORTED_SPECIES` | 예외 | 미결 질문(Phase 3) — "게코 외 종의 스트릭 호출 → `FEATURE_NOT_SUPPORTED_SPECIES` 신설" | 3 | ✅ |
+| REQ-10-67 | 〃 | 게코 펫 호출 → **HTTP 왕복** 200 | 정상 | 범위—포함 — "거식 스트릭은 게코 전용" | 3 | ✅ |
+
+> **결과 갱신: 2026-09-01 — 43~67 전부 `✅` (Phase 3).** `/testrun REQ-10` 82 메서드 실행(weight·activity·feeding 전체) · 실패 0 · 표 25행 ↔ 코드 25 ID 일치 · 근거 인용 표본 검사 통과. `/testrun`이 자체 실행 1차에서 REQ-10-51 두 케이스를 (a) 테스트 결함으로 분류해 고쳤다 — `FeedingServiceTest`의 `NOW` 상수가 `+09:00`으로 선언돼 있었는데, 이 파일의 `CursorCodec`은 앱 `JacksonConfig`(KST 존)를 안 거친 무설정 `ObjectMapper`라 인코드 시 오프셋을 `Z`로 정규화한다(Jackson jsr310 기본값) — 순간은 같은데 레코드 동등성 비교만 깨졌다. `Weight`·`ActivityServiceTest`는 애초에 UTC 리터럴이라 드러나지 않았을 뿐이다. `NOW`를 `Z` 표기로 바꿔 해결(같은 순간, 표기만 변경). **계약 승격 제안 — 아래 참고**
+> ⚠️ **Phase 3 체크는 켜지 않는다** — 완료 기준의 "V4가 로컬 DB에 적용되고 `ddl-auto: validate` 통과"는 `/testgen`이 의도적으로 표에 넣지 않은 수동 확인 항목이다(Phase 1·2의 "로컬 DB 확인 1건 남음"과 같은 성격). 25개 케이스는 전부 통과했지만 이 부분이 아직 미확인이라 완료 기준을 다 채우지 못했다.
+> `/testgen`이 승인된 표대로 테스트 코드까지 작성했다(`FeedingServiceTest`·`AnorexiaStreakCalculatorTest`·`FeedingControllerWebMvcTest`·`FeedingDtoContractTest`) — 대상 클래스가 아직 없어 **컴파일되지 않는 상태**로 커밋 전이었다(Phase 1·2 와 같은 순서, REQ-08·09 실측). `/implement`가 구현을 채워 커밋했다(`9e148df`, wip — 당시 REQ-10-51 2건 미해결이라 미푸시). 코드가 정한 계약 —
+> - `FeedingService(PetAccessGuard, FeedingLogRepository, CursorCodec, Clock)`. `fed_at` 미래 거부는 전용 코드가 없어 `ErrorCode.INVALID_INPUT` 을 그대로 썼다(REQ-10-54)
+> - `AnorexiaStreakCalculator.calculate(OffsetDateTime lastEatenAt, OffsetDateTime now)` — **거식 시도 List 가 아니라 "마지막 정상 급여 시각(nullable)"만 받는 순수 정적 메서드.** "일수냐 건수냐"(미결 질문) 질문이 시그니처 자체로 답해진다 — 건수는 파라미터에 없어 계산에 들어올 수가 없다. "기록은 있지만 전부 거식"인 경우도 `lastEatenAt = null` 로 합류해 "0건"과 같은 결과가 된다(별도 케이스 불필요)
+> - `FeedingLog` 는 필드 8개(`petId`·`foodType`·`foodSize`·`amount`·`amountUnit`·`isRefused`·`fedAt`·`memo`) — `Pet` 과 같은 이유로 `@Builder`+`@AllArgsConstructor(PRIVATE)` 가 필요하다(AGENTS §5, Checkstyle `ParameterNumber` 최대 7). **`update()` 는 `petId` 를 뺀 7개라 일반 메서드로 된다**
+> - `FeedingLogRepository.findFirstByPetIdAndIsRefusedFalseOrderByFedAtDesc(petId)` — 스트릭 계산의 "마지막 정상 급여" 조회
+> ⚠️ **REQ-10-66/67 은 Controller 레벨(서비스 목)만 있고, `FeedingService.getAnorexiaStreak` 의 종 검증 자체를 서비스 레벨에서 잰 케이스가 이 표에 없다** — Activity 의 REQ-10-24~26(서비스 레벨)과 REQ-10-34(컨트롤러 레벨)가 둘 다 있던 것과 다르다. 승인된 표에 없어 임의로 추가하지 않았다 — 원하면 별도 케이스로 추가
 
 ## 제약·함정
 

@@ -141,7 +141,7 @@
 | DELETE | `/shed/{record_id}` | 삭제 |
 | GET | `/shed/prediction` | 🦎 다음 탈피 예측 |
 
-**종별 제약**: 크레스티드 게코 전용 → 그 외 종은 `SHED_NOT_SUPPORTED_SPECIES`
+**종별 제약**: 크레스티드 게코 전용 → 그 외 종은 `FEATURE_NOT_SUPPORTED_SPECIES` (거식 스트릭과 공통 코드, 2026-08-28 확정 · 2026-09-01 Notion 「소스 구조」 §10 반영)
 
 **탈피 예측** (`ShedPredictionCalculator` — I/O 없는 순수 클래스)
 - 출력: `{predicted_date, average_cycle_days, based_on_records, confidence}`

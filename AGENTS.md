@@ -116,6 +116,8 @@ com.petkok
 - ⚠️ **스택 PR의 base 자동 재지정은 "선행 PR 머지"가 아니라 "base 브랜치 삭제"가 조건이다.** 선행 PR을 머지해도 그 브랜치가 원격에 남아 있으면 후속 PR의 base는 그대로이고, 머지하면 **`main`이 아니라 그 브랜치로 들어간다.** 머지는 성공으로 표시되고 PR도 `MERGED`가 되므로 **조용하다** — `main`에 아무것도 안 올라간 것은 따로 확인해야만 보인다. 2026-08-07에 실제로 발생했다(#21 머지 28분 뒤 #22가 `chore/req08-phase0-archunit`으로 머지 → Phase 1 전체 13파일이 `main`을 비껴감, #23으로 복구)
 	- 대응은 셋 중 하나 — 선행 PR 머지 시 **브랜치 삭제를 함께** 하거나, 후속 PR의 **base를 수동으로 `main`으로 변경**(`gh pr edit <n> --base main`)하거나, 애초에 스택하지 않는다
 	- **머지 후에는 `main`에 실제로 들어갔는지 확인한다.** `git log --oneline origin/main..origin/<브랜치>`가 비어 있어야 한다. PR 상태(`MERGED`)만으로는 알 수 없다
+- ⚠️ **PR이 머지되고 원격 브랜치가 삭제돼도 로컬 브랜치는 스스로 없어지지 않는다.** `git status`·`git branch --show-current` 어디에도 이상 신호가 없고, 그 위에 새 커밋을 얹어도 git이 경고 없이 받아준다 — 이미 머지된 옛 커밋들 위에 새 작업이 쌓인 채로 존재하게 된다. 2026-09-01 실제로 발생했다(PR #43 머지·브랜치 삭제 후 `docs/req16-phase4-backfill` 로컬 브랜치에 그대로 커밋). `git fetch --prune` 후 `git branch -vv`에서 해당 브랜치가 `[origin/… : gone]`으로 보일 때만 드러난다
+	- 대응은 **PR을 만들기/커밋을 얹기 전에 `git fetch --prune`으로 원격 상태를 먼저 갱신**하거나, 매번 `git checkout -b <새 브랜치> origin/main`으로 새로 시작하는 것. 이미 얹었다면 `origin/main` 기준 새 브랜치에 해당 커밋만 `cherry-pick`하고 낡은 로컬 브랜치는 삭제한다
 - ⚠️ **`git log -- <경로>`로 "커밋 안 됐다"고 단정하지 말 것.** 이 명령은 **HEAD에서 도달 가능한 커밋만** 본다. 다른 브랜치의 작업은 안 보이는데 출력은 "이 파일의 전체 이력"처럼 보이고, **에러도 경고도 없다.** 2026-08-03에 이 한 줄로 "REQ-08 Phase 0가 유실됐다"고 판단해 **같은 변경을 통째로 중복 재구현**했다 — 실제로는 미푸시 로컬 브랜치(`chore/archunit-tighten-empty-allowance`의 `f6f66c7`)에 그대로 있었다. 확인은 `git log --all -- <경로>` 또는 `git branch --all --contains <sha>`로 한다
 	- 같은 이유로 **작업을 끝냈으면 브랜치를 푸시한다.** 로컬에만 있는 브랜치는 `git status`·`git log`·워킹 트리 어디에도 나타나지 않아 **다음 세션에서 없는 것과 구별되지 않는다.** 위 사고의 뿌리는 "커밋을 안 한 것"이 아니라 "푸시·PR을 안 한 것"이었다
 
@@ -142,6 +144,7 @@ com.petkok
 	- ⚠️ **대가 — 빌더에 `id`가 노출된다.** 전 필드 생성자를 만들었으므로 `@GeneratedValue` 인 `id`도 빌더로 설정할 수 있게 된다. **JPA가 채워야 할 값을 호출부가 덮어쓰면 `merge` 로 새는 등 조용히 어긋난다.** 코드로 막을 방법이 없으므로 **엔티티 javadoc에 경고를 반드시 남긴다**(`Pet` 참고)
 	- 필드가 7개 이하면 이 우회를 쓰지 않는다. **정적 팩토리가 기본**이다 — 빌더는 필수 필드를 강제하지 못한다
 - **페이지네이션**: 커서 기반 (opaque base64 `next_cursor`)
+	- ⚠️ **테스트에서 `CursorCodec`을 직접 만들 때 `OffsetDateTime` 리터럴은 `ZoneOffset.UTC`(또는 `Z`)를 쓴다.** `new CursorCodec(new ObjectMapper().findAndRegisterModules())`는 앱 `JacksonConfig`의 `timeZone(KST)` 설정을 안 거친 무설정 매퍼라, 인코드 시 Jackson jsr310 기본값(`ADJUST_DATES_TO_CONTEXT_TIME_ZONE`)이 오프셋을 `Z`로 정규화한다. **순간은 같은데 `OffsetDateTime.equals()`(오프셋까지 비교)로 만든 레코드 동등성 단언만 조용히 깨진다** — 구현 결함이 아니다. 2026-09-01 `FeedingServiceTest`에서 실측(`WeightServiceTest`는 `LocalDate`, `ActivityServiceTest`는 우연히 `ZoneOffset.UTC` 리터럴이라 안 드러났었다)
 - **수정 메서드**: 리소스 수정은 `PATCH`(부분 수정)로 통일. `PUT`(전체 교체)은 쓰지 않는다 — 누락 필드와 `null` 의도를 구분할 수 없기 때문
 - ⚠️ **PATCH 요청 DTO 필드에 `@NotBlank`·`@NotNull`을 붙이지 않는다.** 둘 다 `null`을 거부하는데, PATCH는 **필드를 안 보내는 것이 정상 경로**다(누락·`null` = "변경 없음"). 붙이면 **부분 수정 요청이 통째로 400**이 된다. `NOT NULL`은 **엔티티의 불변식이지 요청 DTO의 불변식이 아니다** — 두 층의 제약을 같은 것으로 착각하기 쉽다. 길이 등 스키마 제약은 `@Size`로만 표현한다(`@Size`는 `null`을 통과시킨다). 2026-08-03 `UserUpdateRequest` 초안에서 실제로 밟았다
 	- **길이 제약은 생략하지 말 것.** `@Size(max = N)`이 없으면 초과 입력이 `DataIntegrityViolationException`으로 올라와 **400이 아니라 500**이 된다 — 클라이언트 입력 오류가 서버 오류로 보고된다

@@ -12,6 +12,8 @@ public enum ErrorCode {
       HttpStatus.BAD_REQUEST, "INVALID_SPECIES_ACTIVITY", "해당 종에서 지원하지 않는 활동 유형입니다."),
   SHED_NOT_SUPPORTED_SPECIES(
       HttpStatus.BAD_REQUEST, "SHED_NOT_SUPPORTED_SPECIES", "탈피 기록은 크레스티드 게코만 지원합니다."),
+  FEATURE_NOT_SUPPORTED_SPECIES(
+      HttpStatus.BAD_REQUEST, "FEATURE_NOT_SUPPORTED_SPECIES", "해당 종은 지원하지 않는 기능입니다."),
 
   // 401
   UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "인증이 필요합니다."),
