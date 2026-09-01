@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-01 (PR #43·#44 머지 · **REQ-16 완료** · **REQ-10 Phase 3(feeding) 케이스 25건 통과** — 로컬 DB 확인 남아 체크 보류)
+> 최종 갱신: 2026-09-01 (PR #43~#46 머지 · **REQ-16 완료** · **REQ-10 Phase 3(feeding) 완료** — V4 로컬 DB 확인이 CHAR/VARCHAR 실결함을 잡음)
 
 ## 요구사항 인덱스
 
@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (Phase 0~2 완료 2026-08-28 · **Phase 3(feeding) 케이스 25건 전부 통과 2026-09-01** — `feat/req10-phase3-feeding` 미푸시, V4 로컬 DB 확인 남아 체크 보류) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (**Phase 0~3 완료 2026-09-01**(PR #45·#46) · 다음은 Phase 4 shed, 선행 조건 없음) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -87,9 +87,37 @@ REQ-10 Phase 3(feeding) 착수 전 선행 조건이던 Notion 역반영 4건(급
 
 > ⭐ **테스트가 만드는 `CursorCodec`이 오프셋을 조용히 뭉갠다.** `FeedingServiceTest`는 `NOW`를 `2026-07-07T12:00:00+09:00`으로 선언했는데, 이 테스트가 직접 만든 `CursorCodec`(`new ObjectMapper().findAndRegisterModules()`)은 앱의 `JacksonConfig`(KST 존 설정)를 안 거친 무설정 매퍼다 — 인코드 시 Jackson jsr310 기본값(`ADJUST_DATES_TO_CONTEXT_TIME_ZONE`)이 `+09:00`을 `Z`로 정규화해, **순간은 같은데 레코드 동등성 비교(`OffsetDateTime.equals`)만 깨진다.** `WeightServiceTest`는 `LocalDate`라 애초에 무관했고 `ActivityServiceTest`는 우연히 `ZoneOffset.UTC` 리터럴을 써서 드러나지 않았다 — feeding이 KST 리터럴을 쓴 첫 케이스라 처음 노출됐다. `NOW`를 `Z` 표기(같은 순간)로 바꿔 해결.
 
-수정 후 `/testrun`을 다시 돌려 REQ-10 전체(weight·activity·feeding) 82케이스 전부 통과 확인. 검증 계약 표의 `결과` 열을 채우고 Phase 3 절 갱신 — 단 **완료 기준의 "V4 로컬 DB 적용·`ddl-auto: validate` 통과"는 여전히 미확인**이라 체크는 켜지 않았다(Phase 1·2 와 같은 성격의 보류).
+수정 후 `/testrun`을 다시 돌려 REQ-10 전체(weight·activity·feeding) 82케이스 전부 통과 확인. 검증 계약 표의 `결과` 열을 채우고 Phase 3 절 갱신 — 단 이 시점엔 **완료 기준의 "V4 로컬 DB 적용·`ddl-auto: validate` 통과"가 여전히 미확인**이라 체크는 켜지지 않았다(Phase 1·2 와 같은 성격의 보류. 아래에서 닫힌다).
 
 **계약 승격 제안** — "테스트에서 `CursorCodec`을 직접 만들 때 `OffsetDateTime` 리터럴은 `ZoneOffset.UTC`(또는 `Z`)를 쓴다 — 비-UTC 오프셋을 쓰면 인코드 후 레코드 동등성 비교가 조용히 깨진다"를 AGENTS.md에 승격할 것을 제안한다. shed·diary Phase에서 같은 함정을 또 밟을 수 있다.
+
+> ✅ **계약 승격 완료 (같은 날).** 사용자 승인 후 AGENTS.md §5에 반영(`1cf9a5b`).
+
+### PR #45 머지 — 그런데 `main`이 origin과 3커밋 벌어져 있었다
+
+Phase 3 구현·테스트 수정을 전부 커밋한 뒤 PR #45를 만들려고 보니, **`main`이 애초에 `origin/main`과 3커밋 차이가 나 있었다** — 어제(`7a78bda`)와 오늘 오전(`87c1188`·`016a0ca`) 작업이 로컬 `main`에서만 커밋되고 한 번도 푸시된 적이 없었다. PR #45는 이 상태의 `main`에서 딴 브랜치라 REQ-16 문서 3건이 Phase 3 구현과 한 PR에 같이 실렸다 — 의도한 묶음은 아니지만 내용 유실은 없다. CI 확인(SHA 대조) 후 스쿼시 머지, 원격 브랜치 삭제까지 확인.
+
+> 머지 후 로컬 정리도 스쿼시 특성을 고려해서 했다 — `git diff origin/main..feat/req10-phase3-feeding`가 빈 걸 먼저 확인해(스쿼시 커밋이 브랜치 내용을 전부 담았다는 뜻) `git branch -f main origin/main`으로 로컬 `main`을 맞추고, `git branch -D`로 강제 삭제했다(스쿼시라 `-d`는 "안 머지됨"으로 거부한다 — 정상 동작).
+
+### ⭐ V4 로컬 DB 확인이 실제 구현 결함을 잡았다 — `food_size` CHAR 추론
+
+Phase 3 완료 기준에 남아 있던 마지막 항목("V4가 로컬 DB에 적용되고 `ddl-auto: validate` 통과")을 실제로 돌렸다 — `colima start` → `docker start petkok-pg` → `set -a && . ./.env && set +a && ./gradlew bootRun`. **기동이 막혔다:**
+
+```
+Schema-validation: wrong column type encountered in column [food_size]
+in table [feeding_logs]; found [varchar (Types#VARCHAR)], but expecting
+[char(1) (Types#CHAR)]
+```
+
+원인 — `FeedingLog.foodSize`가 `@Enumerated(EnumType.STRING)` + `@Column(length = 1)` 조합이었는데, **Hibernate 6가 이 조합을 `CHAR(1)`로 추론한다.** `V4__feeding_food_size.sql`은 Notion 원본 그대로 `varchar(1)`이 맞으므로 — 마이그레이션이 아니라 엔티티의 `length = 1` 힌트를 뺐다. 재기동으로 `Started PetKokApplication` 확인, REQ-10 82케이스 재확인 통과. `fix/req10-feeding-food-size-column-type` 브랜치 → PR #46 → CI 확인 후 머지(`ee57090`).
+
+> ⭐ **REQ-16 계약("`ddl-auto: validate`는 컬럼 존재만 보고 타입은 안 본다")과 정면으로 부딪히는 것처럼 보이지만 아니다.** REQ-16이 실측한 사각지대는 `timestamp`/`timestamptz`처럼 **JDBC 타입 코드가 같게 취급되는 조합**이었다. 이번 `VARCHAR`/`CHAR`는 **JDBC 타입 코드 자체가 다르다**(`Types#VARCHAR` vs `Types#CHAR`)—validate가 원래도 잡는 부류다. "타입을 안 본다"는 전체 규칙이 아니라 **"타입 코드가 같은 것끼리는 못 가른다"**로 좁혀 읽어야 정확하다. `docs/plans/PLAN-REQ-10-record-domains.md` 제약·함정 절에 이 구분을 남겼다.
+
+**계약 승격 제안** — "단일 문자 값을 갖는 문자열/enum 컬럼에 `@Column(length = 1)`을 쓰지 않는다(Hibernate 6가 `CHAR`로 추론해 `varchar` DDL과 충돌한다)"를 AGENTS.md에 추가할 것을 제안한다. shed·diary Phase의 단일 문자 enum(있다면)에서 재발할 수 있다.
+
+### REQ-10 Phase 3(feeding) 완료 — 체크 켬
+
+25개 케이스 전부 `✅` + V4 로컬 DB 확인까지 닫혀 완료 기준을 전부 채웠다. `docs/plans/PLAN-REQ-10-record-domains.md` Phase 3 체크 켬. **다음은 Phase 4(shed)** — 선행 조건 없음, 곧바로 `/testgen`부터 시작할 수 있다.
 
 ## 2026-08-31
 

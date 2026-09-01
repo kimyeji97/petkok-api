@@ -1,6 +1,6 @@
 # PLAN-REQ-10 · 기록 도메인 5종 (weight · activity · feeding · shed · diary)
 
-> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0~2 완료 2026-08-28 · Phase 3 케이스 완료 2026-09-01 — 로컬 DB 확인 남아 체크 보류)
+> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0~3 완료 2026-09-01 · 다음은 Phase 4 shed)
 
 ## 배경
 
@@ -112,9 +112,9 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
       Phase 1 형태 복제 + `ActivityType` enum + 종별 검증(`INVALID_SPECIES_ACTIVITY`).
       완료 기준: 게코가 `WALK` → 400 `INVALID_SPECIES_ACTIVITY` · 개가 `HANDLING` → 400 · 개가 `WALK` → 201 · 게코가 `HANDLING` → 201 · PATCH 로 `activity_type` 을 바꿔도 종 검증이 다시 걸린다 · 나머지는 Phase 1 과 동일 기준
 
-- [ ] **Phase 3 — feeding (5행) + V4** — 코드·케이스 25건 완료 (2026-09-01, `9e148df` · `feat/req10-phase3-feeding`, 미푸시). **체크 보류: 로컬 DB 확인 1건 남음** — `V4__feeding_food_size.sql` 적용·`ddl-auto: validate` 통과가 미확인이다(Phase 1·2 와 같은 성격). ⚠️ **선행이었던 REQ-16 은 완료됨**(2026-09-01) · `V3` 는 REQ-16 이 가져갔다
+- [x] **Phase 3 — feeding (5행) + V4** — 코드·케이스 25건 완료, PR #45 머지(2026-09-01, `e54b4d9`). **로컬 DB 확인도 닫혔다** — `docker start petkok-pg` + `bootRun` 으로 돌려보니 `ddl-auto: validate` 가 실제로 걸렸다: `food_size` 컬럼이 `@Enumerated(STRING)` + `@Column(length = 1)` 조합 때문에 Hibernate 가 `CHAR(1)` 로 추론해 `V4` 의 `varchar(1)` 과 충돌 — `length = 1` 을 빼서 고치고 PR #46(`ee57090`)으로 머지, 재기동으로 `Started PetKokApplication` 확인. ⚠️ **선행이었던 REQ-16 은 완료됨**(2026-09-01) · `V3` 는 REQ-16 이 가져갔다
       `V4__feeding_food_size.sql` · `FeedingLog` · `FoodSize` enum(S/M/L) · CRUD 4행 · `AnorexiaStreakCalculator`(순수) + `GET /feeding/anorexia-streak`.
-      완료 기준: V4 가 로컬 DB 에 적용되고 `ddl-auto: validate` 통과 **⏸ 미확인** · `is_refused` 누락 400 ✅ · 계산기 단위 테스트가 미결 답(스트릭 정의·경계·0건)을 케이스로 고정 ✅ · `level` 경계값(2일/3일/6일/7일) ✅ · 게코 외 종의 스트릭 호출이 미결 답대로 ✅ · 나머지는 Phase 1 기준 ✅
+      완료 기준: V4 가 로컬 DB 에 적용되고 `ddl-auto: validate` 통과 ✅(PR #46 으로 실제 결함 잡고 확인) · `is_refused` 누락 400 ✅ · 계산기 단위 테스트가 미결 답(스트릭 정의·경계·0건)을 케이스로 고정 ✅ · `level` 경계값(2일/3일/6일/7일) ✅ · 게코 외 종의 스트릭 호출이 미결 답대로 ✅ · 나머지는 Phase 1 기준 ✅
 
 - [ ] **Phase 4 — shed (5행)**
       `ShedRecord` · CRUD 4행(게코 외 종은 **네 행 전부** `SHED_NOT_SUPPORTED_SPECIES`) · `ShedPredictionCalculator`(순수) + `GET /shed/prediction`.
@@ -211,7 +211,9 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 | REQ-10-67 | 〃 | 게코 펫 호출 → **HTTP 왕복** 200 | 정상 | 범위—포함 — "거식 스트릭은 게코 전용" | 3 | ✅ |
 
 > **결과 갱신: 2026-09-01 — 43~67 전부 `✅` (Phase 3).** `/testrun REQ-10` 82 메서드 실행(weight·activity·feeding 전체) · 실패 0 · 표 25행 ↔ 코드 25 ID 일치 · 근거 인용 표본 검사 통과. `/testrun`이 자체 실행 1차에서 REQ-10-51 두 케이스를 (a) 테스트 결함으로 분류해 고쳤다 — `FeedingServiceTest`의 `NOW` 상수가 `+09:00`으로 선언돼 있었는데, 이 파일의 `CursorCodec`은 앱 `JacksonConfig`(KST 존)를 안 거친 무설정 `ObjectMapper`라 인코드 시 오프셋을 `Z`로 정규화한다(Jackson jsr310 기본값) — 순간은 같은데 레코드 동등성 비교만 깨졌다. `Weight`·`ActivityServiceTest`는 애초에 UTC 리터럴이라 드러나지 않았을 뿐이다. `NOW`를 `Z` 표기로 바꿔 해결(같은 순간, 표기만 변경). **계약 승격 제안 — 아래 참고**
-> ⚠️ **Phase 3 체크는 켜지 않는다** — 완료 기준의 "V4가 로컬 DB에 적용되고 `ddl-auto: validate` 통과"는 `/testgen`이 의도적으로 표에 넣지 않은 수동 확인 항목이다(Phase 1·2의 "로컬 DB 확인 1건 남음"과 같은 성격). 25개 케이스는 전부 통과했지만 이 부분이 아직 미확인이라 완료 기준을 다 채우지 못했다.
+> ✅ **Phase 3 체크 완료 (2026-09-01 오후).** "V4가 로컬 DB에 적용되고 `ddl-auto: validate` 통과"를 실제로 돌려 닫았다 — `docker start petkok-pg` + `bootRun`. **닫는 과정에서 실제 구현 결함을 잡았다**: `FeedingLog.foodSize`가 `@Enumerated(EnumType.STRING)` + `@Column(length = 1)` 조합이었는데, Hibernate 6가 이 조합을 `CHAR(1)`로 추론해 `V4__feeding_food_size.sql`의 `varchar(1)`과 충돌 — `Schema-validation: wrong column type ... found [varchar], but expecting [char(1)]`로 기동 자체가 막혔다. `length = 1`을 빼서 고치고(PR #46, `ee57090`) 재기동으로 `Started PetKokApplication` 확인, REQ-10 82케이스 재확인 통과.
+> ⭐ **REQ-16 CLAUDE.md 계약("`ddl-auto: validate`는 컬럼 존재만 보고 타입은 안 본다")과 겹쳐 보이지만 다른 이야기다.** 그 계약은 `timestamp`/`timestamptz`처럼 **JDBC 타입 코드가 같게 취급되는 경우**의 사각지대였고, 이번 `VARCHAR`/`CHAR`는 **JDBC 타입 코드 자체가 다르다**(`Types#VARCHAR` vs `Types#CHAR`)— validate가 원래도 잡는 부류다. "타입을 안 본다"가 전체 규칙이 아니라 "코드가 같은 타입끼리는 못 가른다"로 정정해서 읽어야 한다.
+> **계약 승격 제안** — "단일 문자 값을 갖는 문자열/enum 컬럼에 `@Column(length = 1)`을 쓰지 않는다(Hibernate 6가 `CHAR`로 추론해 `varchar` DDL과 충돌한다). 길이를 굳이 제한하고 싶으면 `columnDefinition`으로 명시하거나 애초에 길이를 지정하지 않는다"를 AGENTS.md에 추가할 것을 제안한다 — shed·diary Phase의 단일 문자 enum(있다면)에서 재발할 수 있다.
 > `/testgen`이 승인된 표대로 테스트 코드까지 작성했다(`FeedingServiceTest`·`AnorexiaStreakCalculatorTest`·`FeedingControllerWebMvcTest`·`FeedingDtoContractTest`) — 대상 클래스가 아직 없어 **컴파일되지 않는 상태**로 커밋 전이었다(Phase 1·2 와 같은 순서, REQ-08·09 실측). `/implement`가 구현을 채워 커밋했다(`9e148df`, wip — 당시 REQ-10-51 2건 미해결이라 미푸시). 코드가 정한 계약 —
 > - `FeedingService(PetAccessGuard, FeedingLogRepository, CursorCodec, Clock)`. `fed_at` 미래 거부는 전용 코드가 없어 `ErrorCode.INVALID_INPUT` 을 그대로 썼다(REQ-10-54)
 > - `AnorexiaStreakCalculator.calculate(OffsetDateTime lastEatenAt, OffsetDateTime now)` — **거식 시도 List 가 아니라 "마지막 정상 급여 시각(nullable)"만 받는 순수 정적 메서드.** "일수냐 건수냐"(미결 질문) 질문이 시그니처 자체로 답해진다 — 건수는 파라미터에 없어 계산에 들어올 수가 없다. "기록은 있지만 전부 거식"인 경우도 `lastEatenAt = null` 로 합류해 "0건"과 같은 결과가 된다(별도 케이스 불필요)
@@ -227,7 +229,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 - **`@Transactional` 안에서 예외를 던지면 쓰기가 사라진다** (AGENTS §5). 이번 REQ 에 "거절하면서 남겨야 하는 쓰기"는 없어 보이지만, 생기면 `noRollbackFor`
 - **PATCH DTO 에 `@NotNull`·`@NotBlank` 금지** (AGENTS §5). 길이·범위는 `@Size`·`@Positive` 로만(`null` 통과)
 - **정의되지 않은 enum 값은 400** — `GlobalExceptionHandler` 의 `HttpMessageNotReadableException` 핸들러가 REQ-09 에서 들어왔다. `ActivityType`·`FoodSize`·`ConditionTag` 전부 이 경로를 탄다. **한글 enum 값(`정상`)은 Jackson 이 `name()` 으로 매칭하므로 enum 상수명을 한글로 두거나 `@JsonValue` 가 필요하다** — 방식은 Phase 5 착수 시 정한다
-- **`ddl-auto: validate` 가 V3 를 처음으로 검증한다** — 엔티티 컬럼과 마이그레이션이 어긋나면 기동 시점에 터진다. REQ-07 이래 마이그레이션 추가가 처음이다
+- **`ddl-auto: validate` 가 이 REQ 의 마이그레이션(V4)을 실제로 검증한다** — 엔티티 컬럼과 마이그레이션이 어긋나면 기동 시점에 터진다(`V3` 는 REQ-16 이 가져갔다). ⚠️ **실측(Phase 3, 2026-09-01)** — `@Enumerated(STRING)` + `@Column(length = 1)` 조합을 Hibernate 6 가 `CHAR(1)` 로 추론해, 마이그레이션의 `varchar(1)` 과 충돌하며 기동이 막혔다(`FeedingLog.foodSize`, PR #46). **단일 문자 값의 문자열/enum 컬럼엔 `length = 1` 을 쓰지 않는다** — 길이를 굳이 제한하려면 `columnDefinition` 으로 명시한다. shed·diary 의 단일 문자 enum(있다면)에서 재발할 수 있다
 - **적용된 마이그레이션은 주석 한 글자도 못 고친다** (CLAUDE.md) — `V1__init.sql` 의 `condition_tag` 주석이 D1 로 **우연히 맞게** 됐다. 고칠 일이 없다
 - **SQL 로 심은 픽스처는 앱 기준 9시간 미래다** (D12, PROGRESS 07-30). 계산기 검증은 순수 단위 테스트로, DB 왕복 확인 시 `now() at time zone 'UTC'`
 - **컨트롤러 테스트는 `@Import({SecurityConfig, JacksonConfig})`** (AGENTS §6). 슬라이스에 `UserService` 가 없으므로 `UserStatusChecker` 를 따로 `@MockBean`(`PetControllerWebMvcTest` 와 같음)
