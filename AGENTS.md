@@ -139,6 +139,7 @@ com.petkok
 	- **충돌 결과가 조용하다.** 거절 응답은 규격대로 나가므로 API 레벨 확인으로는 통과하고, **저장소를 목으로 대체한 단위 테스트도 통과한다**(목은 롤백되지 않는다). 2026-07-30 실측 — `AuthService.refresh`의 재사용 감지가 401을 정상 반환하면서 `revokeAllByUserId`만 되돌아가, 탈취범이 쥔 나머지 토큰이 그대로 살아 있었다
 	- 따라서 **DB를 실제로 태워 확인**해야 하고, 확인 후에는 애노테이션 자체를 테스트로 고정한다(`AuthServiceRefreshTest` REQ-07-23이 그 예다). 동작은 목으로 검증할 수 없으므로 애노테이션 고정 + DB 왕복 두 겹으로 간다
 - **Enum**: Java Enum + `@Enumerated(STRING)`, DB는 varchar
+	- ⚠️ **`@Column(length = 1)`을 쓰지 않는다 — 값이 1글자뿐이어도.** Hibernate 6가 `@Enumerated(STRING)` + `length = 1` 조합을 **`CHAR(1)`로 추론**해, `varchar` 규약을 지킨 마이그레이션과 타입이 갈려 `ddl-auto: validate`가 기동을 막는다("`CHAR`가 더 정석 아닌가"로 헷갈리기 쉬운데, 틀린 건 DDL이 아니라 이 `length` 힌트다 — 이 프로젝트는 "enum=varchar"를 예외 없이 지키기로 했고, `food_size`(S/M/L) 하나만 CHAR로 새면 그 규칙이 깨진다). 길이를 굳이 제한하려면 `columnDefinition = "varchar(1)"`로 명시하거나, 애초에 `length`를 지정하지 않는다. `FeedingLog.foodSize` 실측(2026-09-01, PR #46)
 - ⚠️ **필드가 8개 이상인 엔티티는 정적 팩토리로 만들 수 없다** — Checkstyle `ParameterNumber`가 **최대 7**이다. 통과하는 형태는 **클래스 레벨 `@Builder` + `@AllArgsConstructor(access = AccessLevel.PRIVATE)`** 하나뿐이다(`Pet`이 첫 사례, 2026-08-10)
 	- ⚠️ **`@Builder`를 생성자에 붙이는 우회는 실패한다.** Lombok이 빌더를 만들어도 **소스에 남은 생성자가 여전히 8파라미터**라 Checkstyle이 그걸 센다. 클래스 레벨에 붙여 **생성자까지 Lombok이 만들게** 해야 통과한다 — 생성된 코드는 Checkstyle이 보지 않기 때문이다. **즉 이건 규칙을 만족시킨 게 아니라 규칙의 사각을 쓴 것이고, 대가가 따라온다**
 	- ⚠️ **대가 — 빌더에 `id`가 노출된다.** 전 필드 생성자를 만들었으므로 `@GeneratedValue` 인 `id`도 빌더로 설정할 수 있게 된다. **JPA가 채워야 할 값을 호출부가 덮어쓰면 `merge` 로 새는 등 조용히 어긋난다.** 코드로 막을 방법이 없으므로 **엔티티 javadoc에 경고를 반드시 남긴다**(`Pet` 참고)
