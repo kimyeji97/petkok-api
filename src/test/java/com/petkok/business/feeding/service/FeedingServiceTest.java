@@ -56,8 +56,11 @@ class FeedingServiceTest {
   private static final UUID LOG_B = UUID.fromString("cccccccc-0000-0000-0000-000000000002");
   private static final UUID LOG_C = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
 
-  // 고정 시각 — 2026-07-07T12:00:00+09:00 (= 2026-07-07T03:00:00Z)
-  private static final OffsetDateTime NOW = OffsetDateTime.parse("2026-07-07T12:00:00+09:00");
+  // 고정 시각 — 2026-07-07T12:00:00+09:00 과 같은 순간이지만 Z 표기로 둔다. 이 파일의 CursorCodec 은
+  // 앱의 JacksonConfig(timeZone=KST) 를 안 거친 무설정 ObjectMapper 라 인코드 시 오프셋을 UTC 로
+  // 정규화한다(Jackson jsr310 기본값) — +09:00 리터럴을 쓰면 REQ-10-51 의 레코드 동등성 비교에서만
+  // 어긋난다(순간은 같다). WeightServiceTest·ActivityServiceTest 는 애초에 UTC 리터럴이라 드러나지 않았다.
+  private static final OffsetDateTime NOW = OffsetDateTime.parse("2026-07-07T03:00:00Z");
   private static final Clock CLOCK =
       Clock.fixed(Instant.parse("2026-07-07T03:00:00Z"), java.time.ZoneId.of("Asia/Seoul"));
 
