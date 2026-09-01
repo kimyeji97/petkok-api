@@ -144,6 +144,7 @@ com.petkok
 	- ⚠️ **대가 — 빌더에 `id`가 노출된다.** 전 필드 생성자를 만들었으므로 `@GeneratedValue` 인 `id`도 빌더로 설정할 수 있게 된다. **JPA가 채워야 할 값을 호출부가 덮어쓰면 `merge` 로 새는 등 조용히 어긋난다.** 코드로 막을 방법이 없으므로 **엔티티 javadoc에 경고를 반드시 남긴다**(`Pet` 참고)
 	- 필드가 7개 이하면 이 우회를 쓰지 않는다. **정적 팩토리가 기본**이다 — 빌더는 필수 필드를 강제하지 못한다
 - **페이지네이션**: 커서 기반 (opaque base64 `next_cursor`)
+	- ⚠️ **테스트에서 `CursorCodec`을 직접 만들 때 `OffsetDateTime` 리터럴은 `ZoneOffset.UTC`(또는 `Z`)를 쓴다.** `new CursorCodec(new ObjectMapper().findAndRegisterModules())`는 앱 `JacksonConfig`의 `timeZone(KST)` 설정을 안 거친 무설정 매퍼라, 인코드 시 Jackson jsr310 기본값(`ADJUST_DATES_TO_CONTEXT_TIME_ZONE`)이 오프셋을 `Z`로 정규화한다. **순간은 같은데 `OffsetDateTime.equals()`(오프셋까지 비교)로 만든 레코드 동등성 단언만 조용히 깨진다** — 구현 결함이 아니다. 2026-09-01 `FeedingServiceTest`에서 실측(`WeightServiceTest`는 `LocalDate`, `ActivityServiceTest`는 우연히 `ZoneOffset.UTC` 리터럴이라 안 드러났었다)
 - **수정 메서드**: 리소스 수정은 `PATCH`(부분 수정)로 통일. `PUT`(전체 교체)은 쓰지 않는다 — 누락 필드와 `null` 의도를 구분할 수 없기 때문
 - ⚠️ **PATCH 요청 DTO 필드에 `@NotBlank`·`@NotNull`을 붙이지 않는다.** 둘 다 `null`을 거부하는데, PATCH는 **필드를 안 보내는 것이 정상 경로**다(누락·`null` = "변경 없음"). 붙이면 **부분 수정 요청이 통째로 400**이 된다. `NOT NULL`은 **엔티티의 불변식이지 요청 DTO의 불변식이 아니다** — 두 층의 제약을 같은 것으로 착각하기 쉽다. 길이 등 스키마 제약은 `@Size`로만 표현한다(`@Size`는 `null`을 통과시킨다). 2026-08-03 `UserUpdateRequest` 초안에서 실제로 밟았다
 	- **길이 제약은 생략하지 말 것.** `@Size(max = N)`이 없으면 초과 입력이 `DataIntegrityViolationException`으로 올라와 **400이 아니라 500**이 된다 — 클라이언트 입력 오류가 서버 오류로 보고된다
