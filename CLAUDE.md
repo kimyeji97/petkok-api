@@ -27,6 +27,16 @@
 - ⚠️ **문서에 실제 시크릿을 쓰지 말 것.** 함정·재현 로그를 `PROGRESS.md`에 적다가 실제 로컬 DB 비밀번호가 public 레포에 커밋된 적이 있다(2026-07-29 `5c7313b`). 재현 상황을 설명할 때는 값을 더미로 바꾼 뒤 적는다
 - `docs/specs/`의 두 문서 — [`api-list.md`](docs/specs/api-list.md)(Notion API I/F 파생), [`db-schema.md`](docs/specs/db-schema.md)(Notion 테이블 정의서 파생) — 는 **둘 다 파생 요약이다.** 원본이 아니다. **ADR-001·ADR-002(스택·DB 엔진)의 원본은 Notion에 있고**, 그 이후 결정은 `docs/adr/ADR-0001…`(4자리)에 쌓인다. 설계 판단 전에 AGENTS.md §0(출처 우선순위)을 먼저 볼 것
 
+## 시각 처리 (AGENTS.md §5 보완)
+
+REQ-16 에서 확정했다(→ [ADR-0002](docs/adr/ADR-0002-time-handling-timestamptz.md)). **저장 = 순간 · 노출 = `+09:00` · 계산 = `Asia/Seoul`.**
+
+- **신규 시각 컬럼은 `timestamptz`, 엔티티 필드는 `OffsetDateTime`.** `timestamp` + `LocalDateTime` 쌍은 **저장된 값만으로 순간이 결정되지 않는다** — 세션 TZ 에 따라 같은 값이 다른 순간이 되고, 그 어긋남은 에러 없이 나타난다. 날짜만 있는 값(`entry_date`·`shed_date`·`measured_at`·`birthday`·`adoption_date`·`taken_at`)은 예외다. 타임존 개념이 없으므로 `date`·`LocalDate` 를 유지한다
+	- ⚠️ **그런데 `ddl-auto: validate` 는 컬럼 *존재*만 보고 *타입*은 보지 않는다** (2026-08-28 실측). 엔티티를 `OffsetDateTime` 으로 두고 컬럼을 `timestamp` 로 남긴 채 기동해도 **그대로 뜬다.** 검사기 자체는 살아 있다 — 컬럼을 지우면 `Schema-validation: missing column` 으로 막힌다
+	- **이 두 줄은 같이 읽어야 뜻이 산다.** 위 규칙을 어겨도 기동이 안 막히는 이유가 아래 사실이다. 즉 **엔티티만 바꾸고 마이그레이션을 빠뜨리면(또는 그 반대) 조용히 통과한다.** 실제 방어선은 마이그레이션 텍스트 검사(`V3TimestamptzMigrationTest`)와 엔티티 타입 검사(`TimeFieldTypeContractTest`) 두 개뿐이고, **둘 다 SQL 과 DB 실물을 맞대보지는 않는다.** 그 구멍은 Testcontainers 도입 전까지 열려 있다(REQ-16 미결 ⑥ — 계약으로만 남기기로 확정)
+- **`now` 는 `Clock` 을 주입받는다. 무인자 `now()` 를 부르지 않는다** — `LocalDateTime`·`OffsetDateTime`·`LocalDate`·`Instant`·`ZonedDateTime` 5종 모두. JVM 기본 TZ 에 암묵 의존해 배포 환경에 `TZ` 가 없으면 **에러 없이** 9시간 어긋난다. ArchUnit `REQ_16_10_NO_DIRECT_NOW` 가 `business`·`framework` 에서 강제한다(`data` 는 범위 밖 — 엔티티에는 빈을 주입할 수 없다)
+- **`Asia/Seoul` 문자열은 `framework/constant/TimeConstant` 한 곳에만 둔다.** 응답 표기(`JacksonConfig`)와 요청 해석(`OffsetDateTimeDeserializer`)이 **서로 다른 두 장치**라 한 곳만 바꾸면 조용히 갈린다. `REQ-16-16` 이 소스 텍스트를 훑어 강제한다
+
 ## Notion 편집 함정 (AGENTS.md §0 보완)
 
 설계 원본이 Notion에 있어 편집이 잦다. 아래 3건은 모르면 증상을 오진한다.
@@ -34,4 +44,6 @@
 - **「설계」 섹션의 DB·API 탭은 API로 수정할 수 없다.** `notion-update-page`가 `validation_error: Object ... is not a page or database`로 거부한다. `fetch`로 읽히고 URL도 페이지처럼 생겼지만 쓰기가 안 되는 객체(탭)다. **읽기는 되는데 쓰기만 막히면 권한이 아니라 객체 타입을 의심할 것.** 우회: 같은 내용이 실린 일반 페이지를 고치고, 탭 안의 원본은 사람이 직접 수정해야 한다
 	- **단, 탭 안의 데이터베이스(`API I/F` 등)에 행을 추가하는 것은 된다** — `notion-create-pages` 에 `parent.data_source_id`(`collection://…`, `fetch` 로 얻는다)를 주면 생성된다(2026-08-27 실측, `DELETE /users/me/profile-image` 행). 기존 행 본문 수정(`update-page`)도 된다. 막히는 것은 **탭 페이지 자체의 본문**뿐이다. "사람이 직접"으로 미루기 전에 대상이 페이지인지 행인지 구분할 것
 - **코드블록이 이스케이프 문자열을 그대로 저장하고 있을 수 있다.** 「소스 구조」 §2 트리가 박스문자·한글을 `├`, `도` 같은 **텍스트로** 담고 있었다(노션에서도 깨져 보인다). 이 상태에서는 `update_content` 부분 치환이 불가능하다 — `old_str`에 리터럴 `\uXXXX`를 실어 보낼 방법이 없어(항상 실제 문자로 디코딩된다) 매칭 자체가 안 된다. 박스문자는 ASCII 마커 2단계 치환으로 우회되지만 한글은 조합 수가 많아 비현실적이다. **해법은 `replace_content` 전체 교체 하나뿐.** 부분 치환이 계속 `No matches found`면 저장 형태를 의심할 것
+- **`old_str`에 리스트 마커(`- `)를 포함하면 매칭되지 않는다.** 리스트 항목은 본문만 콘텐츠로 취급되는 모양이다. 2026-08-31 실측 — `- 컬럼명: \`deleted_at timestamp NULL\`` 은 `No matches found`, 마커를 뺀 `` `deleted_at timestamp NULL` `` 은 즉시 통과. **`No matches found`가 나면 내용을 의심하기 전에 줄머리 기호부터 떼 볼 것**
+- **`content_updates` 배열은 원자적이다 — 한 건이 실패하면 같은 배치의 나머지도 전부 적용되지 않는다.** 부분 반영이 없다는 뜻이라 안전한 쪽이지만, **배치가 실패했을 때 "일부는 들어갔겠지"로 넘기면 안 된다.** 실패한 것만 고쳐 다시 보내지 말고 **전부 다시** 보낸다 (2026-08-31 실측 — 4건 중 1건 실패로 3건이 통째로 안 들어갔다)
 - **`old_str`과 `new_str`을 같은 문자열로 쓰면 성공은 하지만 아무것도 안 바뀐다.** 이스케이프를 다루다 보면 둘 다 같은 값이 되기 쉽고, 도구는 성공을 반환하므로 고쳤다고 착각한다. 치환 후에는 **다른 문자열로 no-op 프로브**를 걸어 실제 저장 형태를 확인할 것

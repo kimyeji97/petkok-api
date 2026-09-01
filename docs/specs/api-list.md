@@ -16,7 +16,10 @@
 - 목록 조회는 커서 기반 페이지네이션 — 응답은 `{items, next_cursor, has_next}` (`CursorPage`). `next_cursor`가 `null`이면 마지막 페이지
 - 요청 파라미터: `cursor`, `limit` (기본 20 / 최대 100, `CursorRequest`)
 - 인증: `Authorization: Bearer <access_token>`
-- 날짜 포맷: ISO 8601 (`2026-06-30`, `2026-06-30T15:00:00Z`)
+- 날짜 포맷: ISO 8601 — 날짜는 `2026-06-30`, **시각은 KST 오프셋 고정** `2026-06-30T15:00:00+09:00`
+	- **응답은 항상 `+09:00`**. `Z` 로 내보내지 않는다 (REQ-16 D3 · [ADR-0002](../adr/ADR-0002-time-handling-timestamptz.md))
+	- **요청은 `Z` · `+09:00` · 오프셋 없음을 모두 받는다.** 오프셋이 없으면 KST 벽시계로 해석한다 (D9)
+	- 저장은 `timestamptz`(순간), 엔티티는 `OffsetDateTime`. 달력 판정(당일·미래·일수)은 `Asia/Seoul` 기준 (D4)
 - `/pets/{pet_id}` 하위 리소스는 모두 소유권 검증 대상 → `PetAccessGuard.getOwnedPet(petId, userId)` → `PET_FORBIDDEN` / `PET_NOT_FOUND`
 - 리소스 수정은 `PATCH`로 통일한다 (Notion API I/F에도 `PUT` 사용처가 없다)
 
