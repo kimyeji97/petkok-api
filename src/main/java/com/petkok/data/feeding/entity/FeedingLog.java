@@ -51,7 +51,7 @@ public class FeedingLog extends BaseCreatedEntity {
   private String foodType;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "food_size", length = 1)
+  @Column(name = "food_size")
   private FoodSize foodSize;
 
   @Column(name = "amount", precision = 8, scale = 2)
