@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-02 (**REQ-10 Phase 4(shed) 완료** — 게코 전용 CRUD + 탈피 예측, `/testgen`~`/testrun` 1회 통과·수정 0건. 크레스티드 게코 성장·탈피 주기 참고 자료 신설)
+> 최종 갱신: 2026-09-02 (**REQ-10 Phase 5(diary) 완료 — 5개 Phase 전부 완료.** `/testrun`이 승인 표 대비 코드 누락(REQ-10-107) 1건을 찾아냈고 소스 변경 없이 채웠다. 개발 플로우 여섯 커맨드 계약을 레포 `AGENTS.md`에서 사용자 전역 `CLAUDE.md`로 최종 이관)
 
 ## 요구사항 인덱스
 
@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (**Phase 0~4 완료 2026-09-02**(`4b4ad4a`) · 다음은 Phase 5 diary — 착수 전 미결 3건 확인 필요) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-02 | 🟡 (**Phase 0~5 전부 완료** · 검증 계약 111건 전부 `✅` · Phase 1·2는 로컬 DB keyset 경계 실측 1건씩 보류라 체크박스는 열어 둠) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -58,6 +58,22 @@ Phase 4 미결 질문("기록 1개일 때 `average_cycle_days`를 뭘로 하나"
 Phase 4 착수 전 미결 3항목 중 2개(기본값·0건 응답)만 사용자에게 확인받았고, 세 번째("`is_complete = false`인 부분 탈피 기록도 주기 계산에 넣는가")는 물어보지 않은 채 구현이 **암묵적으로 "넣는다"**로 정했다 — `ShedPredictionCalculator`가 받는 최근 `shed_date` 목록이 `is_complete` 필터링을 안 한다. `/implement`의 "미결 질문을 구현으로 확정하지 않는다"를 이 부분에서 어겼다 — 계획서 미결 질문 절에 열어 둔 채로 남겼다(체크는 부분적으로만 켰다).
 
 **남은 것 (REQ-10)** — Phase 5(diary) 하나. 착수 전 미결 3건(미래 날짜 불가 기준 타임존 · `limit` 50 vs 100 · 거꾸리 경고) 전부 미확인 — 이번 세션에서 손 안 댔다.
+
+### 개발 플로우 여섯 커맨드 계약 — AGENTS.md → 레포 CLAUDE.md → 사용자 전역 CLAUDE.md로 재배치
+
+세 커밋(`d07ef26`·`48d9c63`·`3609ba5`)에 걸쳐 자리를 두 번 옮겼다. 처음엔 "`/workplan → /testgen → /implement → /testrun → /checkpoint → /progress` 순서로 작업한다"는 문장 자체가 어디에도 없어(흔적만 §0·§4·`CLAUDE.md`에 흩어져 있었다) `AGENTS.md §4`에 통째로 승격했다(`d07ef26`). 그런데 슬래시 커맨드는 Claude Code 전용이라 "모든 AI 에이전트용 진입점"인 `AGENTS.md`에 있을 것이 아니었다 — 커맨드 여섯 개의 책임 표를 레포 `CLAUDE.md`로 옮기고 `AGENTS.md §4`에는 도구 중립 원칙 세 개(계획서→검증 계약→구현→판정→기록 순서 · Phase 1개=커밋 1개 · 판정하는 손은 구현을 고치지 않는다)만 남겼다(`48d9c63`). 다음 단계로 커맨드 정의가 실제로 사는 `claude-commands` 저장소에 전역 `CLAUDE.md`를 두고 각 프로필(`~/.claude`, `~/.claude-apple` 등)이 심볼릭 링크하도록 바꿔(별도 작업, DEV-13), 이 레포 `CLAUDE.md`는 전역을 가리키는 포인터 + 레포에서만 다른 것(Java 테스트 컴파일 제약·계획서 경로·Notion 원본·새 머신 clone 순서)만 남겼다(`3609ba5`). **레포 문서는 "이 레포에서만 다른 것"만, 전역 계약은 전역 파일에** — 이 원칙이 이번 재배치 세 번의 공통 이유다.
+
+### REQ-10 Phase 5(diary) 완료 — 케이스 24건, `/testrun`이 승인 표 대비 코드 누락 1건을 실제로 잡아냈다
+
+**착수 전 미결 3건 확정(대화, `181e8a3`)** — ① "미래 날짜 불가"의 기준 타임존: **KST 자정.** REQ-16 ADR-0002가 "계산은 `Asia/Seoul`"을 이미 다이어리 미래 날짜 케이스까지 이름을 대며 답해 둔 상태라 새로 정할 것이 없었다. ② `limit` 50 vs `CursorRequest.MAX_LIMIT`(100): **`DiaryService`에서 `min(limit, 50)`으로 한 번 더 클램프**, framework 전역 상한은 안 건드림(이미 나간 weight·activity·feeding·shed 계약을 깰 수 없어서). ③ 거꾸리 경고: **범위 제외 확정** — 애초에 `API I/F` 응답 어디에도 형태가 없어(「소스 구조」에만 있음) Phase 5를 막는 미결이 아니었다.
+
+**`/testgen`** — 21건 승인 후 작성 직전에 `ConditionTag` enum 설계가 넷째 미결로 드러났다: 이 프로젝트 첫 **한글 값** enum이라 `Species`·`ActivityType`처럼 그대로 갈 전례가 없었다. **영문 상수(`NORMAL`/`ACTIVE`/`FLOPPY_TAIL`/`VOMITING`) + `@JsonValue`/`@JsonCreator`**로 확정 — DB·Java 상수명은 AGENTS §5(영문 UPPER_SNAKE_CASE)를 지키고 JSON 왕복만 한글로 갈라 둔다.
+
+**`/implement REQ-10 5`** — `feat/req10-phase5-diary` 브랜치. `DiaryEntry`(`BaseTimeEntity`, `updated_at` 있음 — D11) · `DiaryService`(종 제한 없음, `Clock` 주입해 미래 날짜 거부) · `condition_tag` 필터 전용 쿼리 메서드 2종. 자체 실행 23/23 1차 통과, 커밋 `183f7e4` 푸시.
+
+**`/testrun REQ-10`** — 여기서 **REQ-10-107(`DiaryService` 응답에 `updated_at` 있음, D11 근거)이 검증 계약 표엔 있는데 테스트 코드가 없는 누락**으로 잡혔다. 승인까지 됐던 케이스가 실제로는 안 쓰인 것 — Phase 5를 21건으로 셌지만 표엔 23건이 있었고 그중 하나를 빠뜨린 채 구현까지 넘어갔던 셈이다. `/testgen`이 `DiaryServiceTest`에 케이스를 추가하고(`update()` 경로, `ReflectionTestUtils`로 `updatedAt` 고정값을 심어 응답에 그대로 전달되는지 단언 — `create()`는 JPA Auditing이 실제로 채우는 값이라 mock 리포지토리로는 검증 불가), `/implement`가 커밋(`acf1299`)·푸시했다. **구현 자체는 이미 정답을 반환하고 있어 소스 코드 변경은 없었다** — 순수하게 검증 계약의 빈틈만 메운 경우.
+
+재실행한 `/testrun REQ-10` — REQ-10 전체(weight·activity·feeding·shed·diary) **141 메서드 실행 · 실패 0** · 표 111행(Phase 0 프로브 3건 제외) ↔ 코드 111 ID 정확히 일치 · 근거 인용 표본 검사 전건 원문 확인. **REQ-10 Phase 0~5 전부 완료.** 단, Phase 1·2는 이전부터 열려 있던 로컬 DB keyset 경계 실측 1건씩이 여전히 보류라(인증 토큰·펫 생성 선행 필요) 계획서 체크박스는 그대로 열어 뒀다 — 이번 세션에서 손대지 않았다.
 
 ## 2026-09-01
 

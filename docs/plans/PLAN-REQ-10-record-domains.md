@@ -1,6 +1,6 @@
 # PLAN-REQ-10 · 기록 도메인 5종 (weight · activity · feeding · shed · diary)
 
-> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0~4 완료 2026-09-02 · Phase 5 diary 착수 전 미결 3건 2026-09-02 전부 확정 — `/testgen` 착수 가능)
+> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0~5 전부 완료 2026-09-02 · 검증 계약 111행 전부 `✅` · **단, Phase 1·2는 로컬 DB keyset 경계 실측 1건씩 여전히 보류**돼 있어 그 두 Phase 체크박스는 열어 둔다)
 
 ## 배경
 
@@ -125,9 +125,9 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
       `ShedRecord` · CRUD 4행(게코 외 종은 **네 행 전부** `FEATURE_NOT_SUPPORTED_SPECIES`, 에러 코드는 아래 참고) · `ShedPredictionCalculator`(순수) + `GET /shed/prediction`.
       완료 기준: 개 펫의 `POST /shed` → 400 ✅(코드는 `FEATURE_NOT_SUPPORTED_SPECIES`) · `GET /shed` 도 400(목록도 게코 전용) ✅ · 예측 `confidence` 가 기록 1/2/3+ 건에서 LOW/MEDIUM/HIGH ✅ · `average_cycle_days` 가 최근 3개 간격 평균 ✅ · 기록 부족 시 동작이 미결 답대로 ✅(0건→200 LOW, 1건→null) · 나머지는 Phase 1 기준 ✅
 
-- [ ] **Phase 5 — diary (5행, 텍스트만)**
-      `DiaryEntry`(`BaseTimeEntity`) · `ConditionTag` enum 4종(D1) · CRUD 5행 · 목록 `condition_tag` 필터.
-      완료 기준: `condition_tag: "거식"` → 400 · `entry_date` 미래 → 400(기준 타임존은 미결 답) · 응답에 `updated_at` 있음(D11) · 응답에 `photos`·`photo_count` **없음**(D4) · `photo_ids` 를 보내도 무시되고 201 · 필터가 걸린 목록도 keyset 유지 · 나머지는 Phase 1 기준
+- [x] **Phase 5 — diary (5행, 텍스트만)** — 코드·케이스 24건 완료, 커밋 `183f7e4`+`acf1299`(`feat/req10-phase5-diary`, 푸시 완료). `/testrun`이 승인된 표 대비 코드 누락(REQ-10-107, `updated_at` 응답 검증)을 찾아 `/testgen`→`/implement`로 채웠다 — 소스 코드는 이미 정답을 반환하고 있어 구현 변경 없이 테스트만 추가.
+      `DiaryEntry`(`BaseTimeEntity`) · `ConditionTag` enum 4종(D1, 한글 값 JSON 직렬화) · CRUD 5행 · 목록 `condition_tag` 필터.
+      완료 기준: `condition_tag: "거식"` → 400 ✅ · `entry_date` 미래 → 400(KST 자정) ✅ · 응답에 `updated_at` 있음(D11) ✅ · 응답에 `photos`·`photo_count` **없음**(D4) ✅ · `photo_ids` 를 보내도 무시되고 201 ✅ · 필터가 걸린 목록도 keyset 유지 ✅ · 나머지는 Phase 1 기준 ✅
 
 ## 검증 계약
 
@@ -241,6 +241,31 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 | REQ-10-91 | 〃 | 기록 4건 → 가장 오래된 것 무시, 최근 3건만 사용(`based_on_records:3`) | 회귀 | 〃 ("최근 3개") | 4 | ✅ |
 | REQ-10-92 | `GET /shed/prediction` | 개 펫 → **HTTP 왕복** 400 · `error.code` = `FEATURE_NOT_SUPPORTED_SPECIES` | 예외 | api-list.md § 8 — "종별 제약" | 4 | ✅ |
 | REQ-10-93 | 〃 | 게코 펫 → **HTTP 왕복** 200 | 정상 | 〃 | 4 | ✅ |
+
+| REQ-10-94 | `POST /diary` | **HTTP 왕복** 201 | 정상 | Phase 5 완료 기준 — "나머지는 Phase 1 기준" · Phase 1 완료 기준 — "4행이 원본 상태코드(201/200/200/204)대로" | 5 | ✅ |
+| REQ-10-95 | `DELETE /diary/{entry_id}` | **HTTP 왕복** 204 · 본문 없음 | 정상 | 〃 | 5 | ✅ |
+| REQ-10-96 | `DiaryService` 진입 | 남의 펫 → `PET_FORBIDDEN` | 예외 | Phase 1 완료 기준 — "남의 펫 403" | 5 | ✅ |
+| REQ-10-97 | 〃 | 삭제된 펫 → `PET_NOT_FOUND` | 예외 | Phase 1 완료 기준 — "삭제된 펫 404" | 5 | ✅ |
+| REQ-10-98 | 기록 조회 | 다른 펫에 속한 기록 id → `RESOURCE_NOT_FOUND` | 예외 | D6 — "`findByIdAndPetId(id, petId)`" | 5 | ✅ |
+| REQ-10-99 | 목록 응답 | `items`·`next_cursor`·`has_next` 키 | 불변식 | 범위—포함 — "`{items, next_cursor, has_next}` 다(= `CursorPage`)" | 5 | ✅ |
+| REQ-10-100 | PATCH 요청 DTO | `@NotNull`·`@NotBlank` 가 없다 | 회귀 | 제약·함정 — "PATCH DTO 에 `@NotNull`·`@NotBlank` 금지" | 5 | ✅ |
+| REQ-10-101 | `PATCH /diary/{entry_id}` | `content` 만 보내면 `title` 이 유지된다 | 회귀 | D10 — "병합은 서비스" | 5 | ✅ |
+| REQ-10-102 | 목록 | `next_cursor` 에 마지막 항목 `id` · 다음 페이지 조회가 `entry_date`·`id` 둘 다 전달 | 회귀 | D8 — "`id` desc 타이브레이크" | 5 | ✅ |
+| REQ-10-103 | `POST /diary` | `entry_date` 누락 → 400 | 경계 | 원본 Validation — "`entry_date` 필수" | 5 | ✅ |
+| REQ-10-104 | `POST /diary` | `condition_tag: "거식"` → 400 | 예외 | Phase 5 완료 기준 — "`condition_tag: \"거식\"` → 400" | 5 | ✅ |
+| REQ-10-105 | 〃 | `entry_date` 가 내일(미래) → 400 | 예외 | Phase 5 완료 기준 — "`entry_date` 미래 → 400" · 미결 질문(Phase 5) — "KST(`Asia/Seoul`) 자정" | 5 | ✅ |
+| REQ-10-106 | 〃 | `entry_date` 가 오늘 → 201 정상 저장 | 정상 | 〃 | 5 | ✅ |
+| REQ-10-107 | `DiaryService` | 응답에 `updated_at` 이 있다 | 불변식 | D11 — "diary 응답에는 `updated_at` 이 들어간다" | 5 | ✅ |
+| REQ-10-108 | 〃 | 상세 응답에 `photos` 가 없다 | 불변식 | D4 — "`photos` · `photo_count` 미포함" | 5 | ✅ |
+| REQ-10-109 | 목록 응답 | 목록 항목에 `photo_count` 가 없다 | 불변식 | 〃 | 5 | ✅ |
+| REQ-10-110 | `POST /diary` | `photo_ids` 를 보내도 무시되고 201 | 회귀 | D4 — "`photo_ids` 무시" | 5 | ✅ |
+| REQ-10-111 | `GET /diary` | `condition_tag` 필터가 걸린 목록도 keyset 이 유지된다(다음 페이지 조회에 `entry_date`·`id` 전달) | 회귀 | Phase 5 완료 기준 — "필터가 걸린 목록도 keyset 유지" | 5 | ✅ |
+| REQ-10-112 | 〃 | `condition_tag` 필터를 걸면 다른 태그 기록은 응답에 없다 | 정상 | 원본 Validation — "`condition_tag` (상태 태그 필터)" | 5 | ✅ |
+| REQ-10-113 | `POST /diary` | `condition_tag: "정상"` 요청이 `NORMAL` 로 파싱된다 | 정상 | 사용자 확정(2026-09-02) — "영문 상수 + `@JsonValue`/`@JsonCreator`" | 5 | ✅ |
+| REQ-10-114 | 응답 | `condition_tag` 가 한글로 직렬화된다(`NORMAL` → `"정상"`) | 정상 | 〃 | 5 | ✅ |
+
+> **2026-09-02 추가 — 94~114 (Phase 5, diary).** 착수 전 미결 4건(타임존·`limit`·거꾸리 경고·`ConditionTag` enum 설계)을 전부 대화로 확정한 뒤 썼다. `ConditionTag`는 이 프로젝트 첫 한글 값 enum이라 `Species`·`ActivityType`·`FoodSize`와 달리 전례가 없었다 — 영문 상수(`NORMAL`/`ACTIVE`/`FLOPPY_TAIL`/`VOMITING`) + `@JsonValue`/`@JsonCreator`로 정했다(AGENTS §5 "상수 UPPER_SNAKE_CASE"와 일관).
+> **결과 갱신: 2026-09-02 — 94~114 전부 `✅` (Phase 5, diary 완료).** `/implement`가 구현하고 `183f7e4`로 커밋·푸시(자체 실행 23/23 1차 통과). `/testrun REQ-10` 1차 실행에서 **REQ-10-107(응답에 `updated_at` 있음)이 표에는 있는데 코드가 없는 누락**으로 잡혔다 — `/testgen`이 `DiaryServiceTest`에 케이스를 추가하고(`/implement`가 `acf1299`로 커밋·푸시), 구현 자체는 이미 `entry.getUpdatedAt()`을 그대로 반환하고 있어 **소스 변경 없이** 통과했다. 재실행한 `/testrun REQ-10` — REQ-10 전체(weight·activity·feeding·shed·diary) **141 메서드 실행 · 실패 0** · 표 111행(01~114, Phase 0 프로브 3건 제외) ↔ 코드 111 ID 정확히 일치 · 근거 인용 표본 검사(REQ-10-104·105·107·113) 전건 원문 확인.
 
 > **2026-09-02 추가 — 68~93 (Phase 4, shed).** 완료 기준의 에러 코드(`SHED_NOT_SUPPORTED_SPECIES`)가 2026-08-28 결정보다 낡아 있어 `FEATURE_NOT_SUPPORTED_SPECIES`로 바꿔 썼다 — `docs/specs/api-list.md § 8`이 이미 이 값으로 갱신돼 있어 그쪽을 근거로 삼았다. 예측 계산기의 기록 부족 시 동작(미결)은 사용자와 함께 확정했다: **0건 → 200(`confidence:LOW`, 나머지 `null`/`0`), 1건 → `average_cycle_days:null`.** 처음엔 "고정 기본값(예: 30일)"을 검토했으나, 사용자가 제공한 성장 단계별 실측 자료(`docs/reference/gecko-growth-and-shed-cycle.md`) — 베이비 1~2주부터 성체 몇 달까지 10배 넘게 차이 — 가 단일 상수를 기각하는 근거가 됐다. 성장 단계 인지 예측은 몸무게·나이 로직이 새로 필요해 이번 Phase 범위 밖 — 그 자료는 향후 참고용으로만 남겼다.
 > **결과 갱신: 2026-09-02 — 68~93 전부 `✅` (Phase 4).** `/implement`가 구현·`ErrorCode.SHED_NOT_SUPPORTED_SPECIES` 제거까지 마치고 `4b4ad4a`로 커밋·푸시(자체 실행 32/32 통과, 수정 루프 0회). `/testrun REQ-10` 재확인 — REQ-10 전체(weight·activity·feeding·shed) 114 메서드 실행 · 실패 0 · (a) 수정 0건 · 표 90행 ↔ 코드 90 ID 일치(Phase 0 프로브 3건 제외) · 근거 인용 전건(계획서 자체 인용 5건 + `api-list.md` 신규 인용 3건) 원문 확인.
