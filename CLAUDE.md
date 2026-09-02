@@ -6,27 +6,11 @@
 
 ## 개발 플로우 (AGENTS.md §4 보완)
 
-AGENTS.md §4의 "계획서 → 검증 계약 → 구현 → 판정 → 기록" 순서는 Claude Code에서 **슬래시 커맨드 여섯 개**로 돈다(2026-09-02 계약 승격). REQ 단위 작업은 이 사이클로 진행하고, **각 커맨드의 책임 밖 일을 그 커맨드 안에서 하지 않는다.**
+AGENTS.md §4의 "계획서 → 검증 계약 → 구현 → 판정 → 기록" 순서는 Claude Code에서 **슬래시 커맨드 여섯 개**(`/workplan → /testgen → /implement → /testrun → /checkpoint → /progress`)로 돈다. **커맨드별 책임·금지 표와 판정 독립성 근거는 사용자 전역 `CLAUDE.md`에 있다** — 프로필(`$CLAUDE_CONFIG_DIR`)의 `CLAUDE.md`가 `~/my_sources/_init/claude-commands/CLAUDE.md`로 링크돼 매 세션 자동 로드된다(2026-09-02 승격 → 같은 날 전역으로 이관). 여기에는 **이 레포에서만 다른 것**만 적는다.
 
-```
-/workplan → /testgen → /implement → /testrun → /checkpoint → /progress
-  계약       검증 계약     구현        검증 실행      기록           조회
-                            ↑  └────────────┘
-                            └── (b) 구현 결함 · Phase N+1
-```
-
-| 커맨드 | 책임 | 하지 않는 것 |
-|---|---|---|
-| `/workplan` | 대화에서 합의한 내용을 `docs/plans/PLAN-REQ-NN-*.md`로. 미결 질문은 추측으로 채우지 않고 남긴다. ADR 승격도 여기서 | 코드 작성 |
-| `/testgen` | 계획서 `## 검증 계약` 표를 채우고 테스트 코드를 쓴다. **Phase 착수 직전에 그 Phase 분만** — 대상 클래스가 없으면 Java 테스트 소스가 통째로 컴파일되지 않는다 | 구현 코드 |
-| `/implement` | **Phase 1개 = 커밋 1개.** 그 Phase 케이스가 녹색일 때만 푸시. 착수 전 게이트에서 미결이 안 닫힌 Phase는 거른다 | 판정(`/testrun` 몫) · 계획서·`PROGRESS.md` 수정 |
-| `/testrun` | 실행하고 실패를 (a) 테스트 결함 · (b) 구현 결함 · (c) 스펙 결함으로 분류. **(a)만 고친다**, (b)는 `/implement`로 돌려보낸다 | 구현 수정 · `결과` 열 기입 |
-| `/checkpoint` | `PROGRESS.md` 로그·인덱스 현행화, 계획서 Phase 체크·`결과` 열 기입, 계약 승격 제안 정리 | 코드 변경 |
-| `/progress` | 조회 전용. 기간·REQ·`예정` 단위로 보고 | 어떤 파일도 수정하지 않는다 |
-
-- **이 순서를 지키는 이유는 판정의 독립성이다.** 구현한 손이 판정까지 하면 "초록불 = 검증됨"이 아니라 "초록불 = 내가 그렇게 짰음"이 된다. 검증 계약(`/testgen`)이 구현(`/implement`) 앞에 오고, 판정(`/testrun`)이 기록(`/checkpoint`)과 분리된 것은 그 때문이다
-- **`/digest`는 사이클 밖 유지보수다** — 완결 분기의 로그·계획서를 아카이브로 회전한다. 기록을 만들지도 조회하지도 않는다
-- ⚠️ **커맨드 정의는 레포에 없다.** `~/.claude/commands/*.md`(사용자 홈)에 있어 **새 머신·다른 클론에서는 보이지 않는다.** 커맨드가 없으면 위 표의 책임 경계를 손으로 지킨다 — 특히 "테스트 코드가 구현보다 먼저", "Phase 1개 = 커밋 1개", "판정 커맨드는 구현을 고치지 않는다" 셋
+- **`/testgen`은 Phase 착수 직전에 그 Phase 분만 쓴다.** Java는 대상 클래스가 없으면 **테스트 소스 전체가 컴파일되지 않아** `main`이 빨간불이 된다(REQ-08·09·10·16 실측). 다른 언어보다 이 제약이 세다
+- **계획서 경로는 `docs/plans/PLAN-REQ-NN-*.md`**, 미결의 원본은 Notion이다(AGENTS §0). `/workplan`이 미결로 남긴 것은 레포 문서로 답하지 말고 Notion에 먼저 적힌 뒤 옮긴다
+- ⚠️ **커맨드 정의와 전역 계약은 이 레포에 없다.** `claude-commands` 저장소(`~/my_sources/_init/claude-commands`)가 실체이고 프로필은 심링크다. 새 머신에서는 그 저장소를 `clone` 후 `./install.sh`를 먼저 돌린다. 커맨드가 없으면 AGENTS §4의 도구 중립 원칙 셋(테스트가 구현보다 먼저 · Phase 1개 = 커밋 1개 · 판정하는 손은 구현을 고치지 않는다)을 손으로 지킨다
 
 ## 로컬 검증 (AGENTS.md §6 보완)
 - lefthook 훅이 설치되어 있다면(`.git/hooks/pre-commit` 존재) 커밋 시 `spotlessApply`가 자동 적용되고 Checkstyle 경고가 출력된다. 새 클론·새 워크트리에서는 `lefthook install`을 먼저 실행할 것 — 미설치 상태면 아무 검증도 걸리지 않아 CI `spotlessCheck`에서 터진다
