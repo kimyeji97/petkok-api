@@ -27,6 +27,7 @@ import com.petkok.framework.pagination.CursorRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -140,6 +141,24 @@ class DiaryServiceTest {
     service.update(OWNER, PET_ID, ENTRY_A, new DiaryUpdateRequest(null, "새 내용", null, null));
 
     assertThat(entry.getTitle()).isEqualTo("원래 제목");
+  }
+
+  // ── 응답 필드 (D11) ─────────────────────────────────────────
+
+  @Test
+  @DisplayName("[REQ-10-107] 응답에 updated_at 이 있다")
+  void req_10_107_responseHasUpdatedAt() {
+    owned();
+    OffsetDateTime updatedAt = OffsetDateTime.parse("2026-07-20T12:00:00+09:00");
+    DiaryEntry entry = DiaryEntry.of(PET_ID, "원래 제목", "원래 내용", null, TODAY);
+    ReflectionTestUtils.setField(entry, "id", ENTRY_A);
+    ReflectionTestUtils.setField(entry, "updatedAt", updatedAt);
+    when(repository.findByIdAndPetId(ENTRY_A, PET_ID)).thenReturn(Optional.of(entry));
+
+    DiaryResponse response =
+        service.update(OWNER, PET_ID, ENTRY_A, new DiaryUpdateRequest(null, "새 내용", null, null));
+
+    assertThat(response.updatedAt()).isEqualTo(updatedAt);
   }
 
   // ── keyset 커서 (D8) ────────────────────────────────────────
