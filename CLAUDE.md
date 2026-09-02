@@ -4,6 +4,30 @@
 - 구현 시작 전 [`README.md`](README.md)와 `@AGENTS.md`의 해당 규칙을 먼저 읽을 것. 스펙 문서(있으면 `docs/specs/`)나 관련 ADR(`docs/adr/`)이 있으면 함께 확인
 - 새로 배운 프로젝트 컨벤션은 임의 적용하지 말고 제안 후 AGENTS.md에 반영
 
+## 개발 플로우 (AGENTS.md §4 보완)
+
+AGENTS.md §4의 "계획서 → 검증 계약 → 구현 → 판정 → 기록" 순서는 Claude Code에서 **슬래시 커맨드 여섯 개**로 돈다(2026-09-02 계약 승격). REQ 단위 작업은 이 사이클로 진행하고, **각 커맨드의 책임 밖 일을 그 커맨드 안에서 하지 않는다.**
+
+```
+/workplan → /testgen → /implement → /testrun → /checkpoint → /progress
+  계약       검증 계약     구현        검증 실행      기록           조회
+                            ↑  └────────────┘
+                            └── (b) 구현 결함 · Phase N+1
+```
+
+| 커맨드 | 책임 | 하지 않는 것 |
+|---|---|---|
+| `/workplan` | 대화에서 합의한 내용을 `docs/plans/PLAN-REQ-NN-*.md`로. 미결 질문은 추측으로 채우지 않고 남긴다. ADR 승격도 여기서 | 코드 작성 |
+| `/testgen` | 계획서 `## 검증 계약` 표를 채우고 테스트 코드를 쓴다. **Phase 착수 직전에 그 Phase 분만** — 대상 클래스가 없으면 Java 테스트 소스가 통째로 컴파일되지 않는다 | 구현 코드 |
+| `/implement` | **Phase 1개 = 커밋 1개.** 그 Phase 케이스가 녹색일 때만 푸시. 착수 전 게이트에서 미결이 안 닫힌 Phase는 거른다 | 판정(`/testrun` 몫) · 계획서·`PROGRESS.md` 수정 |
+| `/testrun` | 실행하고 실패를 (a) 테스트 결함 · (b) 구현 결함 · (c) 스펙 결함으로 분류. **(a)만 고친다**, (b)는 `/implement`로 돌려보낸다 | 구현 수정 · `결과` 열 기입 |
+| `/checkpoint` | `PROGRESS.md` 로그·인덱스 현행화, 계획서 Phase 체크·`결과` 열 기입, 계약 승격 제안 정리 | 코드 변경 |
+| `/progress` | 조회 전용. 기간·REQ·`예정` 단위로 보고 | 어떤 파일도 수정하지 않는다 |
+
+- **이 순서를 지키는 이유는 판정의 독립성이다.** 구현한 손이 판정까지 하면 "초록불 = 검증됨"이 아니라 "초록불 = 내가 그렇게 짰음"이 된다. 검증 계약(`/testgen`)이 구현(`/implement`) 앞에 오고, 판정(`/testrun`)이 기록(`/checkpoint`)과 분리된 것은 그 때문이다
+- **`/digest`는 사이클 밖 유지보수다** — 완결 분기의 로그·계획서를 아카이브로 회전한다. 기록을 만들지도 조회하지도 않는다
+- ⚠️ **커맨드 정의는 레포에 없다.** `~/.claude/commands/*.md`(사용자 홈)에 있어 **새 머신·다른 클론에서는 보이지 않는다.** 커맨드가 없으면 위 표의 책임 경계를 손으로 지킨다 — 특히 "테스트 코드가 구현보다 먼저", "Phase 1개 = 커밋 1개", "판정 커맨드는 구현을 고치지 않는다" 셋
+
 ## 로컬 검증 (AGENTS.md §6 보완)
 - lefthook 훅이 설치되어 있다면(`.git/hooks/pre-commit` 존재) 커밋 시 `spotlessApply`가 자동 적용되고 Checkstyle 경고가 출력된다. 새 클론·새 워크트리에서는 `lefthook install`을 먼저 실행할 것 — 미설치 상태면 아무 검증도 걸리지 않아 CI `spotlessCheck`에서 터진다
 - 커밋 전 CI 게이트 재현: `./gradlew spotlessApply && ./gradlew build -x test && ./gradlew checkstyleMain -PciStrict`
