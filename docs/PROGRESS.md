@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-01 (PR #43~#47 머지 · **REQ-16 완료** · **REQ-10 Phase 3(feeding) 완료** — V4 로컬 DB 확인이 CHAR/VARCHAR 실결함을 잡음 · `main` 로컬-원격 괴리 재발 2건 → 계약 승격으로 마감. 세션 종료 시점 미커밋·미푸시·미머지 0건)
+> 최종 갱신: 2026-09-02 (**REQ-10 Phase 4(shed) 완료** — 게코 전용 CRUD + 탈피 예측, `/testgen`~`/testrun` 1회 통과·수정 0건. 크레스티드 게코 성장·탈피 주기 참고 자료 신설)
 
 ## 요구사항 인덱스
 
@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (**Phase 0~3 완료 2026-09-01**(PR #45·#46) · 다음은 Phase 4 shed, 선행 조건 없음) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | — | 🟡 (**Phase 0~4 완료 2026-09-02**(`4b4ad4a`) · 다음은 Phase 5 diary — 착수 전 미결 3건 확인 필요) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -34,6 +34,30 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-02
+
+> **REQ-10 Phase 4(shed) 완료.** `/testgen`→`/implement`→`/testrun`이 전부 1회에 녹색으로 끝났다(수정 루프 0회) — Phase 3까지 매번 뭔가 걸렸던 것과 다르다. 그 전에 사용자가 준 실제 도메인 지식(게코 성장 단계별 탈피 주기)이 설계 방향 하나를 바로 뒤집었다.
+
+### 탈피 예측 기본값을 정하려다 "고정 상수 자체가 틀렸다"는 걸 알았다
+
+Phase 4 미결 질문("기록 1개일 때 `average_cycle_days`를 뭘로 하나")에 처음엔 "고정 기본값(예: 30일)"으로 사용자가 답했는데, 실제 숫자를 물으니 대신 **크레스티드 게코의 성장 단계별 실측 자료**가 나왔다 — 베이비(1~2주)부터 성체(한 달~몇 달)까지 탈피 주기가 10배 넘게 갈린다. 이 자료를 `docs/reference/gecko-growth-and-shed-cycle.md`로 남기고(`3915e9c`), 애초에 물었던 "고정 기본값"이 성립할 수 없다는 게 자료 자체로 드러나 **`null`로 되돌렸다** — 처음에 권장했던 안으로 복귀.
+
+> 이 문서는 지금 당장 코드에 안 쓰인다. "용도는 나중에"라고 사용자가 명시했다 — 성장 단계 인지 예측을 하려면 `weight_logs`·`pets.birthday`에서 나이·몸무게를 끌어와야 해서 이번 Phase 범위 밖이다. **당장 안 쓸 참고 자료도 나오면 바로 문서화한다** — 나중에 이 대화를 다시 찾아야 하는 비용을 지금 치르는 게 싸다.
+
+### REQ-10 Phase 4(shed) — 케이스 26건, 자체 실행부터 `/testrun`까지 전부 1회 통과
+
+**`/testgen`** — 완료 기준의 에러 코드가 낡아 있었다 — `SHED_NOT_SUPPORTED_SPECIES`(2026-08-27 작성)를 그대로 썼으면 2026-08-28에 이미 뒤집힌 결정(→ `FEATURE_NOT_SUPPORTED_SPECIES`, 거식 스트릭과 공통 코드)을 무시하는 것이었다. `docs/specs/api-list.md § 8`이 이미 최신 값으로 갱신돼 있어 그쪽을 근거로 삼았다 — **완료 기준 문구보다 더 최신 결정이 이긴다**는 원칙을 실제로 적용한 사례.
+
+**`/implement REQ-10 4`** — `feat/req10-phase4-shed` 브랜치. `ShedRecord`(`LocalDate` 필드라 `Clock` 불필요) · `ShedService`(다섯 엔드포인트 전부 진입 시 종 검증) · `ShedPredictionCalculator`(순수, 최근 3건 간격 평균). `ErrorCode.SHED_NOT_SUPPORTED_SPECIES` 제거까지 — 2026-08-28 결정("소비자 없으니 제거") 실행. 자체 실행 32/32 **1차 통과**, 수정 루프 0회. 커밋(`4b4ad4a`)·푸시 완료.
+
+**`/testrun REQ-10`** — REQ-10 전체(weight·activity·feeding·shed) 114 메서드 실행·실패 0·(a) 수정 0건. 표 90행 ↔ 코드 90 ID 정확히 일치(Phase 0 프로브 3건 제외). 근거 인용 전건(계획서 자체 인용 5건 + `api-list.md` 신규 인용 3건) 원문에서 확인.
+
+### 미결 하나가 완전히 안 닫혔다 — `is_complete = false` 기록의 주기 계산 포함 여부
+
+Phase 4 착수 전 미결 3항목 중 2개(기본값·0건 응답)만 사용자에게 확인받았고, 세 번째("`is_complete = false`인 부분 탈피 기록도 주기 계산에 넣는가")는 물어보지 않은 채 구현이 **암묵적으로 "넣는다"**로 정했다 — `ShedPredictionCalculator`가 받는 최근 `shed_date` 목록이 `is_complete` 필터링을 안 한다. `/implement`의 "미결 질문을 구현으로 확정하지 않는다"를 이 부분에서 어겼다 — 계획서 미결 질문 절에 열어 둔 채로 남겼다(체크는 부분적으로만 켰다).
+
+**남은 것 (REQ-10)** — Phase 5(diary) 하나. 착수 전 미결 3건(미래 날짜 불가 기준 타임존 · `limit` 50 vs 100 · 거꾸리 경고) 전부 미확인 — 이번 세션에서 손 안 댔다.
 
 ## 2026-09-01
 

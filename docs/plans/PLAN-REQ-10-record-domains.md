@@ -1,6 +1,6 @@
 # PLAN-REQ-10 · 기록 도메인 5종 (weight · activity · feeding · shed · diary)
 
-> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0~3 완료 2026-09-01 · 다음은 Phase 4 shed)
+> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0~4 완료 2026-09-02 · 다음은 Phase 5 diary — 착수 전 미결 3건 확인 필요)
 
 ## 배경
 
@@ -84,7 +84,9 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 
 **Phase 4 (shed) 전**
 - [ ] **"완료일은 시작일 이후여야 함"** — `shed_records` 에는 `shed_date` 하나뿐이다. 낡은 문구로 보이며 **원본 행에서 지우는 역반영**이 필요하다. 지우지 않으면 검증 계약이 존재하지 않는 컬럼을 가리킨다
-- [ ] **탈피 예측의 기록 부족 시 동작.** `confidence LOW(1개)` 일 때 `average_cycle_days` 는 무엇으로 계산하는가(간격이 없다) — 기본 주기 상수? "3회 이상 시 실제 간격 평균으로 **자동 보정**"의 "보정 전" 값이 원본에 없다. 0건일 때 응답(빈 객체? 404?). `is_complete = false` 기록을 주기 계산에 넣는가
+- [x] **탈피 예측의 기록 부족 시 동작 — 2026-09-02 확정(2문항만).** `confidence LOW(1개)`일 때 `average_cycle_days`는 **`null`**(고정 기본값 검토했으나 성장 단계별 주기가 1~2주~몇 달로 10배 넘게 갈려 기각 — `docs/reference/gecko-growth-and-shed-cycle.md` 근거). 0건일 때 응답은 **200, `{predicted_date:null, average_cycle_days:null, based_on_records:0, confidence:LOW}`**(`AnorexiaStreakCalculator`가 0건을 200으로 처리한 것과 같은 결).
+      ⚠️ **`is_complete = false` 기록을 주기 계산에 넣는가는 사용자에게 확인받지 않은 채 구현이 암묵적으로 "넣는다"로 정했다** — `ShedPredictionCalculator`가 받는 `recentShedDatesDesc`는 `is_complete` 를 필터링하지 않고 최근 `shed_date` 그대로 쓴다. 이 부분은 **아직 열려 있다** — 확인 필요
+      (원문:) `confidence LOW(1개)` 일 때 `average_cycle_days` 는 무엇으로 계산하는가(간격이 없다) — 기본 주기 상수? "3회 이상 시 실제 간격 평균으로 **자동 보정**"의 "보정 전" 값이 원본에 없다. 0건일 때 응답(빈 객체? 404?). `is_complete = false` 기록을 주기 계산에 넣는가
 - [ ] **`is_assisted ↔ condition_tag '탈피도와줌'` 연계** (테이블 정의서) — D1 로 다이어리에 그 태그가 없어졌다. 연계 규칙 자체를 폐기하고 테이블 정의서에서 지울지, timeline(REQ-12) 이벤트로만 표기할지
 
 **Phase 5 (diary) 전**
@@ -116,9 +118,9 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
       `V4__feeding_food_size.sql` · `FeedingLog` · `FoodSize` enum(S/M/L) · CRUD 4행 · `AnorexiaStreakCalculator`(순수) + `GET /feeding/anorexia-streak`.
       완료 기준: V4 가 로컬 DB 에 적용되고 `ddl-auto: validate` 통과 ✅(PR #46 으로 실제 결함 잡고 확인) · `is_refused` 누락 400 ✅ · 계산기 단위 테스트가 미결 답(스트릭 정의·경계·0건)을 케이스로 고정 ✅ · `level` 경계값(2일/3일/6일/7일) ✅ · 게코 외 종의 스트릭 호출이 미결 답대로 ✅ · 나머지는 Phase 1 기준 ✅
 
-- [ ] **Phase 4 — shed (5행)**
-      `ShedRecord` · CRUD 4행(게코 외 종은 **네 행 전부** `SHED_NOT_SUPPORTED_SPECIES`) · `ShedPredictionCalculator`(순수) + `GET /shed/prediction`.
-      완료 기준: 개 펫의 `POST /shed` → 400 `SHED_NOT_SUPPORTED_SPECIES` · `GET /shed` 도 400(목록도 게코 전용) · 예측 `confidence` 가 기록 1/2/3+ 건에서 LOW/MEDIUM/HIGH · `average_cycle_days` 가 최근 3개 간격 평균 · 기록 부족 시 동작이 미결 답대로 · 나머지는 Phase 1 기준
+- [x] **Phase 4 — shed (5행)** — 코드·케이스 26건 완료, 커밋 `4b4ad4a`(`feat/req10-phase4-shed`, 푸시 완료). 새 마이그레이션이 없는 Phase라(shed_records는 V1부터 존재) Phase 1~3 과 달리 로컬 DB 확인 항목 자체가 없다 — 케이스 통과만으로 완료 기준을 전부 채운다.
+      `ShedRecord` · CRUD 4행(게코 외 종은 **네 행 전부** `FEATURE_NOT_SUPPORTED_SPECIES`, 에러 코드는 아래 참고) · `ShedPredictionCalculator`(순수) + `GET /shed/prediction`.
+      완료 기준: 개 펫의 `POST /shed` → 400 ✅(코드는 `FEATURE_NOT_SUPPORTED_SPECIES`) · `GET /shed` 도 400(목록도 게코 전용) ✅ · 예측 `confidence` 가 기록 1/2/3+ 건에서 LOW/MEDIUM/HIGH ✅ · `average_cycle_days` 가 최근 3개 간격 평균 ✅ · 기록 부족 시 동작이 미결 답대로 ✅(0건→200 LOW, 1건→null) · 나머지는 Phase 1 기준 ✅
 
 - [ ] **Phase 5 — diary (5행, 텍스트만)**
       `DiaryEntry`(`BaseTimeEntity`) · `ConditionTag` enum 4종(D1) · CRUD 5행 · 목록 `condition_tag` 필터.
@@ -209,6 +211,38 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 | REQ-10-65 | 〃 | 경과일 0일이면(건수 아님) `NONE` 유지 | 회귀 | 미결 질문(Phase 3) — "연속 거식 건수 안은 기각" | 3 | ✅ |
 | REQ-10-66 | `GET /feeding/anorexia-streak` | 개 펫 호출 → **HTTP 왕복** 400 · `error.code` = `FEATURE_NOT_SUPPORTED_SPECIES` | 예외 | 미결 질문(Phase 3) — "게코 외 종의 스트릭 호출 → `FEATURE_NOT_SUPPORTED_SPECIES` 신설" | 3 | ✅ |
 | REQ-10-67 | 〃 | 게코 펫 호출 → **HTTP 왕복** 200 | 정상 | 범위—포함 — "거식 스트릭은 게코 전용" | 3 | ✅ |
+
+| REQ-10-68 | `POST /shed` | **HTTP 왕복** 201 | 정상 | Phase 4 완료 기준 — "나머지는 Phase 1 기준" · Phase 1 완료 기준 — "4행이 원본 상태코드(201/200/200/204)대로" | 4 | ✅ |
+| REQ-10-69 | `DELETE /shed/{record_id}` | **HTTP 왕복** 204 · 본문 없음 | 정상 | 〃 | 4 | ✅ |
+| REQ-10-70 | `ShedService` 진입 | 남의 펫 → `PET_FORBIDDEN` | 예외 | Phase 1 완료 기준 — "남의 펫 403" | 4 | ✅ |
+| REQ-10-71 | 〃 | 삭제된 펫 → `PET_NOT_FOUND` | 예외 | Phase 1 완료 기준 — "삭제된 펫 404" | 4 | ✅ |
+| REQ-10-72 | 기록 조회 | 다른 펫에 속한 기록 id → `RESOURCE_NOT_FOUND` | 예외 | D6 — "`findByIdAndPetId(id, petId)`" | 4 | ✅ |
+| REQ-10-73 | 목록 응답 | `items`·`next_cursor`·`has_next` 키 | 불변식 | 범위—포함 — "`{items, next_cursor, has_next}` 다(= `CursorPage`)" | 4 | ✅ |
+| REQ-10-74 | PATCH 요청 DTO | `@NotNull`·`@NotBlank` 가 없다 | 회귀 | 제약·함정 — "PATCH DTO 에 `@NotNull`·`@NotBlank` 금지" | 4 | ✅ |
+| REQ-10-75 | `PATCH /shed/{record_id}` | `memo` 만 보내면 `is_complete` 가 유지된다 | 회귀 | D10 — "병합은 서비스" | 4 | ✅ |
+| REQ-10-76 | 목록 | `next_cursor` 에 마지막 항목 `id` · 다음 페이지 조회가 `shed_date`·`id` 둘 다 전달 | 회귀 | D8 — "`id` desc 타이브레이크" | 4 | ✅ |
+| REQ-10-77 | `POST /shed` | `shed_date` 누락 → 400 | 경계 | 원본 Validation — "`shed_date` 필수" | 4 | ✅ |
+| REQ-10-78 | `ShedService` | 개 펫 `create` 호출 → `FEATURE_NOT_SUPPORTED_SPECIES` | 예외 | api-list.md § 8 — "종별 제약: 크레스티드 게코 전용 → 그 외 종은 `FEATURE_NOT_SUPPORTED_SPECIES`" | 4 | ✅ |
+| REQ-10-79 | `POST /shed` | 개 펫 → **HTTP 왕복** 400 · `error.code` = `FEATURE_NOT_SUPPORTED_SPECIES` | 예외 | 〃 | 4 | ✅ |
+| REQ-10-80 | `GET /shed` | 개 펫 → **HTTP 왕복** 400 (목록도 게코 전용) | 예외 | 〃 | 4 | ✅ |
+| REQ-10-81 | `PATCH /shed/{record_id}` | 개 펫 → **HTTP 왕복** 400 | 예외 | 〃 | 4 | ✅ |
+| REQ-10-82 | `DELETE /shed/{record_id}` | 개 펫 → **HTTP 왕복** 400 | 예외 | 〃 | 4 | ✅ |
+| REQ-10-83 | `ShedService` | 게코 펫 `create` → 정상 저장 | 정상 | 〃 | 4 | ✅ |
+| REQ-10-84 | `ShedPredictionCalculator` | 기록 0건 → `{predicted_date:null, average_cycle_days:null, based_on_records:0, confidence:LOW}` | 경계 | 사용자 확정(2026-09-02) | 4 | ✅ |
+| REQ-10-85 | 〃 | 기록 1건 → `confidence:LOW` · `average_cycle_days:null` | 경계 | 사용자 확정(2026-09-02, `docs/reference/gecko-growth-and-shed-cycle.md` 근거) | 4 | ✅ |
+| REQ-10-86 | 〃 | 기록 2건 → `confidence:MEDIUM` | 경계 | api-list.md § 8 — "`MEDIUM`(2개)" | 4 | ✅ |
+| REQ-10-87 | 〃 | 기록 2건 → `average_cycle_days` = 두 기록 사이 일수 | 정상 | api-list.md § 8 — "최근 3개 기록의 간격 평균으로 산출" | 4 | ✅ |
+| REQ-10-88 | 〃 | 기록 2건 → `predicted_date` = 최근 `shed_date` + `average_cycle_days` | 정상 | 〃 | 4 | ✅ |
+| REQ-10-89 | 〃 | 기록 3건 → `confidence:HIGH` | 경계 | api-list.md § 8 — "`HIGH`(3개 이상)" | 4 | ✅ |
+| REQ-10-90 | 〃 | 기록 3건 → `average_cycle_days` = 최근 2개 간격 평균 | 정상 | api-list.md § 8 — "최근 3개 기록의 간격 평균으로 산출" | 4 | ✅ |
+| REQ-10-91 | 〃 | 기록 4건 → 가장 오래된 것 무시, 최근 3건만 사용(`based_on_records:3`) | 회귀 | 〃 ("최근 3개") | 4 | ✅ |
+| REQ-10-92 | `GET /shed/prediction` | 개 펫 → **HTTP 왕복** 400 · `error.code` = `FEATURE_NOT_SUPPORTED_SPECIES` | 예외 | api-list.md § 8 — "종별 제약" | 4 | ✅ |
+| REQ-10-93 | 〃 | 게코 펫 → **HTTP 왕복** 200 | 정상 | 〃 | 4 | ✅ |
+
+> **2026-09-02 추가 — 68~93 (Phase 4, shed).** 완료 기준의 에러 코드(`SHED_NOT_SUPPORTED_SPECIES`)가 2026-08-28 결정보다 낡아 있어 `FEATURE_NOT_SUPPORTED_SPECIES`로 바꿔 썼다 — `docs/specs/api-list.md § 8`이 이미 이 값으로 갱신돼 있어 그쪽을 근거로 삼았다. 예측 계산기의 기록 부족 시 동작(미결)은 사용자와 함께 확정했다: **0건 → 200(`confidence:LOW`, 나머지 `null`/`0`), 1건 → `average_cycle_days:null`.** 처음엔 "고정 기본값(예: 30일)"을 검토했으나, 사용자가 제공한 성장 단계별 실측 자료(`docs/reference/gecko-growth-and-shed-cycle.md`) — 베이비 1~2주부터 성체 몇 달까지 10배 넘게 차이 — 가 단일 상수를 기각하는 근거가 됐다. 성장 단계 인지 예측은 몸무게·나이 로직이 새로 필요해 이번 Phase 범위 밖 — 그 자료는 향후 참고용으로만 남겼다.
+> **결과 갱신: 2026-09-02 — 68~93 전부 `✅` (Phase 4).** `/implement`가 구현·`ErrorCode.SHED_NOT_SUPPORTED_SPECIES` 제거까지 마치고 `4b4ad4a`로 커밋·푸시(자체 실행 32/32 통과, 수정 루프 0회). `/testrun REQ-10` 재확인 — REQ-10 전체(weight·activity·feeding·shed) 114 메서드 실행 · 실패 0 · (a) 수정 0건 · 표 90행 ↔ 코드 90 ID 일치(Phase 0 프로브 3건 제외) · 근거 인용 전건(계획서 자체 인용 5건 + `api-list.md` 신규 인용 3건) 원문 확인.
+> ⚠️ **`is_complete = false` 기록의 주기 계산 포함 여부는 여전히 미확인이다** — 위 미결 질문 항목 참고. `ShedPredictionCalculator`가 암묵적으로 "포함"으로 구현됐고 사용자 확인은 안 받았다.
+> ⚠️ **`ErrorCode.SHED_NOT_SUPPORTED_SPECIES` 는 이제 완전히 죽은 코드다.** 2026-08-28 결정("제거하고 shed도 `FEATURE_NOT_SUPPORTED_SPECIES`로 간다")을 이번에 실행한다 — `/implement`가 제거한다.
 
 > **결과 갱신: 2026-09-01 — 43~67 전부 `✅` (Phase 3).** `/testrun REQ-10` 82 메서드 실행(weight·activity·feeding 전체) · 실패 0 · 표 25행 ↔ 코드 25 ID 일치 · 근거 인용 표본 검사 통과. `/testrun`이 자체 실행 1차에서 REQ-10-51 두 케이스를 (a) 테스트 결함으로 분류해 고쳤다 — `FeedingServiceTest`의 `NOW` 상수가 `+09:00`으로 선언돼 있었는데, 이 파일의 `CursorCodec`은 앱 `JacksonConfig`(KST 존)를 안 거친 무설정 `ObjectMapper`라 인코드 시 오프셋을 `Z`로 정규화한다(Jackson jsr310 기본값) — 순간은 같은데 레코드 동등성 비교만 깨졌다. `Weight`·`ActivityServiceTest`는 애초에 UTC 리터럴이라 드러나지 않았을 뿐이다. `NOW`를 `Z` 표기로 바꿔 해결(같은 순간, 표기만 변경). **계약 승격 제안 — 아래 참고**
 > ✅ **Phase 3 체크 완료 (2026-09-01 오후).** "V4가 로컬 DB에 적용되고 `ddl-auto: validate` 통과"를 실제로 돌려 닫았다 — `docker start petkok-pg` + `bootRun`. **닫는 과정에서 실제 구현 결함을 잡았다**: `FeedingLog.foodSize`가 `@Enumerated(EnumType.STRING)` + `@Column(length = 1)` 조합이었는데, Hibernate 6가 이 조합을 `CHAR(1)`로 추론해 `V4__feeding_food_size.sql`의 `varchar(1)`과 충돌 — `Schema-validation: wrong column type ... found [varchar], but expecting [char(1)]`로 기동 자체가 막혔다. `length = 1`을 빼서 고치고(PR #46, `ee57090`) 재기동으로 `Started PetKokApplication` 확인, REQ-10 82케이스 재확인 통과.
