@@ -12,6 +12,24 @@ AGENTS.md §4의 "계획서 → 검증 계약 → 구현 → 판정 → 기록" 
 - **계획서 경로는 `docs/plans/PLAN-REQ-NN-*.md`**, 미결의 원본은 Notion이다(AGENTS §0). `/workplan`이 미결로 남긴 것은 레포 문서로 답하지 말고 Notion에 먼저 적힌 뒤 옮긴다
 - ⚠️ **커맨드 정의와 전역 계약은 이 레포에 없다.** `claude-commands` 저장소(`~/my_sources/_init/claude-commands`)가 실체이고 프로필은 심링크다. 새 머신에서는 그 저장소를 `clone` 후 `./install.sh`를 먼저 돌린다. 커맨드가 없으면 AGENTS §4의 도구 중립 원칙 셋(테스트가 구현보다 먼저 · Phase 1개 = 커밋 1개 · 판정하는 손은 구현을 고치지 않는다)을 손으로 지킨다
 
+## Notion 작업 이력 (AGENTS.md §0 보완 · 2026-09-03 계약)
+
+`docs/PROGRESS.md`가 원본이고 Notion의 두 외부 DB는 **파생 요약**이다(팻콕 페이지 「구현」 절이 view로 참조). 커맨드는 레포를 가정하지 않으므로 아래 값과 규칙은 이 레포 문서에만 있고, `/workplan`·`/checkpoint`는 "레포 `CLAUDE.md`에 이 절이 있으면 따른다"로 여기에 온다.
+
+| 대상 | data source | 필수 프로퍼티 |
+|---|---|---|
+| ☑️ All Tasks (업무) | `collection://381b81b5-6e60-80f6-930a-000bff15a564` | `이름`(**`REQ-NN ` 접두사** + 인덱스 기능명) · `작업상태` · `유형` · `📽️ Project` = `https://app.notion.com/p/389b81b56e6080f6bfc2f7972108e778` |
+| 👣 All Tasks History (일별 이력) | `collection://3c9b81b5-6e60-801d-90aa-000b7a109501` | `이력명`(`<요약> (REQ-NN Phase X~Y · REQ-MM …)`) · `작업일`(`date:작업일:start`, 날짜만) · `유형` · `☑️ All Tasks`(그날 손댄 Task **전부** 연결) |
+
+`관련 기술`(multi-select)은 선택. Task 본문은 비워 둔다 — 내용은 계획서·PROGRESS.md에 있고, 두 곳에 적으면 갈린다.
+
+- **Task 생성 = `/workplan`.** REQ 번호가 인덱스에 들어가는 순간 행을 만든다. 상태 `시작 전`(⏸로 들어가면 `보류`). REQ가 아닌 잡무(로컬 DB 구성 등)도 행을 둘 수 있지만 접두사 없이 만들고 인덱스와 조인되지 않음을 감수한다
+- **History 작성·상태 전이 = `/checkpoint` 한 손.** 하루의 Phase 작업이 끝나 `/checkpoint`를 찍을 때 **그날 행이 있으면 새로 만들지 않고 이력명·관계를 갱신**(upsert), 없으면 생성. `/checkpoint`는 Phase마다 여러 번 돌 수 있으므로 이 규칙이 없으면 하루에 행이 여러 개 생긴다. 같은 호출에서 Task 상태도 옮긴다 — 첫 History가 붙을 때 `시작 전 → 진행 중`, 인덱스가 ✅가 될 때 `완료`
+- **`완료` = 인덱스 ✅와 같은 정의**(전 Phase + 검증 계약 통과). **배포는 포함하지 않는다** — 2026-09-03 확정. 파이프라인이 없어 배포를 기다리면 전부 `진행 중`에 묶이고 인덱스와 갈린다. 배포가 생기면 별도 Task로 둔다
+- **상태는 인덱스 범례와 1:1이다.** `✅ 완료` · `🟡 진행 중` · `⏸ 보류` · `❌ 폐기` · 미착수 `시작 전`. 인덱스가 바뀌었는데 Notion이 그대로면 `/progress`가 불일치로 보고한다
+- **쓰고 나서 `fetch`로 재조회한다.** `create-pages`·`update-page`는 성공을 돌려주지만 관계·select 값이 실제로 들어갔는지는 읽어야 안다(§Notion 편집 함정과 같은 이유). 행 생성은 `parent.data_source_id`로, 관계 값은 페이지 URL 배열로 준다
+- 소급 이력: 2026-08-27에 REQ-01~09·13~15를 일괄 등록했고 그 뒤 08-28~09-03 4일치와 REQ-10·11·12·16 행이 빠져 있던 것을 2026-09-03에 채웠다. REQ-13은 `완료`에서 `폐기`로 정정
+
 ## 로컬 검증 (AGENTS.md §6 보완)
 - lefthook 훅이 설치되어 있다면(`.git/hooks/pre-commit` 존재) 커밋 시 `spotlessApply`가 자동 적용되고 Checkstyle 경고가 출력된다. 새 클론·새 워크트리에서는 `lefthook install`을 먼저 실행할 것 — 미설치 상태면 아무 검증도 걸리지 않아 CI `spotlessCheck`에서 터진다
 - 커밋 전 CI 게이트 재현: `./gradlew spotlessApply && ./gradlew build -x test && ./gradlew checkstyleMain -PciStrict`

@@ -17,7 +17,7 @@
 | 소스 구조·레이어 규칙·파생 로직 설계 | **Notion** → 설계 → 소스 구조/아키텍처 설계 |
 | 스택·패키지 구조·로컬 실행 | [`README.md`](README.md) |
 | 코드 컨벤션·CI 게이트 | 이 문서 (§5·§6) |
-| 진행 이력·판단 근거 | [`docs/PROGRESS.md`](docs/PROGRESS.md) |
+| 진행 이력·판단 근거 | [`docs/PROGRESS.md`](docs/PROGRESS.md). **Notion `All Tasks`·`All Tasks History`는 이것의 파생 요약**이다 — REQ 1건 = Task 1행, 하루 1행 History. 상태는 인덱스 범례와 1:1(✅ 완료 · 🟡 진행 중 · ⏸ 보류 · ❌ 폐기 · 미착수 시작 전). 갱신 규칙은 [`CLAUDE.md`](CLAUDE.md) 「Notion 작업 이력」(2026-09-03 계약) |
 
 - `docs/specs/api-list.md`(API I/F)와 `docs/specs/db-schema.md`(테이블 정의서)는 **Notion의 파생 요약**이다. 원본이 아니다. **충돌하면 언제나 Notion이 이긴다**
 - 설계 관련 판단이 필요하면 레포 문서만 보고 결정하지 말 것. 실제로 레포 문서만 보고 진행했다가 이미 Accepted 상태이던 ADR-002(DB 엔진)와 어긋난 계획을 세운 적이 있다
