@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-03 (**REQ-10 완전 마감 — Notion 역반영 4건 전부 완료.** 「테이블 정의서」의 값 목록 셀 1곳만 API로 원문을 못 읽어 사람이 직접 고쳤고, 다시 입력하면서 저장 형태 자체가 정상화됐다. Notion 작업 이력(All Tasks·History) 계약이 새로 승격됐고 소급분까지 이미 채워져 있다 — 이 원본과 동기화 확인함. 남은 건 Phase 1·2 로컬 DB keyset 경계 실측뿐)
+> 최종 갱신: 2026-09-03 (**REQ-10 완전 마감 — Notion 역반영 4건 전부 완료.** Notion 작업 이력(All Tasks·History) 계약 승격·소급 확인. 낡은 문서 2건(`PLAN-REQ-10` 헤더·`CLAUDE.md` `.env` 안내) 정정, `## 2026-09-02` 날짜 헤딩 유실을 이 세션 안에서 발견해 복원. 남은 건 Phase 1·2 로컬 DB keyset 경계 실측뿐)
 
 ## 요구사항 인덱스
 
@@ -58,6 +58,17 @@
 이 세션 밖(다른 Claude 세션, `session_01Nn9he7kZvuuZwLfSeWuwjn`)에서 `CLAUDE.md`에 「Notion 작업 이력」절을 새로 추가했다 — `docs/PROGRESS.md`를 원본으로 두고 Notion의 두 외부 DB(☑️ All Tasks · 👣 All Tasks History)를 파생 요약으로 규정한다. Task 생성은 `/workplan`(REQ 번호가 인덱스에 들어갈 때), 일별 History 작성과 상태 전이는 `/checkpoint` 한 손(upsert) — 이 커맨드가 Phase마다 여러 번 돌 수 있으므로 그날 History 행이 있으면 새로 만들지 않고 덧붙인다. **완료 정의는 인덱스 ✅와 동일하고 배포는 포함하지 않는다**(2026-08-27 일괄 등록 이후 아무도 안 쓰고 있던 것이 계약 필요성의 근거였다).
 
 같은 커밋에서 **소급분까지 이미 채워져 있었다** — REQ-10·11·12·16 Task 행 생성, REQ-13 완료→폐기 정정, 08-28~09-03 History 5행. 이 `/checkpoint` 실행에서 재조회로 확인한 결과 — **REQ-10 Task는 이미 `완료`, 오늘(2026-09-03) History 행도 이미 있고 REQ-10 Task에 정확히 연결돼 있다**(diary CRUD·Notion 역반영 4건·이 계약 자체까지 한 행에 담겨 있음). 이번 실행에서 추가로 쓸 Notion 변경은 없다 — 다른 세션이 같은 날 이미 upsert 규칙대로 처리해 뒀다.
+
+### `/progress 예정` 조회로 드러난 문서 불일치 2건 정정
+
+`/progress 예정` 조회에서 찾아낸 낡은 문서 2건을 사용자 지시로 바로 고쳤다.
+
+- **`PLAN-REQ-10` 헤더가 `🟡 진행`으로 남아 있었다.** `PROGRESS.md` 인덱스는 이미 REQ-10을 `✅`로 올렸는데(2026-09-03 오전) 계획서 자체의 헤더 문구는 안 고쳐서 갈라져 있었다 — `✅ 완료`로 정정, Notion 역반영 완료 사실도 문구에 추가
+- **`CLAUDE.md`의 `.env` 기동 안내가 낡아 있었다.** `set -a && . ./.env && set +a && ./gradlew bootRun`을 여전히 안내했는데, 2026-08-28 실측(`PROGRESS.md` 같은 날 로그)으로 이미 `application.yml`의 `spring.config.import: optional:file:.env[.properties]` 덕에 `./gradlew bootRun`만으로 충분하다는 게 확인돼 있었다. 그날 로그에 "다음 세션에서 고칠 것"이라 적어 두고 6일간 안 고쳐진 것을 이번에 정정
+
+⚠️ **이 `/checkpoint` 실행 자체가 이 파일의 델타를 하나 더 만들었다** — 앞선 편집(오늘 오전 "Notion 작업 이력" 섹션 추가) 때 `## 2026-09-02` 날짜 헤딩을 실수로 지웠다. 그 결과 2026-09-02에 있었던 일(Phase 4 shed·개발 플로우 재배치·Phase 5 diary·shed 미결 정리 전부)이 09-03 헤딩 밑에 눌려 붙어, `/progress`의 날짜 기반 파싱이 깨질 뻔했다. 이번에 헤딩을 원래 자리(Phase 4 shed 시작 지점)에 복원했다 — **`/checkpoint`가 실행 중 자기가 만든 문서 자체의 결함을 발견하고 고친 사례**로 남긴다.
+
+## 2026-09-02
 
 > **REQ-10 Phase 4(shed) 완료.** `/testgen`→`/implement`→`/testrun`이 전부 1회에 녹색으로 끝났다(수정 루프 0회) — Phase 3까지 매번 뭔가 걸렸던 것과 다르다. 그 전에 사용자가 준 실제 도메인 지식(게코 성장 단계별 탈피 주기)이 설계 방향 하나를 바로 뒤집었다.
 
