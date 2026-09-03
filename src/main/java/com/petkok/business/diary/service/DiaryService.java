@@ -27,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 다이어리 CRUD + {@code condition_tag} 필터 목록. 검증 계약 REQ-10-94 ~ 114 (PLAN-REQ-10 § 검증 계약). 종 제한 없음 —
  * 모든 종에 열려 있다({@code ShedService} 와 달리 {@code validateGecko} 가 없다).
  *
- * <p>{@code entry_date} 는 미래 불가(Phase 5 미결 확정 — KST 자정, ADR-0002 계산=Asia/Seoul). {@code Clock} 을
- * 주입받아 무인자 {@code now()} 를 쓰지 않는다(REQ-16 D5).
+ * <p>{@code entry_date} 는 미래 불가(Phase 5 미결 확정 — KST 자정, ADR-0002 계산 존). {@code Clock} 을 주입받아 무인자
+ * {@code now()} 를 쓰지 않는다(REQ-16 D5).
  */
 @Slf4j
 @Service
