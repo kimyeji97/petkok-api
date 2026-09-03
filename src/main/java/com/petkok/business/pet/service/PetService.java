@@ -7,6 +7,8 @@ import com.petkok.data.pet.entity.Pet;
 import com.petkok.data.pet.repository.PetRepository;
 import com.petkok.framework.exception.BusinessException;
 import com.petkok.framework.exception.ErrorCode;
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -19,9 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class PetService {
 
   private final PetRepository petRepository;
+  private final Clock clock;
 
-  public PetService(PetRepository petRepository) {
+  public PetService(PetRepository petRepository, Clock clock) {
     this.petRepository = petRepository;
+    this.clock = clock;
   }
 
   @Transactional
@@ -82,7 +86,7 @@ public class PetService {
    */
   @Transactional
   public void delete(UUID userId, UUID petId) {
-    findOwned(userId, petId).softDelete();
+    findOwned(userId, petId).softDelete(OffsetDateTime.now(clock));
     log.info("Pet soft-deleted. petId={}", petId);
   }
 

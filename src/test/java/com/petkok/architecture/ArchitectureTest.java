@@ -166,10 +166,11 @@ final class ArchitectureTest {
    *
    * <p><b>{@code now(Clock)} 오버로드는 걸리지 않는다</b> — 파라미터 없는 시그니처만 지정했기 때문이고, 그게 이 규칙이 열어 두려는 정확한 통로다.
    *
-   * <p><b>{@code data} 는 범위 밖이다</b>(2026-08-31 결정). {@code BaseSoftDeleteEntity.softDelete()} 가
-   * {@code OffsetDateTime.now()} 를 부르지만 JPA 엔티티라 빈을 주입할 수 없고, {@code deleted_at} 은 벽시계 파생이 아니라
-   * <b>순간</b>이라 D4 의 자리가 아니다 — Phase 1 이 {@code OffsetDateTime} 으로 바꾼 시점에 TZ 위험은 이미 사라졌다. 남는 이득은
-   * 테스트 고정 하나뿐이라 엔티티 시그니처를 바꿀 값을 못 한다.
+   * <p><b>{@code data} 는 범위 밖이다</b>(2026-08-31 결정) — JPA 엔티티라 빈을 주입할 수 없고, {@code deleted_at} 은 벽시계
+   * 파생이 아니라 <b>순간</b>이라 D4 의 자리가 아니다. {@code BaseSoftDeleteEntity.softDelete(OffsetDateTime now)} 는
+   * 무인자 {@code now()} 를 부르지 않는다(REQ-16 미결 ⑦, 2026-09-03 확정) — 호출부({@code UserService}·{@code
+   * PetService})가 이미 주입받은 {@code Clock} 으로 구한 순간을 파라미터로 넘긴다. {@code
+   * RefreshToken#revoke(OffsetDateTime)} 와 같은 형태다.
    */
   @ArchTest
   static final ArchRule REQ_16_10_NO_DIRECT_NOW =
