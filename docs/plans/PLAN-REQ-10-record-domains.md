@@ -1,6 +1,6 @@
 # PLAN-REQ-10 · 기록 도메인 5종 (weight · activity · feeding · shed · diary)
 
-> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0~4 완료 2026-09-02 · Phase 5 diary 착수 전 미결 3건 2026-09-02 전부 확정 — `/testgen` 착수 가능)
+> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 상태: 🟡 진행 (Phase 0~5 전부 완료 2026-09-02 · 검증 계약 111행 전부 `✅` · **단, Phase 1·2는 로컬 DB keyset 경계 실측 1건씩 여전히 보류**돼 있어 그 두 Phase 체크박스는 열어 둔다)
 
 ## 배경
 
@@ -83,11 +83,11 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 - [x] **`food_size` 는 종과 무관하게 그대로 저장 (2026-08-28 확정 · 2026-09-01 Notion 역반영 완료 — 「급여 기록」 Validation 문구 정정).** D13(`distance_km`)과 같은 결 — "개/고양이 미사용"은 입력 UI 규약이지 서버 거부 규약이 아니다. 거부하는 것은 enum 밖의 값뿐(400). (원문:) **`food_size` 를 개/고양이가 보내면** — "개/고양이 미사용". 무시 vs 400 (activity `distance_km` 와 같은 질문)
 
 **Phase 4 (shed) 전**
-- [ ] **"완료일은 시작일 이후여야 함"** — `shed_records` 에는 `shed_date` 하나뿐이다. 낡은 문구로 보이며 **원본 행에서 지우는 역반영**이 필요하다. 지우지 않으면 검증 계약이 존재하지 않는 컬럼을 가리킨다
+- [x] **"완료일은 시작일 이후여야 함" — 2026-09-02 확정.** **낡은 문구 — 원본에서 삭제하는 역반영을 제안한다.** `shed_records`(`docs/specs/db-schema.md:183`)는 `shed_date` 컬럼 하나뿐이고 완료 여부는 `is_complete` 불리언으로만 표시한다 — 시작일/완료일 두 날짜를 쓰던 예전 설계의 흔적으로 보이며, 지금 스키마엔 대응하는 컬럼 쌍이 아예 없다. 코드 영향 없음(애초에 그런 검증을 구현할 컬럼이 없다) — Notion 원본 삭제는 사람이 진행
 - [x] **탈피 예측의 기록 부족 시 동작 — 2026-09-02 확정(2문항만).** `confidence LOW(1개)`일 때 `average_cycle_days`는 **`null`**(고정 기본값 검토했으나 성장 단계별 주기가 1~2주~몇 달로 10배 넘게 갈려 기각 — `docs/reference/gecko-growth-and-shed-cycle.md` 근거). 0건일 때 응답은 **200, `{predicted_date:null, average_cycle_days:null, based_on_records:0, confidence:LOW}`**(`AnorexiaStreakCalculator`가 0건을 200으로 처리한 것과 같은 결).
       ⚠️ **`is_complete = false` 기록을 주기 계산에 넣는가는 사용자에게 확인받지 않은 채 구현이 암묵적으로 "넣는다"로 정했다** — `ShedPredictionCalculator`가 받는 `recentShedDatesDesc`는 `is_complete` 를 필터링하지 않고 최근 `shed_date` 그대로 쓴다. 이 부분은 **아직 열려 있다** — 확인 필요
       (원문:) `confidence LOW(1개)` 일 때 `average_cycle_days` 는 무엇으로 계산하는가(간격이 없다) — 기본 주기 상수? "3회 이상 시 실제 간격 평균으로 **자동 보정**"의 "보정 전" 값이 원본에 없다. 0건일 때 응답(빈 객체? 404?). `is_complete = false` 기록을 주기 계산에 넣는가
-- [ ] **`is_assisted ↔ condition_tag '탈피도와줌'` 연계** (테이블 정의서) — D1 로 다이어리에 그 태그가 없어졌다. 연계 규칙 자체를 폐기하고 테이블 정의서에서 지울지, timeline(REQ-12) 이벤트로만 표기할지
+- [x] **`is_assisted ↔ condition_tag '탈피도와줌'` 연계 — 2026-09-02 확정. 폐기.** `shed_records.is_assisted`가 이미 그 자체로 "탈피도와줌" 상태의 단일 출처다([ADR-0001](../adr/ADR-0001-derived-state-single-source.md) — D1 이 다이어리 `condition_tag` 를 4종으로 확정하며 "거식·탈피도와줌·탈피완료는 급여·탈피 기록에서 파생돼 단일 출처"라 못박은 것과 같은 근거). 다이어리 `condition_tag`로 재반영할 연계 규칙 자체가 불필요 — timeline(REQ-12)이 이 상태를 보여주려면 `shed_records`를 직접 읽으면 된다. 테이블 정의서(`docs/specs/db-schema.md:189`)의 연계 문구는 역반영 대상
 
 **Phase 5 (diary) 전**
 - [x] **"미래 날짜 불가"의 기준 타임존 — 2026-09-02 확정.** **KST(`Asia/Seoul`) 자정.** `ADR-0002`가 이 케이스를 이름까지 대며 이미 답해 뒀다 — "계산 — '오늘'·'당일'·'미래'·'일수'·'주기' 등 달력 판정은 전부 `Asia/Seoul` 자정 경계"(REQ-16). `LocalDate.now(Clock)`(KST 존 `Clock` 빈)으로 "오늘"을 구하고 `entry_date > 오늘` 이면 400. `fed_at`(Phase 3)과 같은 원칙.
@@ -99,7 +99,7 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 
 **전체**
 - [x] **응답 시각의 `Z` 표기 → REQ-16 으로 이관 (2026-08-28).** framework 전역 결정으로 번져 별도 REQ 가 됐다 — 저장을 `timestamptz` 로 바꾸고 응답은 `+09:00`, 달력 판정은 KST 고정([ADR-0002](../adr/ADR-0002-time-handling-timestamptz.md) · [PLAN-REQ-16](PLAN-REQ-16-time-handling-timestamptz.md)). **REQ-10 Phase 3 이후는 REQ-16 완료 뒤에 진행한다** — "당일"·스트릭 일수가 달력 기준을 요구하기 때문이다. (원문:) **응답 시각의 `Z` 표기** (2026-08-28 등록) — D12 는 "요청·응답은 ISO-8601 `Z`"인데 Jackson 에 시각 포맷 설정이 없어 응답 `logged_at`·`created_at` 이 `2026-06-30T09:00:00`(Z 없음)으로 나간다. 기존 엔티티 전부 같은 상태라 framework 전역 결정이다 — `JacksonConfig` 에 `LocalDateTime` 직렬화 포맷을 두거나 D12 문구를 현실에 맞추거나. Phase 3 전에 정한다
-- [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ~~ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절~~ (2026-08-28 완료) ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제 ~~ⓔ 체중 경고 필드 명시~~ (2026-08-28 완료) ~~ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건~~ (2026-08-28 완료 — callout + 스케치 ① 갱신, `fetch` 로 저장 확인) ~~ⓖ 급여 기록 callout "당일 시간만 허용" → "미래 시각 불가" ⓗ 거식 스트릭 응답 예시의 자기모순 ⓘ 「소스 구조」 §10 에 `FEATURE_NOT_SUPPORTED_SPECIES` 추가 ⓙ 급여 기록 행에 `food_size` 처리 절~~ (2026-09-01 완료 — `fetch` 재조회로 4곳 전부 확인. ⓘ의 "`SHED_NOT_SUPPORTED_SPECIES` 제거"는 대상이 애초에 Notion에 없어 추가만 했다, 위 미결 참고) — Phase 3 착수 전 원본 정리 끝. (시각 예시 `…Z` → `+09:00` 은 REQ-16 Phase 4 소관, 완료됨)
+- [ ] **역반영 목록** (Phase 진행하며 사람이 Notion 에서) — ⓐ 테이블 정의서·「소스 구조」§8·ERD 의 `condition_tag` 7종 → 4종 ⓑ 테이블 정의서 `feeding_logs` 에 `food_size` ~~ⓒ 활동·체중·탈피 목록 행에 `cursor`/`limit` 절~~ (2026-08-28 완료) ⓓ 탈피 기록 "완료일은 시작일 이후" 삭제(**결정 확정 2026-09-02, 위 미결 참고 — 삭제만 남음**) ~~ⓔ 체중 경고 필드 명시~~ (2026-08-28 완료) ~~ⓕ 「소스 구조」 §13 ArchUnit 스케치에 예외 3건~~ (2026-08-28 완료 — callout + 스케치 ① 갱신, `fetch` 로 저장 확인) ~~ⓖ 급여 기록 callout "당일 시간만 허용" → "미래 시각 불가" ⓗ 거식 스트릭 응답 예시의 자기모순 ⓘ 「소스 구조」 §10 에 `FEATURE_NOT_SUPPORTED_SPECIES` 추가 ⓙ 급여 기록 행에 `food_size` 처리 절~~ (2026-09-01 완료 — `fetch` 재조회로 4곳 전부 확인. ⓘ의 "`SHED_NOT_SUPPORTED_SPECIES` 제거"는 대상이 애초에 Notion에 없어 추가만 했다, 위 미결 참고) — Phase 3 착수 전 원본 정리 끝. (시각 예시 `…Z` → `+09:00` 은 REQ-16 Phase 4 소관, 완료됨) ⓚ 테이블 정의서 `shed_records` 비즈니스 규칙의 `is_assisted ↔ condition_tag '탈피도와줌'` 연계 문구 삭제(**결정 확정 2026-09-02 — 폐기, 위 미결 참고**)
 
 ## 작업 단계
 
@@ -125,9 +125,9 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
       `ShedRecord` · CRUD 4행(게코 외 종은 **네 행 전부** `FEATURE_NOT_SUPPORTED_SPECIES`, 에러 코드는 아래 참고) · `ShedPredictionCalculator`(순수) + `GET /shed/prediction`.
       완료 기준: 개 펫의 `POST /shed` → 400 ✅(코드는 `FEATURE_NOT_SUPPORTED_SPECIES`) · `GET /shed` 도 400(목록도 게코 전용) ✅ · 예측 `confidence` 가 기록 1/2/3+ 건에서 LOW/MEDIUM/HIGH ✅ · `average_cycle_days` 가 최근 3개 간격 평균 ✅ · 기록 부족 시 동작이 미결 답대로 ✅(0건→200 LOW, 1건→null) · 나머지는 Phase 1 기준 ✅
 
-- [ ] **Phase 5 — diary (5행, 텍스트만)**
-      `DiaryEntry`(`BaseTimeEntity`) · `ConditionTag` enum 4종(D1) · CRUD 5행 · 목록 `condition_tag` 필터.
-      완료 기준: `condition_tag: "거식"` → 400 · `entry_date` 미래 → 400(기준 타임존은 미결 답) · 응답에 `updated_at` 있음(D11) · 응답에 `photos`·`photo_count` **없음**(D4) · `photo_ids` 를 보내도 무시되고 201 · 필터가 걸린 목록도 keyset 유지 · 나머지는 Phase 1 기준
+- [x] **Phase 5 — diary (5행, 텍스트만)** — 코드·케이스 24건 완료, 커밋 `183f7e4`+`acf1299`(`feat/req10-phase5-diary`, 푸시 완료). `/testrun`이 승인된 표 대비 코드 누락(REQ-10-107, `updated_at` 응답 검증)을 찾아 `/testgen`→`/implement`로 채웠다 — 소스 코드는 이미 정답을 반환하고 있어 구현 변경 없이 테스트만 추가.
+      `DiaryEntry`(`BaseTimeEntity`) · `ConditionTag` enum 4종(D1, 한글 값 JSON 직렬화) · CRUD 5행 · 목록 `condition_tag` 필터.
+      완료 기준: `condition_tag: "거식"` → 400 ✅ · `entry_date` 미래 → 400(KST 자정) ✅ · 응답에 `updated_at` 있음(D11) ✅ · 응답에 `photos`·`photo_count` **없음**(D4) ✅ · `photo_ids` 를 보내도 무시되고 201 ✅ · 필터가 걸린 목록도 keyset 유지 ✅ · 나머지는 Phase 1 기준 ✅
 
 ## 검증 계약
 
@@ -241,6 +241,31 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 | REQ-10-91 | 〃 | 기록 4건 → 가장 오래된 것 무시, 최근 3건만 사용(`based_on_records:3`) | 회귀 | 〃 ("최근 3개") | 4 | ✅ |
 | REQ-10-92 | `GET /shed/prediction` | 개 펫 → **HTTP 왕복** 400 · `error.code` = `FEATURE_NOT_SUPPORTED_SPECIES` | 예외 | api-list.md § 8 — "종별 제약" | 4 | ✅ |
 | REQ-10-93 | 〃 | 게코 펫 → **HTTP 왕복** 200 | 정상 | 〃 | 4 | ✅ |
+
+| REQ-10-94 | `POST /diary` | **HTTP 왕복** 201 | 정상 | Phase 5 완료 기준 — "나머지는 Phase 1 기준" · Phase 1 완료 기준 — "4행이 원본 상태코드(201/200/200/204)대로" | 5 | ✅ |
+| REQ-10-95 | `DELETE /diary/{entry_id}` | **HTTP 왕복** 204 · 본문 없음 | 정상 | 〃 | 5 | ✅ |
+| REQ-10-96 | `DiaryService` 진입 | 남의 펫 → `PET_FORBIDDEN` | 예외 | Phase 1 완료 기준 — "남의 펫 403" | 5 | ✅ |
+| REQ-10-97 | 〃 | 삭제된 펫 → `PET_NOT_FOUND` | 예외 | Phase 1 완료 기준 — "삭제된 펫 404" | 5 | ✅ |
+| REQ-10-98 | 기록 조회 | 다른 펫에 속한 기록 id → `RESOURCE_NOT_FOUND` | 예외 | D6 — "`findByIdAndPetId(id, petId)`" | 5 | ✅ |
+| REQ-10-99 | 목록 응답 | `items`·`next_cursor`·`has_next` 키 | 불변식 | 범위—포함 — "`{items, next_cursor, has_next}` 다(= `CursorPage`)" | 5 | ✅ |
+| REQ-10-100 | PATCH 요청 DTO | `@NotNull`·`@NotBlank` 가 없다 | 회귀 | 제약·함정 — "PATCH DTO 에 `@NotNull`·`@NotBlank` 금지" | 5 | ✅ |
+| REQ-10-101 | `PATCH /diary/{entry_id}` | `content` 만 보내면 `title` 이 유지된다 | 회귀 | D10 — "병합은 서비스" | 5 | ✅ |
+| REQ-10-102 | 목록 | `next_cursor` 에 마지막 항목 `id` · 다음 페이지 조회가 `entry_date`·`id` 둘 다 전달 | 회귀 | D8 — "`id` desc 타이브레이크" | 5 | ✅ |
+| REQ-10-103 | `POST /diary` | `entry_date` 누락 → 400 | 경계 | 원본 Validation — "`entry_date` 필수" | 5 | ✅ |
+| REQ-10-104 | `POST /diary` | `condition_tag: "거식"` → 400 | 예외 | Phase 5 완료 기준 — "`condition_tag: \"거식\"` → 400" | 5 | ✅ |
+| REQ-10-105 | 〃 | `entry_date` 가 내일(미래) → 400 | 예외 | Phase 5 완료 기준 — "`entry_date` 미래 → 400" · 미결 질문(Phase 5) — "KST(`Asia/Seoul`) 자정" | 5 | ✅ |
+| REQ-10-106 | 〃 | `entry_date` 가 오늘 → 201 정상 저장 | 정상 | 〃 | 5 | ✅ |
+| REQ-10-107 | `DiaryService` | 응답에 `updated_at` 이 있다 | 불변식 | D11 — "diary 응답에는 `updated_at` 이 들어간다" | 5 | ✅ |
+| REQ-10-108 | 〃 | 상세 응답에 `photos` 가 없다 | 불변식 | D4 — "`photos` · `photo_count` 미포함" | 5 | ✅ |
+| REQ-10-109 | 목록 응답 | 목록 항목에 `photo_count` 가 없다 | 불변식 | 〃 | 5 | ✅ |
+| REQ-10-110 | `POST /diary` | `photo_ids` 를 보내도 무시되고 201 | 회귀 | D4 — "`photo_ids` 무시" | 5 | ✅ |
+| REQ-10-111 | `GET /diary` | `condition_tag` 필터가 걸린 목록도 keyset 이 유지된다(다음 페이지 조회에 `entry_date`·`id` 전달) | 회귀 | Phase 5 완료 기준 — "필터가 걸린 목록도 keyset 유지" | 5 | ✅ |
+| REQ-10-112 | 〃 | `condition_tag` 필터를 걸면 다른 태그 기록은 응답에 없다 | 정상 | 원본 Validation — "`condition_tag` (상태 태그 필터)" | 5 | ✅ |
+| REQ-10-113 | `POST /diary` | `condition_tag: "정상"` 요청이 `NORMAL` 로 파싱된다 | 정상 | 사용자 확정(2026-09-02) — "영문 상수 + `@JsonValue`/`@JsonCreator`" | 5 | ✅ |
+| REQ-10-114 | 응답 | `condition_tag` 가 한글로 직렬화된다(`NORMAL` → `"정상"`) | 정상 | 〃 | 5 | ✅ |
+
+> **2026-09-02 추가 — 94~114 (Phase 5, diary).** 착수 전 미결 4건(타임존·`limit`·거꾸리 경고·`ConditionTag` enum 설계)을 전부 대화로 확정한 뒤 썼다. `ConditionTag`는 이 프로젝트 첫 한글 값 enum이라 `Species`·`ActivityType`·`FoodSize`와 달리 전례가 없었다 — 영문 상수(`NORMAL`/`ACTIVE`/`FLOPPY_TAIL`/`VOMITING`) + `@JsonValue`/`@JsonCreator`로 정했다(AGENTS §5 "상수 UPPER_SNAKE_CASE"와 일관).
+> **결과 갱신: 2026-09-02 — 94~114 전부 `✅` (Phase 5, diary 완료).** `/implement`가 구현하고 `183f7e4`로 커밋·푸시(자체 실행 23/23 1차 통과). `/testrun REQ-10` 1차 실행에서 **REQ-10-107(응답에 `updated_at` 있음)이 표에는 있는데 코드가 없는 누락**으로 잡혔다 — `/testgen`이 `DiaryServiceTest`에 케이스를 추가하고(`/implement`가 `acf1299`로 커밋·푸시), 구현 자체는 이미 `entry.getUpdatedAt()`을 그대로 반환하고 있어 **소스 변경 없이** 통과했다. 재실행한 `/testrun REQ-10` — REQ-10 전체(weight·activity·feeding·shed·diary) **141 메서드 실행 · 실패 0** · 표 111행(01~114, Phase 0 프로브 3건 제외) ↔ 코드 111 ID 정확히 일치 · 근거 인용 표본 검사(REQ-10-104·105·107·113) 전건 원문 확인.
 
 > **2026-09-02 추가 — 68~93 (Phase 4, shed).** 완료 기준의 에러 코드(`SHED_NOT_SUPPORTED_SPECIES`)가 2026-08-28 결정보다 낡아 있어 `FEATURE_NOT_SUPPORTED_SPECIES`로 바꿔 썼다 — `docs/specs/api-list.md § 8`이 이미 이 값으로 갱신돼 있어 그쪽을 근거로 삼았다. 예측 계산기의 기록 부족 시 동작(미결)은 사용자와 함께 확정했다: **0건 → 200(`confidence:LOW`, 나머지 `null`/`0`), 1건 → `average_cycle_days:null`.** 처음엔 "고정 기본값(예: 30일)"을 검토했으나, 사용자가 제공한 성장 단계별 실측 자료(`docs/reference/gecko-growth-and-shed-cycle.md`) — 베이비 1~2주부터 성체 몇 달까지 10배 넘게 차이 — 가 단일 상수를 기각하는 근거가 됐다. 성장 단계 인지 예측은 몸무게·나이 로직이 새로 필요해 이번 Phase 범위 밖 — 그 자료는 향후 참고용으로만 남겼다.
 > **결과 갱신: 2026-09-02 — 68~93 전부 `✅` (Phase 4).** `/implement`가 구현·`ErrorCode.SHED_NOT_SUPPORTED_SPECIES` 제거까지 마치고 `4b4ad4a`로 커밋·푸시(자체 실행 32/32 통과, 수정 루프 0회). `/testrun REQ-10` 재확인 — REQ-10 전체(weight·activity·feeding·shed) 114 메서드 실행 · 실패 0 · (a) 수정 0건 · 표 90행 ↔ 코드 90 ID 일치(Phase 0 프로브 3건 제외) · 근거 인용 전건(계획서 자체 인용 5건 + `api-list.md` 신규 인용 3건) 원문 확인.
