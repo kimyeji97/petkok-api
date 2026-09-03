@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-03 (**REQ-10·REQ-16 둘 다 완전 마감.** REQ-10: Notion 역반영 4건 전부 완료. REQ-16: 미결 ⑦⑧ 해소 — `BaseSoftDeleteEntity.softDelete(OffsetDateTime)`로 시그니처 변경(`RefreshToken.revoke()`와 관례 통일), `JwtTokenProvider.create()`는 규약 밖 확정. Notion 작업 이력 계약 승격·소급 확인, 낡은 문서 2건 정정, `## 2026-09-02` 헤딩 유실 발견·복원. 남은 건 Phase 1·2 로컬 DB keyset 경계 실측뿐)
+> 최종 갱신: 2026-09-03 (**REQ-10·REQ-16 둘 다 완전 마감, PR #49·#50 머지.** REQ-10: Notion 역반영 4건 전부 완료. REQ-16: 미결 ⑦⑧ 해소 — `BaseSoftDeleteEntity.softDelete(OffsetDateTime)`로 시그니처 변경(`RefreshToken.revoke()`와 관례 통일), `JwtTokenProvider.create()`는 규약 밖 확정. Notion 작업 이력 계약 승격·소급 확인, 낡은 문서 2건 정정, `## 2026-09-02` 헤딩 유실 발견·복원, main 직접 커밋 후 미푸시 재발 3회째 잡아 정리. 남은 건 Phase 1·2 로컬 DB keyset 경계 실측뿐 — 카카오 로그인 필요해 내일로 이연)
 
 ## 요구사항 인덱스
 
@@ -79,6 +79,12 @@
 **⑧ `JwtTokenProvider.create()`** — 규약 밖으로 확정(코드 변경 없음). `new Date()`는 epoch 기반이라 TZ 개념이 아예 없고, `JwtTokenProviderTest`가 이미 "음수 유효기간으로 즉시 만료"라는 다른 방법으로 결정론적 테스트 문제를 풀어 뒀다 — 여기도 실제로 막힌 테스트가 없었다.
 
 **검증** — `compileJava`/`compileTestJava` 통과, 전체 스위트(266케이스, ArchUnit 8건 포함) 실패 0, 로컬 CI 게이트(`spotlessApply`·`build -x test`·`checkstyleMain -PciStrict`) 통과. **REQ-16 미결 0건으로 완전히 닫혔다.**
+
+**PR #50 머지 완료(`6095d9f`).** 머지 전 로컬 `main`이 원격보다 2커밋 앞서 있던 것을 또 발견했다 — 직전 두 `/checkpoint`(`842cb92`·`ce4ce5a`)를 커밋만 하고 그 자리에서 바로 안 밀었다. AGENTS §4가 이미 두 번 적어 둔("main에 직접 커밋했으면 그 자리에서 바로 push한다") 바로 그 패턴이 세 번째로 재발한 것 — 다행히 fast-forward라 충돌 없이 바로 밀어 정리했다. **계약을 이미 아는 것과 매번 지키는 것은 다르다**는 걸 또 보여준 사례.
+
+### 오늘 마감 — REQ-10 Phase 1·2 로컬 DB 실측은 내일로
+
+`/progress 예정`에서 찾은 항목 중 REQ-16 미결 ⑦⑧과 문서 정정 2건은 오늘 안에 닫았다. **남은 하나(REQ-10 Phase 1·2 keyset 경계 실측)는 카카오 로그인이라는 사람 개입 단계가 있어 내일 진행하기로 했다.** 실측 절차(Docker Postgres 기동 → 카카오 로그인으로 access 토큰 발급 → 펫 생성 → 같은 `measured_at`/`logged_at` 값으로 weight·activity 각 3건 생성 → `limit=2` 로 페이지 경계 조회 → 누락·중복 확인)를 대화로 안내했다 — 사람이 브라우저 로그인만 하면 나머지(펫·기록 생성·페이지 조회·검증)는 다음 세션에서 대신 실행하기로.
 
 ## 2026-09-02
 
