@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-03 (**REQ-10 완전 마감 — Notion 역반영 4건 전부 완료.** Notion 작업 이력(All Tasks·History) 계약 승격·소급 확인. 낡은 문서 2건(`PLAN-REQ-10` 헤더·`CLAUDE.md` `.env` 안내) 정정, `## 2026-09-02` 날짜 헤딩 유실을 이 세션 안에서 발견해 복원. 남은 건 Phase 1·2 로컬 DB keyset 경계 실측뿐)
+> 최종 갱신: 2026-09-03 (**REQ-10·REQ-16 둘 다 완전 마감.** REQ-10: Notion 역반영 4건 전부 완료. REQ-16: 미결 ⑦⑧ 해소 — `BaseSoftDeleteEntity.softDelete(OffsetDateTime)`로 시그니처 변경(`RefreshToken.revoke()`와 관례 통일), `JwtTokenProvider.create()`는 규약 밖 확정. Notion 작업 이력 계약 승격·소급 확인, 낡은 문서 2건 정정, `## 2026-09-02` 헤딩 유실 발견·복원. 남은 건 Phase 1·2 로컬 DB keyset 경계 실측뿐)
 
 ## 요구사항 인덱스
 
@@ -25,7 +25,7 @@
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
-| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-01 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 ⑦⑧은 이 REQ 밖 판단으로 별건) |
+| REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -67,6 +67,18 @@
 - **`CLAUDE.md`의 `.env` 기동 안내가 낡아 있었다.** `set -a && . ./.env && set +a && ./gradlew bootRun`을 여전히 안내했는데, 2026-08-28 실측(`PROGRESS.md` 같은 날 로그)으로 이미 `application.yml`의 `spring.config.import: optional:file:.env[.properties]` 덕에 `./gradlew bootRun`만으로 충분하다는 게 확인돼 있었다. 그날 로그에 "다음 세션에서 고칠 것"이라 적어 두고 6일간 안 고쳐진 것을 이번에 정정
 
 ⚠️ **이 `/checkpoint` 실행 자체가 이 파일의 델타를 하나 더 만들었다** — 앞선 편집(오늘 오전 "Notion 작업 이력" 섹션 추가) 때 `## 2026-09-02` 날짜 헤딩을 실수로 지웠다. 그 결과 2026-09-02에 있었던 일(Phase 4 shed·개발 플로우 재배치·Phase 5 diary·shed 미결 정리 전부)이 09-03 헤딩 밑에 눌려 붙어, `/progress`의 날짜 기반 파싱이 깨질 뻔했다. 이번에 헤딩을 원래 자리(Phase 4 shed 시작 지점)에 복원했다 — **`/checkpoint`가 실행 중 자기가 만든 문서 자체의 결함을 발견하고 고친 사례**로 남긴다.
+
+### REQ-16 미결 ⑦⑧ 해소 — `RefreshToken.revoke()`와의 불일치가 결정타였다
+
+`/progress 예정` 조회에서 남겨 뒀던 REQ-16 미결 ⑦⑧을 대화로 확정하고 바로 구현까지 마쳤다(`fix/req16-softdelete-clock-param` 브랜치).
+
+**⑦ `BaseSoftDeleteEntity.softDelete()`** — 처음엔 "현상 유지"를 권장했다(TZ 위험 없음 + 정확한 `deletedAt` 값을 검증하는 테스트가 없음, `UserServiceTest`·`PetServiceTest` 둘 다 `isDeleted()` 불리언만 봄). **사용자가 "다른 쪽 softDelete는 전부 인자 받아?"라고 되물어서 코드를 다시 뒤졌더니, `RefreshToken.revoke(OffsetDateTime now)`가 정확히 같은 모양(엔티티가 자기 상태 전이 시각을 파라미터로 받는다)의 기존 선례였다.** `softDelete()`만 그 관례의 유일한 예외였던 것 — 권장을 뒤집어 `softDelete(OffsetDateTime now)`로 시그니처 변경. `UserService`·`PetService`에 `Clock` 생성자 주입, 호출부 2곳, 기존 테스트 2개(고정 `Clock` 추가) 수정. `ArchitectureTest`의 "data는 범위 밖" 주석도 시그니처에 맞춰 갱신.
+
+> **판단 근거를 뒤집은 과정 자체를 남긴다** — 처음 권장("추가 이득 없으면 안 건드린다")은 그 자체로 틀리지 않았지만, "이 코드베이스에 이미 있는 관례와 맞는가"라는 더 강한 기준을 놓쳤다. 사용자의 되물음이 그 기준을 상기시켰다.
+
+**⑧ `JwtTokenProvider.create()`** — 규약 밖으로 확정(코드 변경 없음). `new Date()`는 epoch 기반이라 TZ 개념이 아예 없고, `JwtTokenProviderTest`가 이미 "음수 유효기간으로 즉시 만료"라는 다른 방법으로 결정론적 테스트 문제를 풀어 뒀다 — 여기도 실제로 막힌 테스트가 없었다.
+
+**검증** — `compileJava`/`compileTestJava` 통과, 전체 스위트(266케이스, ArchUnit 8건 포함) 실패 0, 로컬 CI 게이트(`spotlessApply`·`build -x test`·`checkstyleMain -PciStrict`) 통과. **REQ-16 미결 0건으로 완전히 닫혔다.**
 
 ## 2026-09-02
 

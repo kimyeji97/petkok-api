@@ -22,7 +22,12 @@ public abstract class BaseSoftDeleteEntity extends BaseTimeEntity {
     return deletedAt != null;
   }
 
-  public void softDelete() {
-    this.deletedAt = OffsetDateTime.now();
+  /**
+   * 소프트 딜리트 — 호출부가 {@code Clock} 으로 구한 순간을 넘긴다. {@code RefreshToken#revoke(OffsetDateTime)} 와 같은
+   * 형태다(REQ-16 미결 ⑦, 2026-09-03 확정) — 무인자 {@code now()} 는 JPA 엔티티라 빈을 주입할 수 없어 REQ-16-10 규칙
+   * 범위(business·framework) 밖이지만, 호출부가 이미 주입받은 {@code Clock} 을 갖고 있으므로 파라미터로 받지 않을 이유가 없다.
+   */
+  public void softDelete(OffsetDateTime now) {
+    this.deletedAt = now;
   }
 }

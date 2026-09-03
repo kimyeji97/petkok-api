@@ -8,6 +8,8 @@ import com.petkok.data.user.repository.UserSocialAccountRepository;
 import com.petkok.framework.exception.BusinessException;
 import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.security.UserStatusChecker;
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,11 +30,15 @@ public class UserService implements UserStatusChecker {
 
   private final UserRepository userRepository;
   private final UserSocialAccountRepository socialAccountRepository;
+  private final Clock clock;
 
   public UserService(
-      UserRepository userRepository, UserSocialAccountRepository socialAccountRepository) {
+      UserRepository userRepository,
+      UserSocialAccountRepository socialAccountRepository,
+      Clock clock) {
     this.userRepository = userRepository;
     this.socialAccountRepository = socialAccountRepository;
+    this.clock = clock;
   }
 
   /**
@@ -126,7 +132,7 @@ public class UserService implements UserStatusChecker {
     User user = findActive(userId);
 
     socialAccountRepository.deleteByUserId(userId);
-    user.softDelete();
+    user.softDelete(OffsetDateTime.now(clock));
 
     log.info("User withdrawn. userId={}", userId);
   }

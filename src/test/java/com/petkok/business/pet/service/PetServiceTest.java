@@ -13,7 +13,10 @@ import com.petkok.data.pet.enums.Species;
 import com.petkok.data.pet.repository.PetRepository;
 import com.petkok.framework.exception.BusinessException;
 import com.petkok.framework.exception.ErrorCode;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -30,8 +33,11 @@ class PetServiceTest {
   private static final UUID STRANGER = UUID.fromString("22222222-2222-2222-2222-222222222222");
   private static final UUID PET_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
+  private static final Clock CLOCK =
+      Clock.fixed(Instant.parse("2026-07-20T03:00:00Z"), ZoneId.of("Asia/Seoul"));
+
   private final PetRepository petRepository = mock(PetRepository.class);
-  private final PetService petService = new PetService(petRepository);
+  private final PetService petService = new PetService(petRepository, CLOCK);
 
   private Pet owned() {
     Pet pet =

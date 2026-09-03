@@ -17,6 +17,9 @@ import com.petkok.framework.exception.BusinessException;
 import com.petkok.framework.exception.ErrorCode;
 import java.lang.reflect.Field;
 import java.lang.reflect.RecordComponent;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,10 +41,14 @@ class UserServiceTest {
   private static final String NICKNAME = "게코집사";
   private static final String IMAGE_URL = "https://img.example.com/a.png";
 
+  private static final Clock CLOCK =
+      Clock.fixed(Instant.parse("2026-07-20T03:00:00Z"), ZoneId.of("Asia/Seoul"));
+
   private final UserRepository userRepository = mock(UserRepository.class);
   private final UserSocialAccountRepository socialAccountRepository =
       mock(UserSocialAccountRepository.class);
-  private final UserService userService = new UserService(userRepository, socialAccountRepository);
+  private final UserService userService =
+      new UserService(userRepository, socialAccountRepository, CLOCK);
 
   /** 활성 사용자 1명을 저장소에 등록한다. 반환값으로 병합 결과를 직접 관찰한다. */
   private User active() {
