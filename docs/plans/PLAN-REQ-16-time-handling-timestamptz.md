@@ -1,6 +1,6 @@
 # PLAN-REQ-16 · 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 = KST 고정)
 
-> 출처: 2026-08-28 세션 (REQ-10 Phase 2 머지 직후) · 작성: 2026-08-28 · 상태: ✅ 완료 (Phase 0~4 전부 완료, 2026-09-01 — Notion 탭 2곳 사람 손 반영 확인. 미결 ⑦⑧은 이 REQ 밖 판단으로 별건)
+> 출처: 2026-08-28 세션 (REQ-10 Phase 2 머지 직후) · 작성: 2026-08-28 · 최종 갱신: 2026-09-03 · 상태: ✅ 완료 (Phase 0~4 전부 완료, 2026-09-01 — Notion 탭 2곳 사람 손 반영 확인. 미결 ⑦⑧ 2026-09-03 해소 — 미결 0건)
 
 ## 배경
 
@@ -79,8 +79,8 @@
 - [x] **⑤ 로컬 DB 없이 어디까지 검증되는가** → **전제가 깨졌다.** 2026-08-28 이 머신에 Docker 로 Postgres 17 을 세웠다(`CLAUDE.local.md`). Phase 1 판정 가능. 다만 **`./gradlew test` 는 여전히 DB 를 쓰지 않는다**(Testcontainers 미도입) — DB 왕복은 수동 확인이다.
       원래 질문: — 이 세션 머신에는 `.env` 도 Postgres 도 없다. REQ-10 Phase 1·2 의 확인 2건도 같은 이유로 밀려 있다. **`ddl-auto: validate` 통과와 마이그레이션 실행은 DB 없이 확인할 수 없다** — Phase 1 완료 기준이 여기에 걸린다
 
-- [ ] **⑦ `BaseSoftDeleteEntity.softDelete()` 는 어느 REQ 가 가져가는가** (2026-08-31 신설) — **이 계획서가 자기 자신과 어긋난다.** `범위 — 포함` 은 "`AuthService` 2곳", `제약·함정` 은 "3곳 — `Clock` 주입은 Phase 3 몫". Phase 3 은 **전자를 따랐다**(2026-08-31 결정): JPA 엔티티라 빈을 주입할 수 없고, `deleted_at` 은 벽시계 파생이 아니라 **순간**이라 D4 의 자리가 아니다 — TZ 위험은 Phase 1 의 `OffsetDateTime` 전환에서 이미 사라졌고 남는 이득은 테스트 고정 하나뿐이라 엔티티 시그니처를 바꿀 값을 못 했다. **REQ-16-10 규칙 범위도 `business`·`framework` 로 한정돼 `data` 는 안 걸린다.** 남은 질문은 "그 상태로 둘 것인가"이고, 답이 "아니다"면 `softDelete(OffsetDateTime now)` 로 바꾸는 별건이다
-- [ ] **⑧ `JwtTokenProvider.create()` 의 `new Date()` 를 규약에 넣는가** (2026-08-31 신설) — 이 계획서 어디에도 없다. `java.time` 이 아니라 **REQ-16-10 에 안 걸리고**, 순간이라 TZ 위험도 없다. 다만 **발급 시각을 고정할 수 없어** 토큰 만료를 시각 독립적으로 재는 길이 막힌다(REQ-16-12·17 은 저장 행의 `expires_at` 을 쓰므로 영향 없다). 규약 밖으로 둘지, `Clock` 을 주입할지 결정 필요
+- [x] **⑦ `BaseSoftDeleteEntity.softDelete()` 는 어느 REQ 가 가져가는가 — 2026-09-03 확정.** `softDelete(OffsetDateTime now)` 로 시그니처 변경 — `RefreshToken#revoke(OffsetDateTime)` 와 정확히 같은 형태(엔티티가 상태 전이 시각을 파라미터로 받는 이 코드베이스의 기존 관례)라는 게 결정타였다. 애초에 검토했던 "테스트 고정" 이득은 확인해보니 실제로 막힌 테스트가 없었지만(REQ-08-09·`UserServiceTest`, REQ-09-19·`PetServiceTest` 둘 다 `isDeleted()` 불리언만 검증), **일관성 쪽 근거가 더 강해 변경을 택했다.** `UserService`·`PetService` 에 `Clock` 주입, 호출부 2곳 수정, 기존 테스트 2개에 고정 `Clock` 추가. `ArchitectureTest` `REQ_16_10_NO_DIRECT_NOW` 의 "data 는 범위 밖" 주석도 갱신(범위 예외 사유는 그대로, 시그니처만 갱신)
+- [x] **⑧ `JwtTokenProvider.create()` 의 `new Date()` 를 규약에 넣는가 — 2026-09-03 확정. 규약 밖으로 둔다.** `new Date()` 는 epoch 기반이라 애초에 TZ 개념이 없다(`OffsetDateTime` 류와 다른 이유로 안전). `JwtTokenProviderTest` 를 보니 이미 "음수 유효기간으로 즉시 만료" 방식으로 `Clock` 없이 결정론적 테스트를 해결해 뒀다 — 여기도 실제로 막힌 테스트가 없어 코드 변경 없이 종료
 
 ## 작업 단계
 
