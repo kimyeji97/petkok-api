@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-02 (**REQ-10 Phase 5(diary) 완료 — 5개 Phase 전부 완료, 판단성 미결도 전부 정리.** `/testrun`이 승인 표 대비 코드 누락(REQ-10-107) 1건을 찾아냈고 소스 변경 없이 채웠다. shed 관련 미결 2건(완료일 콜아웃 삭제·is_assisted 연계 폐기) 대화로 확정. 남은 건 Notion 편집·로컬 DB 실측뿐인 실행 항목 셋. 개발 플로우 여섯 커맨드 계약을 레포 `AGENTS.md`에서 사용자 전역 `CLAUDE.md`로 최종 이관)
+> 최종 갱신: 2026-09-03 (**REQ-10 Notion 역반영 4건(ⓐⓑⓓⓚ) 전부 완료.** 「테이블 정의서」의 값 목록 셀 1곳만 API로 원문을 못 읽어 사람이 직접 고쳤고, 다시 입력하면서 저장 형태 자체가 정상화됐다(API로도 다시 읽힘). 남은 건 Phase 1·2 로컬 DB keyset 경계 실측뿐)
 
 ## 요구사항 인덱스
 
@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-02 | 🟡 (**Phase 0~5 전부 완료** · 검증 계약 111건 전부 `✅` · Phase 1·2는 로컬 DB keyset 경계 실측 1건씩 보류라 체크박스는 열어 둠) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측 1건씩만 보류) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -34,6 +34,24 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-03
+
+> **REQ-10 Notion 역반영 4건(ⓐⓑⓓⓚ) 전부 완료 — REQ-10 완전 마감.** 사람 개입이 필요했던 건 예상(사람이 직접 셀 재입력)과 실제(사람이 고치자 API 저장 형태 자체가 정상화됨)가 갈렸다.
+
+### ⓑ·ⓓ·ⓚ — API로 바로 처리, 계획에 없던 중복 1건 발견
+
+`feeding_logs`에 `food_size varchar(1)` 행 추가(ⓑ), 탈피 기록 "완료일은 시작일 이후" 콜아웃 삭제(ⓓ), `is_assisted↔condition_tag'탈피도와줌'` 연계 폐기(ⓚ) — 셋 다 `notion-update-page`의 `update_content`로 바로 반영됐다. ⓓ를 처리하며 계획서에 없던 **「비즈니스 규칙」 `BR-DIARY-05`** 행(같은 규칙의 별도 사본)을 찾아 같이 폐기 표시했다 — 승인된 항목 목록만 보고 멈췄으면 놓쳤을 중복이다.
+
+### ⓐ(condition_tag 7종→4종) — "API로 못 읽는다"에서 "사람이 고치니 API로도 읽힌다"로
+
+「테이블 정의서」의 `condition_tag` 값 목록 셀이 `fetch`·`search` 양쪽에서 첫 값(`정상`) + `\` 에서 끊긴 채 반환됐다 — 재조회로도 재현되는 결정적 증상이라 CLAUDE.md에 새 함정으로 승격했다(`9d3863b`). 같은 문서의 `species`·`gender`·`provider`·`activity_type` 셀도 같은 증상이었지만 값 자체가 이미 정확해 손대지 않았다.
+
+**같은 문제가 실은 두 종류였다.** 「ERD 설계」·「소스 구조」 문서에 있던 **같은 7종 목록의 다른 사본**(코드블록·표·확정 문구, 총 6곳)은 전혀 문제없이 API로 읽고 고쳐졌다 — 값 목록이 일반 텍스트/SQL 코드블록이었기 때문. 막힌 건 「테이블 정의서」의 **테이블 셀** 형태 하나뿐이었다. 이 과정에서 「소스 구조」§8에 `is_assisted↔'탈피도와줌'` 연계 문구의 **세 번째 사본**을 또 발견해 같이 폐기했다(ⓚ가 테이블 정의서·ERD·소스구조 세 곳에 흩어져 있었던 것).
+
+사용자가 Notion UI에서 그 셀을 직접 지우고 4종을 다시 입력하자, `fetch` 재조회에서 **`"개체 상태 태그. (정상 \| 활발 \| 거꾸리 \| 구토)"`로 온전하게 읽혔다** — 이전엔 끊기던 자리가 이번엔 안 끊겼다. **저장 형태 자체가 망가져 있었고(어떤 과거 편집 경로가 남긴 것으로 추정 — 정확한 원인은 미확인), 사람이 새로 입력하면서 정상 형태로 재작성된 것으로 보인다.** 값을 지우고 다시 쓰는 것 자체가 우회책이었던 셈 — 다음에 같은 증상을 만나면 "API로 못 고친다"에서 멈추지 말고 이 경로를 먼저 시도할 만하다.
+
+**REQ-10 역반영 목록 전 항목(ⓐ~ⓚ) 완료.** 남은 건 Phase 1·2의 로컬 DB keyset 경계 실측(인증 토큰·펫 생성 선행 필요)뿐 — REQ-10을 ✅로 승격했다.
 
 ## 2026-09-02
 
