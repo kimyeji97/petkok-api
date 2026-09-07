@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-03 (**REQ-10·REQ-16 둘 다 완전 마감, PR #49·#50 머지.** REQ-10: Notion 역반영 4건 전부 완료. REQ-16: 미결 ⑦⑧ 해소 — `BaseSoftDeleteEntity.softDelete(OffsetDateTime)`로 시그니처 변경(`RefreshToken.revoke()`와 관례 통일), `JwtTokenProvider.create()`는 규약 밖 확정. Notion 작업 이력 계약 승격·소급 확인, 낡은 문서 2건 정정, `## 2026-09-02` 헤딩 유실 발견·복원, main 직접 커밋 후 미푸시 재발 3회째 잡아 정리. 남은 건 Phase 1·2 로컬 DB keyset 경계 실측뿐 — 카카오 로그인 필요해 내일로 이연)
+> 최종 갱신: 2026-09-07 (**REQ-10 Phase 1·2 로컬 DB keyset 경계 실측 완료 — REQ-10 미결 0건.** 실측 도중 JPA Auditing이 `OffsetDateTime` 필드를 못 채워 모든 엔티티 저장이 500으로 죽는 결함을 발견·수정(PR #51). `./gradlew test`가 DB를 안 타서 지금까지 한 번도 안 잡히던 사각지대였다)
 
 ## 요구사항 인덱스
 
@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측 1건씩만 보류) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건) |
 | REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
 | REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -34,6 +34,45 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-07
+
+> **REQ-10 Phase 1·2 로컬 DB keyset 경계 실측 완료 — REQ-10 미결 0건으로 완전히 닫혔다.** 실측 첫 단계(카카오 자동가입)에서 바로 막혔는데, 원인이 REQ-10 범위 밖의 **프레임워크 전역 결함**이었다 — JPA Auditing이 `OffsetDateTime` 필드를 못 채워 엔티티 저장 자체가 500으로 죽고 있었다. `./gradlew test`가 DB를 안 타서(`CLAUDE.local.md`) 지금까지 한 번도 실행된 적 없던 경로다.
+
+### `docs/reference/kakao-login-manual-test.md` 신설 — 실측 착수 전 준비
+
+REQ-10 Phase 1·2 실측을 시작하기 전, 카카오 로그인으로 petkok access 토큰을 받는 수동 절차를 문서로 정리했다(2026-09-04 작성, 이번에 커밋). `.env` 사전 확인 체크리스트, 앱 기동, 인가코드 → 토큰 교환 curl, 실패 증상별 진단표(`KOE101`·`KOE006`·`ip mismatched!` 등)까지 담아 다음에 같은 실측을 할 때 카카오 콘솔 설정부터 다시 헤매지 않도록 했다. 자동화하지 않는 이유도 명시 — 인가코드는 사람이 브라우저로 로그인해야 나오고 1회용·약 10분 만료라 자동화 대상이 아니다.
+
+### ⭐ JPA Auditing이 `OffsetDateTime`을 못 채우는 결함 발견 — 카카오 자동가입부터 500
+
+문서 절차대로 앱을 띄우고 첫 로그인을 시도하자 `POST /auth/kakao`가 카카오 토큰 교환까지는 성공하고 `users` 자동가입 저장에서 500(`INTERNAL_ERROR`)으로 죽었다. 로그를 보니:
+
+```
+IllegalArgumentException: Cannot convert unsupported date type java.time.LocalDateTime
+to java.time.OffsetDateTime; Supported types are [LocalDateTime, LocalDate, LocalTime,
+Instant, Date, Long, long]
+```
+
+**원인** — `JpaAuditingConfig`가 `@EnableJpaAuditing`만 걸고 커스텀 `DateTimeProvider`를 지정하지 않았다. Spring Data의 기본 `DateTimeProvider`는 `LocalDateTime.now()`를 반환하는데, `BaseCreatedEntity.createdAt`/`BaseTimeEntity.updatedAt`은 REQ-16(ADR-0002)이 확정한 대로 `OffsetDateTime`이다. Spring Data 3.3.5의 변환기가 `LocalDateTime → OffsetDateTime` 변환 자체를 지원하지 않아 `@CreatedDate`/`@LastModifiedDate` 채우기가 예외로 죽는다.
+
+**영향 범위** — `@CreatedDate`·`@LastModifiedDate`가 걸린 **모든 도메인의 모든 INSERT**(user·pet·weight·activity·feeding·shed·diary 전부). 사실상 이 앱은 로컬 DB에서 엔티티를 한 건도 정상 생성해 본 적이 없었다는 뜻이다.
+
+**왜 지금까지 안 잡혔나** — REQ-16이 "무인자 `now()` 금지"를 ArchUnit(REQ-16-10)으로 강제했지만, 그건 `business`·`framework`의 **직접 호출**만 본다. JPA Auditing의 기본 `DateTimeProvider`는 Spring Data 내부 코드가 부르는 것이라 이 규칙의 대상이 아니었다 — REQ-16이 "미결 0건"으로 닫힐 때도 이 경로는 검사 범위 밖이었다. 그리고 `CLAUDE.local.md`가 이미 적어 둔 대로 `./gradlew test`는 DB를 안 타 Hibernate persist 콜백이 실행되는 순간 자체가 한 번도 없었다.
+
+**수정** — `TimeConfig`의 `Clock` 빈으로 `OffsetDateTime`을 직접 공급하는 `DateTimeProvider` 빈을 추가, `@EnableJpaAuditing(dateTimeProviderRef = ...)`로 지정(`JpaAuditingConfig.java`). `fix/jpa-auditing-offsetdatetime` 브랜치 → PR #51 → CI 확인(SHA 대조) 후 스쿼시 머지(`4d75edd`).
+
+**재검증** — 수정 후 같은 절차(카카오 로그인 → 자동가입 → 펫 생성)가 전부 정상 동작 확인. 로컬 CI 게이트(`spotlessApply`·`build -x test`·`checkstyleMain -PciStrict`) + 전체 테스트 스위트 회귀 0건.
+
+> **계약 승격 제안** — "JPA Auditing에 커스텀 `DateTimeProvider`(`Clock` 기반 `OffsetDateTime.now(clock)`)가 반드시 있어야 하고, 걷어내거나 신규 `@CreatedDate`/`@LastModifiedDate` 필드를 `LocalDateTime`이 아닌 다른 타입으로 추가할 때 이 배선을 잊으면 그 엔티티의 최초 저장이 통째로 500으로 죽는다"를 CLAUDE.md 시각 처리 절(REQ-16/ADR-0002 옆)에 추가할 것을 제안한다. 다음 세션에서 확인·승인 필요.
+
+### REQ-10 Phase 1·2 keyset 경계 실측 — weight·activity 둘 다 누락·중복 0건
+
+결함 수정 후 실측을 이어갔다. 펫 1마리(🦎) 생성 → weight 3건(동일 `measured_at`) + activity 3건(동일 `logged_at`, `HANDLING`) 생성 → `limit=2`로 페이지 경계 조회.
+
+- **weight** — 페이지 1(`ffc2aa6e` 30g, `6a5e3be8` 32g) → 페이지 2(`10528a62` 31g) → `has_next: false`. 3건 전부 유일하게 조회, 누락·중복 0건. D8의 "날짜 컬럼 desc + `id` desc 타이브레이크"가 실제로 UUID 내림차순으로 동작함을 확인(`ffc2aa6e` > `6a5e3be8` > `10528a62`)
+- **activity** — 같은 방식으로 3건(`a9283bde`/`5c69c19c`/`4404eb4e`) 전부 정상, 누락·중복 0건
+
+**Phase 1·2 완료 기준의 마지막 항목("같은 `measured_at`/`logged_at` 여러 건에서 keyset 누락·중복 없음")이 실제로 충족됐다.** `PLAN-REQ-10` 두 Phase 체크박스를 켰다 — REQ-10 전체가 코드·검증 계약·Notion 역반영·로컬 DB 실측까지 전부 닫혔다.
 
 ## 2026-09-03
 

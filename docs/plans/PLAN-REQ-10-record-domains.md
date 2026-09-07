@@ -1,6 +1,6 @@
 # PLAN-REQ-10 · 기록 도메인 5종 (weight · activity · feeding · shed · diary)
 
-> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 최종 갱신: 2026-09-03 · 상태: ✅ **완료** (Phase 0~5 전부 완료 2026-09-02 · 검증 계약 111행 전부 `✅` · Notion 역반영 4건 전부 완료 2026-09-03 · **단, Phase 1·2는 로컬 DB keyset 경계 실측 1건씩 여전히 보류**돼 있어 그 두 Phase 체크박스는 열어 둔다)
+> 출처: 2026-08-27 세션 (REQ-09 완료 · 미결 12건 처리 직후) · 작성: 2026-08-27 · 최종 갱신: 2026-09-07 · 상태: ✅ **완료** (Phase 0~5 전부 완료 2026-09-02 · 검증 계약 111행 전부 `✅` · Notion 역반영 4건 전부 완료 2026-09-03 · **Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건**. 실측 도중 REQ-10 범위 밖의 JPA Auditing `OffsetDateTime` 결함을 발견·수정(PR #51, `docs/PROGRESS.md` 2026-09-07 참고))
 
 ## 배경
 
@@ -110,11 +110,11 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
       `DomainBoundaryTest` 에 `ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.business.pet.service.."))` · `data.pet.dto..` · `data.pet.enums..` 추가. REQ-09 프로브에서 검증된 형태.
       완료 기준: 가짜 `business/weight/service` 가 가드를 주입해 통과 · `PetRepository` 직접 주입은 **여전히 FAIL** · `Pet` 엔티티 직접 참조는 **여전히 FAIL** (셋 다 프로브 후 삭제) · ArchUnit 8건 통과 · 「소스 구조」 §13 역반영
 
-- [ ] **Phase 1 — weight (4행)** — 코드·케이스 20건 완료 (2026-08-28, `acde9ab` · `feat/req10-phase1-weight`). **체크 보류: 로컬 DB 확인 1건 남음** — ~~① `bootRun` 으로 `@Query` 기동 검증~~ **2026-08-28 닫힘** (Docker Postgres 17 구성 후 기동 성공. `w.measuredAt` → `w.measuredAtXX` 로 일부러 깨자 `UnknownPathException` 으로 기동이 막히는 것까지 확인해 "초록 기동 = 실제 파싱 통과"를 성립시켰다) · ② 같은 `measured_at` 3건 · `limit=2` 로 페이지 경계 누락·중복 실측 — **인증 토큰·펫 생성이 선행이라 아직 남음**
+- [x] **Phase 1 — weight (4행)** — 코드·케이스 20건 완료 (2026-08-28, `acde9ab` · `feat/req10-phase1-weight`). 로컬 DB 확인 2건 모두 닫힘 — ~~① `bootRun` 으로 `@Query` 기동 검증~~ **2026-08-28 닫힘** (Docker Postgres 17 구성 후 기동 성공. `w.measuredAt` → `w.measuredAtXX` 로 일부러 깨자 `UnknownPathException` 으로 기동이 막히는 것까지 확인해 "초록 기동 = 실제 파싱 통과"를 성립시켰다) · ~~② 같은 `measured_at` 3건 · `limit=2` 로 페이지 경계 누락·중복 실측~~ **2026-09-07 닫힘** — 카카오 로그인 실측(펫 생성 → weight 30/31/32g, 동일 `measured_at`) → `limit=2` 조회에서 30g·32g(페이지 1) → 31g(페이지 2), 누락·중복 0건. id desc 타이브레이크(D8) 확인
       `WeightLog` 엔티티(`BaseCreatedEntity`) · `WeightLogRepository`(`findByIdAndPetId` · keyset 목록) · `WeightService`(가드 소비, D6, 파생 필드 D3) · `WeightController`. **여기서 확정되는 것**: 가드 소비 코드 모양 · 커서 페이로드 형태 · D6 404 · 목록 응답 = `CursorPage`.
       완료 기준: 4행이 원본 상태코드(201/200/200/204)대로 · 남의 펫 403 · 삭제된 펫 404 · 남의 기록 id 404(D6) · 목록 `has_next`/`next_cursor` 가 keyset 으로 동작(같은 `measured_at` 여러 건에서 누락·중복 없음) · `weight_g` 0 이하 400 · 체중 경고 필드가 미결 답대로 · ArchUnit 통과
 
-- [ ] **Phase 2 — activity (4행)** — 코드·케이스 19건 완료 (2026-08-28, `47cf630`). **체크 보류: Phase 1 과 같은 로컬 DB 확인 1건**(keyset 경계) — `@Query` 기동은 2026-08-28 닫혔다(Phase 1 참조) · keyset 경계는 Phase 1 확인 시 같이 본다
+- [x] **Phase 2 — activity (4행)** — 코드·케이스 19건 완료 (2026-08-28, `47cf630`). 로컬 DB 확인 완료 — `@Query` 기동은 2026-08-28 닫혔다(Phase 1 참조) · keyset 경계는 **2026-09-07** Phase 1과 같은 실측에서 함께 닫힘(펫에 activity 3건, 동일 `logged_at`, `HANDLING`) → `limit=2` 조회에서 누락·중복 0건
       Phase 1 형태 복제 + `ActivityType` enum + 종별 검증(`INVALID_SPECIES_ACTIVITY`).
       완료 기준: 게코가 `WALK` → 400 `INVALID_SPECIES_ACTIVITY` · 개가 `HANDLING` → 400 · 개가 `WALK` → 201 · 게코가 `HANDLING` → 201 · PATCH 로 `activity_type` 을 바꿔도 종 검증이 다시 걸린다 · 나머지는 Phase 1 과 동일 기준
 
@@ -298,3 +298,4 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 - **컨트롤러 테스트는 `@Import({SecurityConfig, JacksonConfig})`** (AGENTS §6). 슬라이스에 `UserService` 가 없으므로 `UserStatusChecker` 를 따로 `@MockBean`(`PetControllerWebMvcTest` 와 같음)
 - **`--tests` 는 문자 클래스를 모르고, XML `testcase name` 은 `@DisplayName` 이다** (CLAUDE.md) — 클래스명으로 거르고 `[REQ-10-xx]` 로 센다
 - **검증 계약 표 셀 안의 `|`** — `WALK | PLAY | …` 인용을 표에 넣으면 셀이 갈라져 자동 대조가 깨진다(REQ-09 실측). 인용을 `\|` 로 이스케이프하면 원문 grep 이 0건이 된다. **`/testgen` 은 인용을 `|` 앞에서 끊는다**
+- ⚠️ **JPA Auditing 기본 `DateTimeProvider`는 `OffsetDateTime` 필드를 못 채운다** — Phase 1·2 로컬 DB keyset 실측(2026-09-07) 도중 발견. `LocalDateTime.now()`만 반환하는 기본값과 REQ-16이 확정한 `OffsetDateTime` 타입이 안 맞아 **모든 도메인의 최초 INSERT가 500으로 죽었다**(카카오 자동가입부터). `TimeConfig`의 `Clock`으로 만든 `DateTimeProvider` 빈(`JpaAuditingConfig`)이 고쳤다. `./gradlew test`는 DB를 안 타 이 경로를 검증하지 못한다 — REQ-10 이후 새 `BaseCreatedEntity`/`BaseTimeEntity` 상속 엔티티를 추가할 때도 이 배선이 살아 있는지 실제 DB로 확인할 것
