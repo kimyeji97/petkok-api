@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-07 (**REQ-10 Phase 1·2 로컬 DB keyset 경계 실측 완료 — REQ-10 미결 0건.** 실측 도중 JPA Auditing이 `OffsetDateTime` 필드를 못 채워 모든 엔티티 저장이 500으로 죽는 결함을 발견·수정(PR #51). `./gradlew test`가 DB를 안 타서 지금까지 한 번도 안 잡히던 사각지대였다)
+> 최종 갱신: 2026-09-08 (**REQ-11(gallery) 착수 — 계획서 작성·미결 6건 확정·Phase 0(PhotoLookup 포트) 구현 완료.** REQ-12보다 먼저 시작한 것은 R2 인프라 기존재·다른 도메인 의존 없음이 근거)
 
 ## 요구사항 인덱스
 
@@ -22,8 +22,8 @@
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건) |
-| REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
-| REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
+| REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | — | 🟡 (Phase 0 완료 — `PhotoLookup` 포트) |
+| REQ-12 | timeline (다중 테이블 union — 앱 레벨 병합이 기본, QueryDSL은 병목 시 대안) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 
@@ -35,7 +35,50 @@
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
 
-## 2026-09-07
+## 2026-09-08
+
+> **REQ-11(gallery) 착수 — 여섯 커맨드 한 바퀴(workplan→testgen→implement→testrun)를 REQ-11 Phase 0에 대해 돌렸다.** 계획서 작성 중 나온 미결 6건을 대화로 전부 확정했고, Phase 0(포트 인터페이스 설계)은 신규 테스트 케이스가 0건이라는 걸 `/testgen`이 발견해 구현·검증까지 이례적으로 가볍게 끝났다.
+
+### REQ-11 vs REQ-12 착수 순서 — REQ-12의 낡은 게이트 발견
+
+`/progress` 조회 중 REQ-11·REQ-12 중 뭘 먼저 할지 물어, REQ-11을 추천하고 착수했다. 근거는 R2 인프라(`R2Config`/`R2Properties`, REQ-05)가 이미 있고 다른 도메인 의존이 없어 착수 비용이 가장 낮다는 것.
+
+이 과정에서 **REQ-12 인덱스 문구가 낡아 있었다는 걸 발견했다** — "QueryDSL 활성화 시점이 이 API"라고 적혀 있었는데, `docs/specs/api-list.md`(176행)는 이미 Notion 대조로 정정돼 있었다: Notion은 **앱 레벨 병합(옵션 A)을 기본으로 추천**하고, QueryDSL(`UNION ALL`)은 무한스크롤에서 병목이 실측될 때 쓰는 대안일 뿐이다. 즉 REQ-12는 애초에 인프라 게이트가 없었다 — 인덱스만 안 고쳐져 있었다. 이번에 인덱스 문구를 정정했다(위 요구사항 인덱스).
+
+### `/workplan REQ-11` — 계획서 작성, 미결 6건
+
+계획서(`docs/plans/PLAN-REQ-11-gallery-domain.md`)를 새로 썼다. 배경은 D4 결정(2026-08-27, PLAN-REQ-10) — diary↔사진 연결을 REQ-11로 이관하기로 한 것 그대로다. 계획 단계에서 미결 6건이 나와 대화로 하나씩 확정했다:
+
+| # | 미결 | 확정 | 근거 |
+|---|---|---|---|
+| 1 | diary→gallery 참조 형태 | **framework 포트 인터페이스**(`PhotoLookup`) | `UserStatusChecker`(REQ-08 D2)와 같은 패턴 재사용 — entity 비노출, `business→framework` 단방향 유지 |
+| 2 | `diary_entry_id` 연결 시점 | 사진 업로드 요청(`POST /pets/{pet_id}/photos`) 시점에 함께 받음 | `photos.diary_entry_id` nullable FK 설계 의도와 바로 맞음 |
+| 3 | 허용 이미지 타입·크기 | jpg·jpeg·png·webp만, 최대 10MB | 대부분 브라우저가 렌더링 가능한 포맷으로 한정 |
+| 4 | 삭제 시 R2 객체 처리 | DB 행 + R2 객체 **둘 다 하드 삭제** | `photos`는 소프트 딜리트 대상 아님(AGENTS §5) |
+| 5 | presigned 발급 소유권 검증 시점 | **인증만** — pet 소유권은 다음 단계(`PetAccessGuard`)에서 | presigned 자체는 DB에 아무것도 안 남겨 오남용 피해가 없음 |
+| 6(파생) | R2·DB 삭제 실패 순서 | **R2 삭제 성공 후에만 DB 삭제**, 실패 시 500 유지 | "고아 R2 파일"보다 "API 응답에 계속 나오는 깨진 이미지"가 더 나쁜 실패 모드 |
+
+**⭐ 미결 3번(업로드 제한)을 정하다가 사용자가 "아이폰 확장자는 다르지 않아?"라고 물어 HEIC를 놓칠 뻔한 게 드러났다.** iOS 기본 사진 포맷(HEIC)은 Safari 외 대부분 브라우저가 렌더링 못 한다 — 화이트리스트에서 안 막으면 "업로드는 됐는데 웹에서 안 보이는 사진"이 조용히 쌓인다. 변환 책임은 모바일 클라이언트(갤러리에서 가져올 때 JPEG로 내보내는 게 일반적)에 두기로 하고 서버는 `UNSUPPORTED_IMAGE_TYPE`으로 거부하기로 했다. **반년 뒤 이 프로젝트를 다시 만지는 사람이 이 결정을 몰랐다면 똑같은 구멍을 다시 열었을 것** — 계획서 제약·함정 절에 남겼다.
+
+### `/testgen REQ-11` — Phase 0 케이스 0건, PhotoSummary 네이밍 충돌 발견
+
+Phase 0(포트 인터페이스·DTO 설계)의 완료 기준 두 가지가 **이미 있는 범용 ArchUnit 규칙**으로 자동 강제된다는 걸 확인했다 — `ArchitectureTest.FRAMEWORK_MUST_NOT_KNOW_DOMAIN`(엔티티 비노출), `DomainBoundaryTest.NO_CROSS_DOMAIN_DEPENDENCY`(diary가 gallery 우회 참조 금지). 새로 케이스를 쓰면 같은 걸 두 번 검사하는 중복이라 **신규 케이스 0건**으로 결론 냈다.
+
+**부수 발견** — 계획했던 `PhotoSummary`를 `data/gallery/dto`에 두면 기존 `DTO_NAMING` 규칙(dto 패키지 클래스는 `Request`/`Response`로 끝나야 함)에 걸린다. `UserStatusChecker` 선례를 따라 `PhotoLookup`·`PhotoSummary` 둘 다 `framework/gallery`에 두기로 계획서를 수정했다.
+
+### `/implement REQ-11 0` — PhotoLookup·PhotoSummary 구현, 스코프 판단 하나
+
+`main`이 보호 브랜치라 `feat/req11-phase0-photo-lookup-port` 브랜치를 새로 만들고, `framework/gallery/PhotoLookup.java`·`PhotoSummary.java` 2개 파일만 작성했다. 로컬 CI 게이트(`spotlessApply`·`build -x test`·`checkstyleMain -PciStrict`) 전부 통과, `ArchitectureTest`(8/8)·`DomainBoundaryTest`(1/1) 재실행도 전부 그린 확인 후 `f97b110`으로 커밋·푸시(PR은 아직 안 만듦).
+
+**계획서 문구와 실제 구현 범위가 갈렸다** — Phase 0 완료 기준 문구가 "구현체가 `business/gallery`에, 사용처가 `business/diary`에 있고"까지 적고 있었는데, 그건 각각 Phase 1(gallery CRUD 생성)·Phase 2(diary 통합)의 몫이라 여기서 만들면 Phase 경계를 넘는다. **이번엔 인터페이스·DTO 선언만 하고 구현체·사용처는 만들지 않았다** — `/workplan` 단계에서 완료 기준 문구를 Phase 경계보다 넓게 썼던 것으로 보이는 계획서 작성 실수다. 계획서 문구 자체는 고치지 않고(조용히 맞추지 않는다는 원칙) Phase 0 항목 아래에 결과 갱신 각주로 남겼다.
+
+### `/testrun REQ-11` — Phase 0 완료 기준 충족 확인
+
+REQ-11 접두사 케이스는 예상대로 0건(`src/test/` grep 재확인). `/testgen`이 지목한 규칙 3개(`FRAMEWORK_MUST_NOT_KNOW_DOMAIN`·`DomainBoundaryTest.NO_CROSS_DOMAIN_DEPENDENCY`·`DTO_NAMING`)를 재실행해 전부 통과 확인, 인용된 규칙 이름 3개도 소스에 그대로 존재함을 재확인(근거 소실 없음). **Phase 0 완료 기준 충족.**
+
+**남은 것 (REQ-11)** — Phase 1(gallery CRUD 4개 엔드포인트 단독 구현) 착수 전 `/testgen REQ-11`을 다시 돌려야 한다(그때부터 실제 케이스 시작). Phase 2(diary 통합)는 그 다음.
+
+> **계약 승격 제안** — "framework 포트가 반환하는 보조 타입(이번 `PhotoSummary` 같은 것)은 `dto` 패키지에 두지 않는다. `UserStatusChecker`처럼 인터페이스와 같은 위치(`framework/{concern}`)에 둔다 — `dto` 패키지에 두면 `DTO_NAMING` 규칙(`Request`/`Response` 접미사)에 걸린다"를 AGENTS.md §3의 "framework가 인터페이스를 정의하고 business가 구현하는 패턴" 항목에 보탤 것을 제안한다. 다음 세션에서 확인·승인 필요.
 
 > **REQ-10 Phase 1·2 로컬 DB keyset 경계 실측 완료 — REQ-10 미결 0건으로 완전히 닫혔다.** 실측 첫 단계(카카오 자동가입)에서 바로 막혔는데, 원인이 REQ-10 범위 밖의 **프레임워크 전역 결함**이었다 — JPA Auditing이 `OffsetDateTime` 필드를 못 채워 엔티티 저장 자체가 500으로 죽고 있었다. `./gradlew test`가 DB를 안 타서(`CLAUDE.local.md`) 지금까지 한 번도 실행된 적 없던 경로다.
 
