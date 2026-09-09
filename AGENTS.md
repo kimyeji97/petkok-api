@@ -92,6 +92,8 @@ com.petkok
 - **framework가 인터페이스를 정의하고 business가 구현하는 패턴** — `framework/security/UserStatusChecker`가 첫 사례다(2026-08-07, REQ-08 D2). framework의 컴포넌트가 도메인 정보를 필요로 할 때 **필요한 쪽이 필요한 모양을 선언하고, 아는 쪽이 채운다.** 의존은 여전히 `business → framework` 한 방향이라 트리 규칙을 깨지 않는다
 	- ⚠️ **인터페이스는 반드시 `framework`에 둔다.** `business`로 옮기면 framework가 그것을 참조하게 되어 **규칙 두 개가 동시에** 깨진다 — `FRAMEWORK_MUST_NOT_KNOW_DOMAIN`(§6 규칙 #4)과 `LAYER_DIRECTION`. 후자는 필터가 정의된 세 레이어 어디에도 속하지 않는데 `Repository` 레이어가 `mayOnlyBeAccessedByLayers("Service")`이기 때문이다. **즉 규칙 #4만 열어서는 직참조가 여전히 통과하지 못한다** (2026-08-03·08-07 프로브 실측)
 	- ⚠️ **포트 시그니처에 도메인 타입을 노출하지 않는다.** 엔티티를 돌려주면 framework가 `data..entity..`를 알게 되어 같은 규칙에 걸린다. `UserStatusChecker`가 `UUID`를 받아 `boolean`을 돌려주는 이유다
+	- ⚠️ **포트가 반환하는 보조 타입(요약·통계 등)을 `dto` 패키지에 두지 않는다.** `dto` 패키지의 클래스는 `Request`/`Response`로 끝나야 하는 `DTO_NAMING` 규칙에 걸린다. 포트 인터페이스와 같은 위치에 둔다 — `PhotoLookup`이 돌려주는 `PhotoSummary`가 그 예다(REQ-11 Phase 0)
+	- ⚠️ **framework 하위 패키지 이름에 도메인 이름을 쓰지 않는다.** `UserStatusChecker`는 관심사 이름(`framework/security`)에 있다 — 포트가 늘어나면 도메인 이름이 아니라 패턴 이름으로 묶는다(`framework/port`). `PhotoLookup`을 처음엔 `framework/gallery`로 뒀다가 이 원칙이 드러나 옮겼다(2026-09-09, REQ-11 Phase 0) — `security`는 여러 도메인에 걸치는 범용 개념이라 자연스러웠지만 `gallery`는 도메인 이름 자체라 framework 트리에 도메인이 새어든 것처럼 보였다
 - 베이스 엔티티는 `framework`가 아니라 `data/common/entity`. framework는 JPA 매핑 규약을 알지 않는다
 
 > ✅ **이행 완료 (2026-07-28).** 55개 파일을 위 구조로 옮겼고 `com.petkok.global.*`은 남아 있지 않다. `business/`·`data/{도메인}`은 도메인 코드가 들어올 때 생성된다(현재는 `data/common/entity`만 존재).

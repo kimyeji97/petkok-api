@@ -88,7 +88,7 @@ REQ-11 접두사 케이스는 예상대로 0건(`src/test/` grep 재확인). `/t
 
 **남은 것 (REQ-11)** — Phase 1(gallery CRUD 4개 엔드포인트 단독 구현) 착수 전 `/testgen REQ-11`을 다시 돌려야 한다(그때부터 실제 케이스 시작). Phase 2(diary 통합)는 그 다음.
 
-> **계약 승격 제안** — "framework 포트가 반환하는 보조 타입(이번 `PhotoSummary` 같은 것)은 `dto` 패키지에 두지 않는다. `UserStatusChecker`처럼 인터페이스와 같은 위치(`framework/{concern}`)에 둔다 — `dto` 패키지에 두면 `DTO_NAMING` 규칙(`Request`/`Response` 접미사)에 걸린다"를 AGENTS.md §3의 "framework가 인터페이스를 정의하고 business가 구현하는 패턴" 항목에 보탤 것을 제안한다. 다음 세션에서 확인·승인 필요.
+> **계약 승격 — 2026-09-09 승인·반영 완료.** AGENTS.md §3 "framework가 인터페이스를 정의하고 business가 구현하는 패턴" 항목에 두 줄을 보탰다 — ① 포트가 반환하는 보조 타입은 `dto` 패키지에 두지 않는다(`DTO_NAMING` 충돌) ② framework 하위 패키지 이름에 도메인 이름을 쓰지 않는다(패턴 이름으로 묶는다). ②는 `framework/gallery` → `framework/port` 정정(위 2026-09-09 섹션)에서 직접 드러난 것이라 같이 승격했다.
 
 > **REQ-10 Phase 1·2 로컬 DB keyset 경계 실측 완료 — REQ-10 미결 0건으로 완전히 닫혔다.** 실측 첫 단계(카카오 자동가입)에서 바로 막혔는데, 원인이 REQ-10 범위 밖의 **프레임워크 전역 결함**이었다 — JPA Auditing이 `OffsetDateTime` 필드를 못 채워 엔티티 저장 자체가 500으로 죽고 있었다. `./gradlew test`가 DB를 안 타서(`CLAUDE.local.md`) 지금까지 한 번도 실행된 적 없던 경로다.
 
