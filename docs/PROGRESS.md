@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-08 (**REQ-11(gallery) 착수 — 계획서 작성·미결 6건 확정·Phase 0(PhotoLookup 포트) 구현 완료.** REQ-12보다 먼저 시작한 것은 R2 인프라 기존재·다른 도메인 의존 없음이 근거)
+> 최종 갱신: 2026-09-09 (**REQ-11 Phase 0 패키지 정정 — `framework/gallery` → `framework/port`.** 사용자 리뷰로 도메인 이름이 framework 트리에 새어든 것이 드러남)
 
 ## 요구사항 인덱스
 
@@ -34,6 +34,16 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-09
+
+### REQ-11 Phase 0 패키지 정정 — `framework/gallery` → `framework/port`
+
+어제 만든 `PhotoLookup`·`PhotoSummary`를 사용자가 리뷰하다가 "framework 하위에 비즈니스류 패키지가 있는 게 싫다"고 지적했다. 맞는 지적이었다 — `gallery`는 AGENTS.md §3에 나열된 10개 도메인 이름 중 하나라, `framework/gallery`로 두면 framework 트리 안에 도메인 이름이 그대로 새어든 꼴이 된다. `UserStatusChecker`가 관심사 이름(`framework/security`)에 있는 것과 결이 달랐다.
+
+**왜 처음에 안 보였나** — `UserStatusChecker` 선례를 참고할 때 "포트를 framework에 둔다"는 것만 옮기고, "관심사 이름으로 묶는다"는 부분은 놓쳤다. `security`는 여러 도메인에 걸치는 범용 개념이라 자연스러웠는데, `gallery`는 애초에 도메인 이름 자체라 그 자리에 넣는 순간 어색해졌다 — 두 예시가 겉보기엔 같은 패턴이어도 이름 짓는 방식은 갈릴 수 있다는 걸 놓친 것.
+
+**정정** — `framework/port`(패턴 이름)로 옮겼다. 앞으로 같은 "framework가 정의하고 business가 구현하는 포트"가 또 생기면 여기 계속 모은다. `UserStatusChecker`는 이미 `security`에 있어 옮기지 않았다(그 자리도 유효한 관심사 이름이라 급할 것 없음). 동작 변경은 없어 로컬 CI 게이트·`ArchitectureTest`(8/8)·`DomainBoundaryTest`(1/1) 재확인만으로 충분했다. 브랜치 `feat/req11-phase0-photo-lookup-port`에 `cabec57`로 커밋·푸시.
 
 ## 2026-09-08
 

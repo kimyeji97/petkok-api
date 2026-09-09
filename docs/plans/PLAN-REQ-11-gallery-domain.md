@@ -49,6 +49,7 @@ REQ-11을 REQ-12(timeline)보다 먼저 하기로 했다 — R2 인프라가 이
 - [x] **Phase 0** — `PhotoLookup` 포트 인터페이스·`PhotoSummary` DTO 설계
       완료 기준: `PhotoLookup`이 `framework`에, 구현체가 `business/gallery`에, 사용처가 `business/diary`에 있고 `data..entity..`(Photo 엔티티)가 포트 시그니처에 노출되지 않음을 확인
       > **결과 갱신: 2026-09-08.** `framework/gallery/PhotoLookup.java`·`PhotoSummary.java` 구현·커밋(`f97b110`, 브랜치 `feat/req11-phase0-photo-lookup-port`). **완료 기준 문구 중 "구현체가 business/gallery에, 사용처가 business/diary에"는 이번에 만들지 않았다** — 각각 Phase 1·Phase 2의 몫이라 Phase 경계를 넘기지 않으려 좁혔다(완료 기준 문구가 애초에 Phase 경계보다 넓게 쓰였던 것으로 보인다). 실제로 검증 가능했던 두 기준(엔티티 미노출·dto 네이밍 비충돌)은 `/testrun`이 기존 ArchUnit 규칙 3개(`FRAMEWORK_MUST_NOT_KNOW_DOMAIN`·`DomainBoundaryTest.NO_CROSS_DOMAIN_DEPENDENCY`·`DTO_NAMING`) 재실행으로 전부 그린 확인했다.
+      > **재정정: 2026-09-09.** `framework/gallery`라는 패키지명 자체가 지적받았다 — `gallery`는 도메인 이름이라 framework 트리 안에 도메인이 새어든 것처럼 보인다(`UserStatusChecker`가 관심사 이름인 `framework/security`에 있는 것과 다름). `framework/port`로 옮겼다(같은 커밋 브랜치에서 후속 커밋).
 - [ ] **Phase 1** — gallery CRUD 단독 구현 (presigned 발급 · 목록 · 생성 · 삭제), diary 통합 제외
       완료 기준: 4개 엔드포인트 정상 동작 · `PetAccessGuard`로 403/404 검증(단, presigned 발급은 인증만) · `image/jpeg`·`png`·`webp` 외 타입과 10MB 초과 요청이 `UNSUPPORTED_IMAGE_TYPE`/`FILE_TOO_LARGE`로 거부됨 · 삭제 시 R2 객체 삭제가 성공해야 DB 행이 지워지고, R2 삭제 실패 시 DB는 그대로 둔 채 500 반환 · 커서 페이지네이션(`created_at` desc) keyset 유지 · `@WebMvcTest` 관례(`@Import({SecurityConfig.class, JacksonConfig.class})`) 적용
 - [ ] **Phase 2** — diary 통합 (`PhotoLookup` 포트로 `photo_ids`·`photos`·`photo_count` 반영)
@@ -61,7 +62,8 @@ REQ-11을 REQ-12(timeline)보다 먼저 하기로 했다 — R2 인프라가 이
 - **도메인 간 참조 금지가 diary→gallery에서 정면으로 걸린다.** `PhotoLookup` 포트를 `framework`에 두지 않고 `business/gallery`에 직접 두면 `business/diary`가 그걸 참조하는 순간 ArchUnit `DomainBoundaryTest`가 막는다(§3). 포트 시그니처에 `Photo` 엔티티를 노출해도 같은 규칙(`FRAMEWORK_MUST_NOT_KNOW_DOMAIN`류)에 걸릴 수 있어 UUID·요약 DTO만 주고받는다(`UserStatusChecker` D 패턴과 동일 이유, §3)
 - `caption`·`taken_at`은 선택 필드로 보이므로 PATCH가 아닌 생성 시점 값으로만 다룬다(수정 엔드포인트 자체가 스펙에 없음 — 위 제외 항목)
 - **HEIC/HEIF는 명시적으로 거부해야 한다.** iOS 기본 사진 형식이라 클라이언트 변환을 안 거치면 그대로 올라올 수 있다 — `content_type` 화이트리스트 검증(jpeg·png·webp)을 빠뜨리면 대부분 브라우저에서 못 여는 이미지가 조용히 저장된다(2026-09-08 결정)
-- **`PhotoSummary`를 `data/gallery/dto`에 두면 안 된다.** 기존 `DTO_NAMING` 규칙(dto 패키지 클래스는 `Request`/`Response`로 끝나야 함)에 걸린다. `UserStatusChecker` 선례(`framework/security`, entity 대신 원시값·UUID만 반환)를 그대로 따라 `PhotoLookup`과 `PhotoSummary` 둘 다 `framework/gallery`에 두고 dto 패키지 규칙 대상에서 아예 뺀다(`/testgen` 2026-09-08 발견)
+- **`PhotoSummary`를 `data/gallery/dto`에 두면 안 된다.** 기존 `DTO_NAMING` 규칙(dto 패키지 클래스는 `Request`/`Response`로 끝나야 함)에 걸린다. `UserStatusChecker` 선례(`framework/security`, entity 대신 원시값·UUID만 반환)를 그대로 따라 `PhotoLookup`과 `PhotoSummary` 둘 다 `framework`에 두고 dto 패키지 규칙 대상에서 아예 뺀다(`/testgen` 2026-09-08 발견)
+- **`framework` 아래 하위 패키지 이름에 도메인 이름을 쓰지 않는다.** 처음엔 `framework/gallery`에 뒀는데, `gallery`가 AGENTS §3의 10개 도메인 이름 중 하나라 framework 트리 안에 도메인이 새어든 것처럼 보인다는 지적을 받았다(2026-09-09). `UserStatusChecker`가 관심사 이름(`framework/security`)에 있는 것과 같은 이유로 **패턴 이름**(`framework/port`)으로 옮겼다 — 앞으로 같은 포트 패턴을 또 쓰게 되면 여기 계속 모은다
 
 ## 검증 계약
 
@@ -73,7 +75,7 @@ REQ-11을 REQ-12(timeline)보다 먼저 하기로 했다 — R2 인프라가 이
 |---|---|---|
 | `PhotoLookup` 시그니처에 `Photo` 엔티티가 노출되지 않음 | `ArchitectureTest.FRAMEWORK_MUST_NOT_KNOW_DOMAIN` | `framework..`가 `data..entity..`를 참조하면 이미 잡는다(`allowEmptyShould(false)`, 대상 패키지 이미 비어있지 않음) |
 | `business/diary`가 `business/gallery`·`data/gallery/entity`를 우회 참조하지 않음 | `DomainBoundaryTest.NO_CROSS_DOMAIN_DEPENDENCY` | diary↔gallery 슬라이스 간 `ignoreDependency` 예외를 추가하지 않는 한 이미 막는다 |
-| `PhotoSummary`가 dto 네이밍 규칙과 충돌하지 않음 | `ArchitectureTest.DTO_NAMING` | `framework/gallery`에 두면(위 제약 참고) 애초에 `..dto..` 패턴에 안 걸려 규칙 대상 밖이다 |
+| `PhotoSummary`가 dto 네이밍 규칙과 충돌하지 않음 | `ArchitectureTest.DTO_NAMING` | `framework/port`에 두면(위 제약 참고) 애초에 `..dto..` 패턴에 안 걸려 규칙 대상 밖이다 |
 
 Phase 1(gallery CRUD)·Phase 2(diary 통합)에서 실제 요청/응답 로직이 생기면 그때부터 케이스가 시작된다 — `/testgen`을 그 착수 직전에 다시 돌릴 것.
 
