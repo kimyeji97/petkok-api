@@ -1,6 +1,6 @@
 # PLAN-REQ-11 · gallery 도메인 (R2 presigned 업로드)
 
-> 출처: 2026-09-08 세션(`/progress` REQ-11/12 순서 논의 직후) · 작성: 2026-09-08 · 상태: 🟡 진행 (Phase 0 완료)
+> 출처: 2026-09-08 세션(`/progress` REQ-11/12 순서 논의 직후) · 작성: 2026-09-08 · 상태: 🟡 진행 (Phase 0·1 완료)
 
 ## 배경
 
@@ -42,7 +42,7 @@ REQ-11을 REQ-12(timeline)보다 먼저 하기로 했다 — R2 인프라가 이
 
 ## 미결 질문
 
-없음 — 2026-09-08 대화에서 전부 확정(위 「결정」 표 참고).
+- [ ] **presigned 응답의 정확한 필드명**(예: `upload_url`/`image_url`) — 계획서·스펙 어디에도 근거가 없다(`/testgen` 2026-09-09 발견). `POST /photos/presigned-url` 컨트롤러 테스트는 상태 코드만 확인하고 필드명은 단언하지 않았다. `/implement`가 임의로 정해도 되는지, 아니면 확정이 필요한지 확인 필요
 
 ## 작업 단계
 
@@ -50,8 +50,9 @@ REQ-11을 REQ-12(timeline)보다 먼저 하기로 했다 — R2 인프라가 이
       완료 기준: `PhotoLookup`이 `framework`에, 구현체가 `business/gallery`에, 사용처가 `business/diary`에 있고 `data..entity..`(Photo 엔티티)가 포트 시그니처에 노출되지 않음을 확인
       > **결과 갱신: 2026-09-08.** `framework/gallery/PhotoLookup.java`·`PhotoSummary.java` 구현·커밋(`f97b110`, 브랜치 `feat/req11-phase0-photo-lookup-port`). **완료 기준 문구 중 "구현체가 business/gallery에, 사용처가 business/diary에"는 이번에 만들지 않았다** — 각각 Phase 1·Phase 2의 몫이라 Phase 경계를 넘기지 않으려 좁혔다(완료 기준 문구가 애초에 Phase 경계보다 넓게 쓰였던 것으로 보인다). 실제로 검증 가능했던 두 기준(엔티티 미노출·dto 네이밍 비충돌)은 `/testrun`이 기존 ArchUnit 규칙 3개(`FRAMEWORK_MUST_NOT_KNOW_DOMAIN`·`DomainBoundaryTest.NO_CROSS_DOMAIN_DEPENDENCY`·`DTO_NAMING`) 재실행으로 전부 그린 확인했다.
       > **재정정: 2026-09-09.** `framework/gallery`라는 패키지명 자체가 지적받았다 — `gallery`는 도메인 이름이라 framework 트리 안에 도메인이 새어든 것처럼 보인다(`UserStatusChecker`가 관심사 이름인 `framework/security`에 있는 것과 다름). `framework/port`로 옮겼다(같은 커밋 브랜치에서 후속 커밋).
-- [ ] **Phase 1** — gallery CRUD 단독 구현 (presigned 발급 · 목록 · 생성 · 삭제), diary 통합 제외
+- [x] **Phase 1** — gallery CRUD 단독 구현 (presigned 발급 · 목록 · 생성 · 삭제), diary 통합 제외
       완료 기준: 4개 엔드포인트 정상 동작 · `PetAccessGuard`로 403/404 검증(단, presigned 발급은 인증만) · `image/jpeg`·`png`·`webp` 외 타입과 10MB 초과 요청이 `UNSUPPORTED_IMAGE_TYPE`/`FILE_TOO_LARGE`로 거부됨 · 삭제 시 R2 객체 삭제가 성공해야 DB 행이 지워지고, R2 삭제 실패 시 DB는 그대로 둔 채 500 반환 · 커서 페이지네이션(`created_at` desc) keyset 유지 · `@WebMvcTest` 관례(`@Import({SecurityConfig.class, JacksonConfig.class})`) 적용
+      > **결과 갱신: 2026-09-09.** `business/gallery`·`data/gallery` 구현(`8c3080c`). 자체 실행 27건 중 3건 실패(REQ-11-01·14·15) — `/testrun`이 전부 (a) 테스트 결함으로 분류·수정(`ce09f33`, 구현 변경 없음). 재실행 27/27 통과, Phase 1 완료 기준 전부 충족. 브랜치 `feat/req11-phase0-photo-lookup-port`에 커밋·푸시.
 - [ ] **Phase 2** — diary 통합 (`PhotoLookup` 포트로 `photo_ids`·`photos`·`photo_count` 반영)
       완료 기준: `business/diary`가 `PhotoLookup`(framework 인터페이스)만 참조하고 `data..gallery..entity..`를 직접 참조하지 않음(ArchUnit 확인) · REQ-10-108/109/110 세 케이스의 기존 단언(없음/무시)을 뒤집는 새 계약으로 교체하고 `/testgen`이 그 갱신을 반영
 
@@ -64,6 +65,8 @@ REQ-11을 REQ-12(timeline)보다 먼저 하기로 했다 — R2 인프라가 이
 - **HEIC/HEIF는 명시적으로 거부해야 한다.** iOS 기본 사진 형식이라 클라이언트 변환을 안 거치면 그대로 올라올 수 있다 — `content_type` 화이트리스트 검증(jpeg·png·webp)을 빠뜨리면 대부분 브라우저에서 못 여는 이미지가 조용히 저장된다(2026-09-08 결정)
 - **`PhotoSummary`를 `data/gallery/dto`에 두면 안 된다.** 기존 `DTO_NAMING` 규칙(dto 패키지 클래스는 `Request`/`Response`로 끝나야 함)에 걸린다. `UserStatusChecker` 선례(`framework/security`, entity 대신 원시값·UUID만 반환)를 그대로 따라 `PhotoLookup`과 `PhotoSummary` 둘 다 `framework`에 두고 dto 패키지 규칙 대상에서 아예 뺀다(`/testgen` 2026-09-08 발견)
 - **`framework` 아래 하위 패키지 이름에 도메인 이름을 쓰지 않는다.** 처음엔 `framework/gallery`에 뒀는데, `gallery`가 AGENTS §3의 10개 도메인 이름 중 하나라 framework 트리 안에 도메인이 새어든 것처럼 보인다는 지적을 받았다(2026-09-09). `UserStatusChecker`가 관심사 이름(`framework/security`)에 있는 것과 같은 이유로 **패턴 이름**(`framework/port`)으로 옮겼다 — 앞으로 같은 포트 패턴을 또 쓰게 되면 여기 계속 모은다
+- **keyset 커서 테스트 리터럴은 `Z`(UTC)로 쓴다 — AGENTS.md에 이미 문서화된 함정인데 REQ-11에서 또 재발했다.** `PhotoServiceTest`의 `JUN_30`을 `+09:00`으로 썼다가, 무설정 `CursorCodec`이 인코드 시 오프셋을 `Z`로 정규화해 `OffsetDateTime.equals()` 비교(REQ-11-14·15)가 깨졌다(`/testrun` 2026-09-09 확인, 구현 결함 아님). `FeedingServiceTest`(REQ-10, 2026-09-01)와 원인이 완전히 같다 — Phase 2나 REQ-12에서 또 `OffsetDateTime` 커서를 쓰면 세 번째로 반복될 수 있다
+- **`S3Presigner`를 목으로 쓸 때 `presignPutObject(...)` 반환값(`PresignedPutObjectRequest`)을 스텁하지 않으면 `.url()`에서 NPE 난다.** 이 프로젝트에서 R2를 목으로 쓴 첫 사례라 처음 걸렸다(`/testrun` 2026-09-09) — `mock(PresignedPutObjectRequest.class)`로 만들어 `.url()`을 스텁할 것
 
 ## 검증 계약
 
@@ -80,4 +83,41 @@ REQ-11을 REQ-12(timeline)보다 먼저 하기로 했다 — R2 인프라가 이
 Phase 1(gallery CRUD)·Phase 2(diary 통합)에서 실제 요청/응답 로직이 생기면 그때부터 케이스가 시작된다 — `/testgen`을 그 착수 직전에 다시 돌릴 것.
 
 > **결과 갱신: 2026-09-08.** `/testrun REQ-11`이 위 3개 규칙을 재실행해 전부 통과 확인(`ArchitectureTest` 8/8 · `DomainBoundaryTest` 1/1), 인용된 규칙 이름 3개도 소스에 그대로 존재함을 재확인. Phase 0 완료 기준 충족.
+
+### Phase 1 (gallery CRUD)
+
+> 작성: 2026-09-09 · 대상: Phase 1 착수 직전 · 검증: `/testrun REQ-11`
+
+| ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
+|----|------|--------|:----:|------|:----:|:----:|
+| REQ-11-01 | `PhotoService`(presigned) | 허용 타입(jpeg/png/webp)·크기 이내 → 200 | 정상 | PLAN §결정 — "image/jpeg`·`image/png`·`image/webp`만 허용" | 1 | ✅ |
+| REQ-11-02 | `PhotoService`(presigned) | `content_type`이 HEIC → 400 `UNSUPPORTED_IMAGE_TYPE` | 예외 | PLAN §결정 — "HEIC/HEIF는 거부" | 1 | ✅ |
+| REQ-11-03 | `PhotoService`(presigned) | 화이트리스트 밖 타입(예: `application/pdf`) → 400 `UNSUPPORTED_IMAGE_TYPE` | 예외 | PLAN §결정 — "image/jpeg`·`image/png`·`image/webp`만 허용" | 1 | ✅ |
+| REQ-11-04 | `PhotoService`(presigned) | `content_length` 10MB 초과 → 400 `FILE_TOO_LARGE` | 경계 | PLAN §결정 — "최대 10MB" | 1 | ✅ |
+| REQ-11-05 | `POST /pets/{pet_id}/photos` | `image_url` 없으면 400 | 예외 | PLAN §범위 — "image_url`(필수)" | 1 | ✅ |
+| REQ-11-06 | `POST /pets/{pet_id}/photos` | `caption`·`taken_at`·`diary_entry_id` 없이도 201 | 정상 | PLAN §범위 — "전부 선택" | 1 | ✅ |
+| REQ-11-07 | `PhotoService.create` | 남의 펫 → 가드의 `PET_FORBIDDEN` | 예외 | PLAN §범위 — "다른 도메인과 동일 패턴, D5 재사용" | 1 | ✅ |
+| REQ-11-08 | `PhotoService.create` | 삭제된 펫 → 가드의 `PET_NOT_FOUND` | 예외 | 〃 | 1 | ✅ |
+| REQ-11-09 | `PhotoService.create` | `diary_entry_id`를 보내면 그대로 저장 | 정상 | PLAN §범위 — "사진을 다이어리에 붙이는 것도 이 요청 시점에 한다" | 1 | ✅ |
+| REQ-11-10 | `PhotoService.create` | `diary_entry_id` 없이 보내면 `null` 유지(단독 갤러리) | 정상 | db-schema.md §9 — "NULL = 단독 갤러리" | 1 | ✅ |
+| REQ-11-11 | `GET /pets/{pet_id}/photos` | 응답에 `items`·`next_cursor`·`has_next` 키 존재 | 정상 | api-list.md §공통 규약 — "{items, next_cursor, has_next}" | 1 | ✅ |
+| REQ-11-12 | `PhotoService.list` | 남의 펫 → `PET_FORBIDDEN` | 예외 | D5 재사용(위와 동일 근거) | 1 | ✅ |
+| REQ-11-13 | `PhotoService.list` | 삭제된 펫 → `PET_NOT_FOUND` | 예외 | 〃 | 1 | ✅ |
+| REQ-11-14 | `PhotoService.list` | 동일 `created_at` 여러 건 → `next_cursor`에 마지막 항목 id(타이브레이크) | 회귀 | PLAN §제약·함정 — "다른 기록 도메인(D8)처럼" | 1 | ✅ |
+| REQ-11-15 | `PhotoService.list` | 다음 페이지 조회는 `created_at`·id 둘 다 저장소에 전달 | 회귀 | 〃 | 1 | ✅ |
+| REQ-11-16 | `PhotoService.list` | limit만큼만 반환 + `has_next` true | 정상 | api-list.md §공통 규약 — "next_cursor`가 `null`이면 마지막 페이지" | 1 | ✅ |
+| REQ-11-17 | `PhotoService.list` | 해석 불가 cursor → `INVALID_CURSOR` | 회귀 | 프레임워크 공통 커서 계약(REQ-10-23과 동일 패턴) | 1 | ✅ |
+| REQ-11-18 | `DELETE /pets/{pet_id}/photos/{photo_id}` | 성공 시 204(본문 없음) | 정상 | 관례 — 다른 도메인 DELETE 전부 204(api-list.md §1·§2) | 1 | ✅ |
+| REQ-11-19 | `PhotoService.delete` | 남의 펫 → `PET_FORBIDDEN` | 예외 | D5 재사용(위와 동일 근거) | 1 | ✅ |
+| REQ-11-20 | `PhotoService.delete` | 삭제된 펫 → `PET_NOT_FOUND` | 예외 | 〃 | 1 | ✅ |
+| REQ-11-21 | `PhotoService.delete` | 다른 펫에 속한 `photo_id` → `RESOURCE_NOT_FOUND` | 예외 | 관례 — REQ-10 D6과 동일 패턴(계획서엔 D5만 명시, 승인받아 확장) | 1 | ✅ |
+| REQ-11-22 | `PhotoService.delete` | 조회에 `pet_id`를 함께 건다 — `findById` 단독 호출 없음 | 불변식 | 〃 | 1 | ✅ |
+| REQ-11-23 | `PhotoService.delete` | R2 삭제 실패 → 저장소 `delete` 미호출 | 회귀 | PLAN §결정 — "R2 객체 삭제 성공 후에만 DB 행 삭제" | 1 | ✅ |
+| REQ-11-24 | `PhotoService.delete` | R2 삭제 실패 → 예외 그대로 전파(500) | 회귀 | PLAN §결정 — "R2 삭제가 실패하면 DB 행은 그대로 두고 500 반환" | 1 | ✅ |
+| REQ-11-25 | `PhotoService.delete` | R2 삭제 성공 → 저장소 `delete` 호출(정상 경로) | 정상 | 〃 | 1 | ✅ |
+| REQ-11-26 | `Photo`(entity) | 소프트 딜리트 엔티티가 아니다 | 불변식 | AGENTS §5 — "users`·`pets`만 `deleted_at`" | 1 | ✅ |
+
+**미결(코드로 안 씀)** — presigned 응답의 정확한 필드명(`upload_url`/`image_url` 등). 계획서·스펙 어디에도 근거가 없다. `/implement`가 정하고, 컨트롤러 테스트는 상태 코드만 확인한다.
+
+> **결과 갱신: 2026-09-09.** 자체 실행 27건 중 3건 실패(REQ-11-01·14·15) — `/testrun`이 전부 (a) 테스트 결함으로 확인·수정(구현 변경 없음). 재실행 27/27 통과. Phase 1 완료 기준 충족.
 

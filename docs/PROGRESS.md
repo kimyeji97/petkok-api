@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-09 (**REQ-11 Phase 0 패키지 정정 — `framework/gallery` → `framework/port`.** 사용자 리뷰로 도메인 이름이 framework 트리에 새어든 것이 드러남)
+> 최종 갱신: 2026-09-09 (**REQ-11 Phase 1(gallery CRUD) 완료 — 검증 계약 26건 전부 통과.** 자체 실행에서 3건 실패했으나 전부 테스트 결함으로 확인·수정)
 
 ## 요구사항 인덱스
 
@@ -22,7 +22,7 @@
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건) |
-| REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | — | 🟡 (Phase 0 완료 — `PhotoLookup` 포트) |
+| REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | — | 🟡 (Phase 0·1 완료 — gallery CRUD 4개 엔드포인트 · Phase 2 diary 통합 남음) |
 | REQ-12 | timeline (다중 테이블 union — 앱 레벨 병합이 기본, QueryDSL은 병목 시 대안) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
@@ -36,6 +36,23 @@
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
 
 ## 2026-09-09
+
+### REQ-11 Phase 1(gallery CRUD) 완료 — 자체 실행 3건 실패, 전부 테스트 결함으로 확인·수정
+
+`/testgen`이 계획서 Phase 1 완료 기준에서 케이스 26건(REQ-11-01~26)을 뽑았다 — presigned 업로드 검증(타입·크기) · `PetAccessGuard` 소비(D5) · 사진↔펫 귀속(REQ-10 D6 관례) · keyset 커서 · R2 삭제 순서. 다른 펫에 속한 `photo_id` 차단(D6)과 `DELETE` 204 두 가지는 계획서에 문구가 없어(D5만 명시) "관례로 확장" 표시를 달고 승인받았다.
+
+`/implement`가 `business/gallery`·`data/gallery`를 신설했다 — `PhotoController`(4 엔드포인트) · `PhotoService` · `Photo` 엔티티 · `PhotoRepository` · DTO 4종. `ErrorCode`에 `UNSUPPORTED_IMAGE_TYPE`·`FILE_TOO_LARGE` 추가. `presigned-url`은 pet 경로 밖이라 `PhotoController`에 클래스 레벨 `@RequestMapping`을 두지 않고 메서드마다 전체 경로를 명시했다.
+
+**자체 실행에서 27건 중 3건이 실패했다.** `/testrun`이 근거를 다시 읽어 전부 (a) 테스트 결함으로 분류했다 — **구현은 한 글자도 안 고쳤다**:
+
+- **REQ-11-14·15** — `JUN_30` 리터럴을 `+09:00`으로 써서, 무설정 `CursorCodec`(`new ObjectMapper().findAndRegisterModules()`)이 인코드 시 오프셋을 `Z`로 정규화해 `OffsetDateTime.equals()` 비교가 깨졌다. **AGENTS.md에 2026-09-01(`FeedingServiceTest`)에 이미 문서화된 바로 그 함정이 REQ-11에서 또 나왔다** — `/testgen`이 케이스를 쓸 때 이 문서화된 함정을 안 챙겨서 재발했다. 리터럴을 `Z`로 바꿔 해결(REQ-10과 동일 처방)
+- **REQ-11-01** — `S3Presigner` 목에 `presignPutObject(...)` 스텁이 없어 `presigned.url()`에서 NPE. 검증 대상(업로드 타입 허용 여부)과 무관한 협력자의 스텁 누락 — `PresignedPutObjectRequest` 목을 만들어 `.url()`을 스텁해 해결. 이 프로젝트에서 R2(`S3Presigner`)를 목으로 쓴 첫 사례라 처음 걸린 함정이다
+
+수정 1회로 27/27 전부 통과. `/implement`가 테스트 수정분을 커밋·푸시(`ce09f33`, 브랜치 `feat/req11-phase0-photo-lookup-port`).
+
+> **관찰 — AGENTS.md의 기존 경고가 있어도 재발했다.** 경고 자체는 정확했지만 "새 keyset 테스트를 쓸 때 이 경고를 능동적으로 대조하라"는 절차가 없어서, `/testgen`이 그냥 그대로 반복했다. 다음에 비슷한 도메인(REQ-12 등)에서 `OffsetDateTime` 커서를 또 쓰게 되면 같은 실수가 세 번째로 날 수 있다 — 계약 승격까지는 아니어도 `/testgen` 체크리스트성 메모로 남긴다.
+
+**남은 것 (REQ-11)** — Phase 2(diary 통합: `PhotoLookup` 실제 구현체를 `business/gallery`에 만들고 `business/diary`가 주입해 `photo_ids`·`photos`·`photo_count` 반영). 착수 전 `/testgen REQ-11` 재실행 필요.
 
 ### REQ-11 Phase 0 패키지 정정 — `framework/gallery` → `framework/port`
 
