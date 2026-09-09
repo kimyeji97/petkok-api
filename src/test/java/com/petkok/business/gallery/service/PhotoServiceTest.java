@@ -26,6 +26,7 @@ import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.pagination.CursorCodec;
 import com.petkok.framework.pagination.CursorPage;
 import com.petkok.framework.pagination.CursorRequest;
+import java.net.URL;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +37,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 /**
  * gallery 도메인 CRUD — presigned 발급 검증 · 가드 소비(D5) · 자원 귀속(D6) · keyset 커서 · R2 삭제 순서. 검증 계약
@@ -57,7 +60,8 @@ class PhotoServiceTest {
   private static final UUID PHOTO_A = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000003");
   private static final UUID PHOTO_B = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000002");
   private static final UUID PHOTO_C = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001");
-  private static final OffsetDateTime JUN_30 = OffsetDateTime.parse("2026-06-30T10:00:00+09:00");
+  // ⚠️ 리터럴은 Z(UTC) 오프셋으로 쓴다 — 무설정 CursorCodec 이 인코드 시 오프셋을 Z 로 정규화한다(AGENTS.md 로컬 검증).
+  private static final OffsetDateTime JUN_30 = OffsetDateTime.parse("2026-06-30T10:00:00Z");
   private static final String IMAGE_URL = "https://img.petkok.com/photos/a.jpg";
   private static final long ONE_MB = 1024L * 1024L;
 
@@ -90,6 +94,10 @@ class PhotoServiceTest {
   @Test
   @DisplayName("[REQ-11-01] 허용 타입(jpeg)·크기 이내 요청은 예외 없이 발급된다")
   void req_11_01_allowedTypeWithinSizeSucceeds() {
+    PresignedPutObjectRequest presigned = mock(PresignedPutObjectRequest.class);
+    when(presigned.url()).thenReturn(mock(URL.class));
+    when(s3Presigner.presignPutObject((PutObjectPresignRequest) any())).thenReturn(presigned);
+
     assertThatCode(
             () ->
                 service.createPresignedUrl(new PhotoPresignedUrlRequest("image/jpeg", 5 * ONE_MB)))
