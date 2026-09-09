@@ -12,6 +12,8 @@ public enum ErrorCode {
       HttpStatus.BAD_REQUEST, "INVALID_SPECIES_ACTIVITY", "해당 종에서 지원하지 않는 활동 유형입니다."),
   FEATURE_NOT_SUPPORTED_SPECIES(
       HttpStatus.BAD_REQUEST, "FEATURE_NOT_SUPPORTED_SPECIES", "해당 종은 지원하지 않는 기능입니다."),
+  UNSUPPORTED_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "UNSUPPORTED_IMAGE_TYPE", "지원하지 않는 이미지 형식입니다."),
+  FILE_TOO_LARGE(HttpStatus.BAD_REQUEST, "FILE_TOO_LARGE", "파일 크기가 허용 범위를 초과했습니다."),
 
   // 401
   UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "인증이 필요합니다."),
