@@ -1,4 +1,4 @@
-package com.petkok.framework.gallery;
+package com.petkok.framework.port;
 
 import java.util.List;
 import java.util.UUID;
@@ -15,6 +15,11 @@ import java.util.UUID;
  *
  * <p>{@code Photo} 엔티티를 돌려주지 않고 {@link PhotoSummary}·{@code int}·{@code UUID} 만 주고받는 것도 의도적이다. 엔티티를
  * 노출하면 framework 가 {@code data..entity..} 를 알게 되어 {@code FRAMEWORK_MUST_NOT_KNOW_DOMAIN} 에 걸린다.
+ *
+ * <p>패키지가 {@code framework.gallery} 가 아니라 {@code framework.port} 인 것도 의도적이다(2026-09-09 정정). {@code
+ * gallery} 는 도메인 이름이라 framework 트리 안에 두면 도메인이 framework 로 새어든 것처럼 보인다 — {@code UserStatusChecker} 가
+ * {@code framework.security}(관심사 이름)에 있는 것과 같은 이유로, 이 포트들은 도메인이 아니라 "framework가 정의하고 business가 구현하는
+ * 포트"라는 패턴 자체로 묶는다.
  */
 public interface PhotoLookup {
 
