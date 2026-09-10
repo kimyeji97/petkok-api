@@ -14,6 +14,7 @@ import com.petkok.data.diary.enums.ConditionTag;
 import com.petkok.framework.config.JacksonConfig;
 import com.petkok.framework.config.SecurityConfig;
 import com.petkok.framework.pagination.CursorPage;
+import com.petkok.framework.port.PhotoSummary;
 import com.petkok.framework.security.AuthPrincipal;
 import com.petkok.framework.security.UserStatusChecker;
 import com.petkok.framework.security.jwt.JwtTokenProvider;
@@ -40,6 +41,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * § 검증 계약). 구성은 AGENTS §6 관례.
  *
  * <p>⚠️ 이 파일은 {@code DiaryController} 등이 아직 없어 컴파일되지 않는다 — {@code /implement REQ-10 5} 가 만든다.
+ *
+ * <p>REQ-10-108·109는 REQ-11 Phase 2(다이어리↔사진 연결)에서 단언이 뒤집혔다 — 원래 "필드 없음"이었던 것이 "필드 있고 값이 채워짐"으로
+ * 바뀌었다. ID는 그대로 유지한다(PLAN-REQ-11 § 검증 계약 참고). REQ-10-110(photo_ids 무시)은 그대로다.
  */
 @WebMvcTest(DiaryController.class)
 @Import({SecurityConfig.class, JacksonConfig.class})
@@ -62,6 +66,11 @@ class DiaryControllerWebMvcTest {
   }
 
   private static DiaryResponse sample(ConditionTag tag) {
+    return sample(tag, null, null);
+  }
+
+  private static DiaryResponse sample(
+      ConditionTag tag, List<PhotoSummary> photos, Integer photoCount) {
     return new DiaryResponse(
         ENTRY_ID,
         PET_ID,
@@ -70,7 +79,9 @@ class DiaryControllerWebMvcTest {
         tag,
         LocalDate.of(2026, 7, 20),
         OffsetDateTime.now(),
-        OffsetDateTime.now());
+        OffsetDateTime.now(),
+        photos,
+        photoCount);
   }
 
   @Test
@@ -141,9 +152,16 @@ class DiaryControllerWebMvcTest {
   }
 
   @Test
-  @DisplayName("[REQ-10-108] 상세 응답에 photos 가 없다")
-  void req_10_108_responseHasNoPhotosField() throws Exception {
-    when(diaryService.create(any(), any(), any())).thenReturn(sample(null));
+  @DisplayName("[REQ-10-108] 상세 응답에 photos 배열이 있다 (REQ-11 Phase 2 — 뒤집힘)")
+  void req_10_108_responseHasPhotosField() throws Exception {
+    List<PhotoSummary> photos =
+        List.of(
+            new PhotoSummary(
+                UUID.fromString("aaaaaaaa-0000-0000-0000-000000000009"),
+                "https://img.petkok.com/photos/a.jpg",
+                null,
+                null));
+    when(diaryService.create(any(), any(), any())).thenReturn(sample(null, photos, null));
 
     mockMvc
         .perform(
@@ -151,18 +169,20 @@ class DiaryControllerWebMvcTest {
                 .with(asUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"entry_date\":\"2026-07-20\"}"))
-        .andExpect(jsonPath("$.data.photos").doesNotExist());
+        .andExpect(jsonPath("$.data.photos").isArray())
+        .andExpect(
+            jsonPath("$.data.photos[0].image_url").value("https://img.petkok.com/photos/a.jpg"));
   }
 
   @Test
-  @DisplayName("[REQ-10-109] 목록 항목에 photo_count 가 없다")
-  void req_10_109_listItemHasNoPhotoCountField() throws Exception {
+  @DisplayName("[REQ-10-109] 목록 항목에 photo_count 필드가 있다 (REQ-11 Phase 2 — 뒤집힘)")
+  void req_10_109_listItemHasPhotoCountField() throws Exception {
     when(diaryService.list(any(), any(), any(), any()))
-        .thenReturn(CursorPage.of(List.of(sample(null)), null, false));
+        .thenReturn(CursorPage.of(List.of(sample(null, null, 3)), null, false));
 
     mockMvc
         .perform(MockMvcRequestBuilders.get(BASE).with(asUser()))
-        .andExpect(jsonPath("$.data.items[0].photo_count").doesNotExist());
+        .andExpect(jsonPath("$.data.items[0].photo_count").value(3));
   }
 
   @Test

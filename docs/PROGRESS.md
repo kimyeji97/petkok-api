@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-07 (**REQ-10 Phase 1·2 로컬 DB keyset 경계 실측 완료 — REQ-10 미결 0건.** 실측 도중 JPA Auditing이 `OffsetDateTime` 필드를 못 채워 모든 엔티티 저장이 500으로 죽는 결함을 발견·수정(PR #51). `./gradlew test`가 DB를 안 타서 지금까지 한 번도 안 잡히던 사각지대였다)
+> 최종 갱신: 2026-09-10 (**REQ-11 전 Phase(0~2) 완료 — gallery 도메인 + diary↔사진 연결.** REQ-10-15·38·49·74·100 재확인 필요 발견 — 동작은 정상, 회귀 테스트 누락)
 
 ## 요구사항 인덱스
 
@@ -21,9 +21,9 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건) |
-| REQ-11 | gallery (R2 presigned 업로드) | [api-list §9](specs/api-list.md) | — | ⏸ |
-| REQ-12 | timeline (다중 테이블 union — QueryDSL 활성화 시점) | [api-list §10](specs/api-list.md) | — | ⏸ |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘, REQ-10-15·38·49·74·100 회귀 테스트 재확인 필요) |
+| REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
+| REQ-12 | timeline (다중 테이블 union — 앱 레벨 병합이 기본, QueryDSL은 병목 시 대안) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 
@@ -35,7 +35,101 @@
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
 
-## 2026-09-07
+## 2026-09-10
+
+> **REQ-11 전 Phase(0~2) 완료 — gallery 도메인 신설 + diary↔사진 연결까지 끝났다.** `/testgen`→`/implement`→`/testrun` 한 바퀴로 Phase 2를 마쳤고, 전체 스위트(REQ-10+REQ-11 168케이스, 프로젝트 전체 298케이스) 실패 0을 확인했다. REQ-11 착수(2026-09-08)부터 계산하면 워크플랜→3개 Phase까지 사흘 걸렸다.
+
+### `/testgen REQ-11` (Phase 2) — 계획서 완료 기준과 이미 확정한 결정이 충돌해 하나 더 물었다
+
+Phase 2 케이스를 뽑다가 계획서 완료 기준 문구("REQ-10-108/109/110 세 케이스를 뒤집는다")가 이미 승인된 결정("사진↔다이어리 연결은 사진 업로드 요청의 `diary_entry_id`에서만 한다")과 충돌하는 걸 발견했다 — `photo_ids`(REQ-10-110)를 진짜로 뒤집으려면 `DiaryCreateRequest`에 필드를 새로 만들어야 하는데, 그건 이미 기각한 안이다. 대화로 확정: **REQ-10-110은 그대로 무시 유지**, 실제로 뒤집는 건 108·109 둘뿐. Phase 0 때 겪었던 "완료 기준 문구가 Phase 경계보다 넓게 쓰였다"와 같은 종류의 실수가 계획서 안에서 또 나온 것 — 이번엔 결정 표와 완료 기준 사이의 불일치였다.
+
+**두 번째 질문 — `photo_count` 계산 방식.** `PhotoLookup` 포트(Phase 0)는 단일 ID 조회만 지원해서, 다이어리 목록의 매 항목마다 반복 호출(N+1)이 필요했다. 배치 메서드를 포트에 추가할지 물어 **N+1 그대로 수용**하기로 확정 — 페이지당 최대 50건이라 부담이 크지 않고, 나중에 실측에서 병목이 보이면 그때 배치로 바꾸기로 했다(REQ-10 D8/타임라인처럼 "지금은 단순하게, 필요해지면 최적화" 패턴 반복).
+
+**세 번째 결정 — ID 접두사 예외.** REQ-10-108·109는 이미 `DiaryControllerWebMvcTest.java`에 존재하는 테스트라, 새 REQ-11 ID를 붙이는 대신 **같은 ID를 유지한 채 단언만 뒤집기로** 했다(승인받음). 대신 `/testrun REQ-11`만으로는 이 두 건이 안 잡혀 `/testrun REQ-10`을 함께 돌려야 한다 — 계획서에 명시해 뒀다. `PLAN-REQ-10`의 원래 108·109 행도 취소선 + "REQ-11 Phase 2에서 뒤집힘" 각주로 고쳤다(원본을 틀린 채로 방치하지 않기 위함, 이 커맨드군의 원칙 그대로).
+
+### `/implement REQ-11 2` — PhotoLookup 구현체, DiaryResponse에 photos·photoCount 추가
+
+`PhotoService`가 `PhotoLookup`을 구현(`countByDiaryEntryId`·`findByDiaryEntryId`, `Photo` 엔티티 대신 `PhotoSummary`만 반환). `DiaryService`가 `PhotoLookup`을 주입받아 상세(생성·수정) 응답엔 `photos`를, 목록 항목엔 `photoCount`를 채우고 — 서로 반대쪽 필드는 비워 둔다(응답 하나가 두 얼굴을 갖는 형태, D4가 원래 그렇게 설계해 뒀던 것). 자체 실행 · 전체 스위트 298케이스 실패 0, 한 번에 커밋·푸시(`d856cec`).
+
+### `/testrun REQ-11 + REQ-10` — 168케이스 전부 통과, 부수적으로 REQ-10의 낡은 구멍 하나 발견
+
+REQ-11(31건) + REQ-10 전체(위 108·109 포함)를 함께 돌려 168케이스 전부 그린 확인. 계획서 표 ↔ 테스트 코드 ID 대조도 REQ-11 쪽은 정확히 일치.
+
+**⚠️ 발견 — REQ-10-15·38·49·74·100이 표에는 있는데 코드에 없다.** weight·activity·feeding·shed·diary 각 도메인의 "PATCH 요청 DTO에 `@NotNull`·`@NotBlank`가 없다"는 회귀 케이스 5건인데, 해당 `[REQ-10-XX]` DisplayName을 가진 테스트가 어디에도 없다. **동작 자체는 정상이다** — 다섯 DTO 파일을 직접 열어 실제 애너테이션이 없음을 재확인했다(주석으로만 규약이 적혀 있다). 표의 `✅`는 2026-09-01~02 원래 `/testrun` 시점 기록을 그대로 물려받은 것이라, 그때 어떻게 확인했는지는 이번 세션에서 추적하지 않았다. REQ-11 작업과 무관해 지금 고치지 않았다 — `PLAN-REQ-10`에 각주로 남기고, 다음에 이 다섯 도메인 중 하나를 건드릴 때 반영을 검토하기로 한다.
+
+**남은 것 (REQ-11)** — 없음. 미결 1건(presigned 응답 필드명)은 비차단으로 남아 있다(REQ-08·09 선례와 같은 성격). `feat/req11-phase0-photo-lookup-port` 브랜치는 PR #52에 Phase 0~2 커밋 전부 포함된 상태로 열려 있음 — 머지는 사람 판단.
+
+## 2026-09-09
+
+### REQ-11 Phase 1(gallery CRUD) 완료 — 자체 실행 3건 실패, 전부 테스트 결함으로 확인·수정
+
+`/testgen`이 계획서 Phase 1 완료 기준에서 케이스 26건(REQ-11-01~26)을 뽑았다 — presigned 업로드 검증(타입·크기) · `PetAccessGuard` 소비(D5) · 사진↔펫 귀속(REQ-10 D6 관례) · keyset 커서 · R2 삭제 순서. 다른 펫에 속한 `photo_id` 차단(D6)과 `DELETE` 204 두 가지는 계획서에 문구가 없어(D5만 명시) "관례로 확장" 표시를 달고 승인받았다.
+
+`/implement`가 `business/gallery`·`data/gallery`를 신설했다 — `PhotoController`(4 엔드포인트) · `PhotoService` · `Photo` 엔티티 · `PhotoRepository` · DTO 4종. `ErrorCode`에 `UNSUPPORTED_IMAGE_TYPE`·`FILE_TOO_LARGE` 추가. `presigned-url`은 pet 경로 밖이라 `PhotoController`에 클래스 레벨 `@RequestMapping`을 두지 않고 메서드마다 전체 경로를 명시했다.
+
+**자체 실행에서 27건 중 3건이 실패했다.** `/testrun`이 근거를 다시 읽어 전부 (a) 테스트 결함으로 분류했다 — **구현은 한 글자도 안 고쳤다**:
+
+- **REQ-11-14·15** — `JUN_30` 리터럴을 `+09:00`으로 써서, 무설정 `CursorCodec`(`new ObjectMapper().findAndRegisterModules()`)이 인코드 시 오프셋을 `Z`로 정규화해 `OffsetDateTime.equals()` 비교가 깨졌다. **AGENTS.md에 2026-09-01(`FeedingServiceTest`)에 이미 문서화된 바로 그 함정이 REQ-11에서 또 나왔다** — `/testgen`이 케이스를 쓸 때 이 문서화된 함정을 안 챙겨서 재발했다. 리터럴을 `Z`로 바꿔 해결(REQ-10과 동일 처방)
+- **REQ-11-01** — `S3Presigner` 목에 `presignPutObject(...)` 스텁이 없어 `presigned.url()`에서 NPE. 검증 대상(업로드 타입 허용 여부)과 무관한 협력자의 스텁 누락 — `PresignedPutObjectRequest` 목을 만들어 `.url()`을 스텁해 해결. 이 프로젝트에서 R2(`S3Presigner`)를 목으로 쓴 첫 사례라 처음 걸린 함정이다
+
+수정 1회로 27/27 전부 통과. `/implement`가 테스트 수정분을 커밋·푸시(`ce09f33`, 브랜치 `feat/req11-phase0-photo-lookup-port`).
+
+> **관찰 — AGENTS.md의 기존 경고가 있어도 재발했다.** 경고 자체는 정확했지만 "새 keyset 테스트를 쓸 때 이 경고를 능동적으로 대조하라"는 절차가 없어서, `/testgen`이 그냥 그대로 반복했다. 다음에 비슷한 도메인(REQ-12 등)에서 `OffsetDateTime` 커서를 또 쓰게 되면 같은 실수가 세 번째로 날 수 있다 — 계약 승격까지는 아니어도 `/testgen` 체크리스트성 메모로 남긴다.
+
+**남은 것 (REQ-11)** — Phase 2(diary 통합: `PhotoLookup` 실제 구현체를 `business/gallery`에 만들고 `business/diary`가 주입해 `photo_ids`·`photos`·`photo_count` 반영). 착수 전 `/testgen REQ-11` 재실행 필요.
+
+### REQ-11 Phase 0 패키지 정정 — `framework/gallery` → `framework/port`
+
+어제 만든 `PhotoLookup`·`PhotoSummary`를 사용자가 리뷰하다가 "framework 하위에 비즈니스류 패키지가 있는 게 싫다"고 지적했다. 맞는 지적이었다 — `gallery`는 AGENTS.md §3에 나열된 10개 도메인 이름 중 하나라, `framework/gallery`로 두면 framework 트리 안에 도메인 이름이 그대로 새어든 꼴이 된다. `UserStatusChecker`가 관심사 이름(`framework/security`)에 있는 것과 결이 달랐다.
+
+**왜 처음에 안 보였나** — `UserStatusChecker` 선례를 참고할 때 "포트를 framework에 둔다"는 것만 옮기고, "관심사 이름으로 묶는다"는 부분은 놓쳤다. `security`는 여러 도메인에 걸치는 범용 개념이라 자연스러웠는데, `gallery`는 애초에 도메인 이름 자체라 그 자리에 넣는 순간 어색해졌다 — 두 예시가 겉보기엔 같은 패턴이어도 이름 짓는 방식은 갈릴 수 있다는 걸 놓친 것.
+
+**정정** — `framework/port`(패턴 이름)로 옮겼다. 앞으로 같은 "framework가 정의하고 business가 구현하는 포트"가 또 생기면 여기 계속 모은다. `UserStatusChecker`는 이미 `security`에 있어 옮기지 않았다(그 자리도 유효한 관심사 이름이라 급할 것 없음). 동작 변경은 없어 로컬 CI 게이트·`ArchitectureTest`(8/8)·`DomainBoundaryTest`(1/1) 재확인만으로 충분했다. 브랜치 `feat/req11-phase0-photo-lookup-port`에 `cabec57`로 커밋·푸시.
+
+## 2026-09-08
+
+> **REQ-11(gallery) 착수 — 여섯 커맨드 한 바퀴(workplan→testgen→implement→testrun)를 REQ-11 Phase 0에 대해 돌렸다.** 계획서 작성 중 나온 미결 6건을 대화로 전부 확정했고, Phase 0(포트 인터페이스 설계)은 신규 테스트 케이스가 0건이라는 걸 `/testgen`이 발견해 구현·검증까지 이례적으로 가볍게 끝났다.
+
+### REQ-11 vs REQ-12 착수 순서 — REQ-12의 낡은 게이트 발견
+
+`/progress` 조회 중 REQ-11·REQ-12 중 뭘 먼저 할지 물어, REQ-11을 추천하고 착수했다. 근거는 R2 인프라(`R2Config`/`R2Properties`, REQ-05)가 이미 있고 다른 도메인 의존이 없어 착수 비용이 가장 낮다는 것.
+
+이 과정에서 **REQ-12 인덱스 문구가 낡아 있었다는 걸 발견했다** — "QueryDSL 활성화 시점이 이 API"라고 적혀 있었는데, `docs/specs/api-list.md`(176행)는 이미 Notion 대조로 정정돼 있었다: Notion은 **앱 레벨 병합(옵션 A)을 기본으로 추천**하고, QueryDSL(`UNION ALL`)은 무한스크롤에서 병목이 실측될 때 쓰는 대안일 뿐이다. 즉 REQ-12는 애초에 인프라 게이트가 없었다 — 인덱스만 안 고쳐져 있었다. 이번에 인덱스 문구를 정정했다(위 요구사항 인덱스).
+
+### `/workplan REQ-11` — 계획서 작성, 미결 6건
+
+계획서(`docs/plans/PLAN-REQ-11-gallery-domain.md`)를 새로 썼다. 배경은 D4 결정(2026-08-27, PLAN-REQ-10) — diary↔사진 연결을 REQ-11로 이관하기로 한 것 그대로다. 계획 단계에서 미결 6건이 나와 대화로 하나씩 확정했다:
+
+| # | 미결 | 확정 | 근거 |
+|---|---|---|---|
+| 1 | diary→gallery 참조 형태 | **framework 포트 인터페이스**(`PhotoLookup`) | `UserStatusChecker`(REQ-08 D2)와 같은 패턴 재사용 — entity 비노출, `business→framework` 단방향 유지 |
+| 2 | `diary_entry_id` 연결 시점 | 사진 업로드 요청(`POST /pets/{pet_id}/photos`) 시점에 함께 받음 | `photos.diary_entry_id` nullable FK 설계 의도와 바로 맞음 |
+| 3 | 허용 이미지 타입·크기 | jpg·jpeg·png·webp만, 최대 10MB | 대부분 브라우저가 렌더링 가능한 포맷으로 한정 |
+| 4 | 삭제 시 R2 객체 처리 | DB 행 + R2 객체 **둘 다 하드 삭제** | `photos`는 소프트 딜리트 대상 아님(AGENTS §5) |
+| 5 | presigned 발급 소유권 검증 시점 | **인증만** — pet 소유권은 다음 단계(`PetAccessGuard`)에서 | presigned 자체는 DB에 아무것도 안 남겨 오남용 피해가 없음 |
+| 6(파생) | R2·DB 삭제 실패 순서 | **R2 삭제 성공 후에만 DB 삭제**, 실패 시 500 유지 | "고아 R2 파일"보다 "API 응답에 계속 나오는 깨진 이미지"가 더 나쁜 실패 모드 |
+
+**⭐ 미결 3번(업로드 제한)을 정하다가 사용자가 "아이폰 확장자는 다르지 않아?"라고 물어 HEIC를 놓칠 뻔한 게 드러났다.** iOS 기본 사진 포맷(HEIC)은 Safari 외 대부분 브라우저가 렌더링 못 한다 — 화이트리스트에서 안 막으면 "업로드는 됐는데 웹에서 안 보이는 사진"이 조용히 쌓인다. 변환 책임은 모바일 클라이언트(갤러리에서 가져올 때 JPEG로 내보내는 게 일반적)에 두기로 하고 서버는 `UNSUPPORTED_IMAGE_TYPE`으로 거부하기로 했다. **반년 뒤 이 프로젝트를 다시 만지는 사람이 이 결정을 몰랐다면 똑같은 구멍을 다시 열었을 것** — 계획서 제약·함정 절에 남겼다.
+
+### `/testgen REQ-11` — Phase 0 케이스 0건, PhotoSummary 네이밍 충돌 발견
+
+Phase 0(포트 인터페이스·DTO 설계)의 완료 기준 두 가지가 **이미 있는 범용 ArchUnit 규칙**으로 자동 강제된다는 걸 확인했다 — `ArchitectureTest.FRAMEWORK_MUST_NOT_KNOW_DOMAIN`(엔티티 비노출), `DomainBoundaryTest.NO_CROSS_DOMAIN_DEPENDENCY`(diary가 gallery 우회 참조 금지). 새로 케이스를 쓰면 같은 걸 두 번 검사하는 중복이라 **신규 케이스 0건**으로 결론 냈다.
+
+**부수 발견** — 계획했던 `PhotoSummary`를 `data/gallery/dto`에 두면 기존 `DTO_NAMING` 규칙(dto 패키지 클래스는 `Request`/`Response`로 끝나야 함)에 걸린다. `UserStatusChecker` 선례를 따라 `PhotoLookup`·`PhotoSummary` 둘 다 `framework/gallery`에 두기로 계획서를 수정했다.
+
+### `/implement REQ-11 0` — PhotoLookup·PhotoSummary 구현, 스코프 판단 하나
+
+`main`이 보호 브랜치라 `feat/req11-phase0-photo-lookup-port` 브랜치를 새로 만들고, `framework/gallery/PhotoLookup.java`·`PhotoSummary.java` 2개 파일만 작성했다. 로컬 CI 게이트(`spotlessApply`·`build -x test`·`checkstyleMain -PciStrict`) 전부 통과, `ArchitectureTest`(8/8)·`DomainBoundaryTest`(1/1) 재실행도 전부 그린 확인 후 `f97b110`으로 커밋·푸시(PR은 아직 안 만듦).
+
+**계획서 문구와 실제 구현 범위가 갈렸다** — Phase 0 완료 기준 문구가 "구현체가 `business/gallery`에, 사용처가 `business/diary`에 있고"까지 적고 있었는데, 그건 각각 Phase 1(gallery CRUD 생성)·Phase 2(diary 통합)의 몫이라 여기서 만들면 Phase 경계를 넘는다. **이번엔 인터페이스·DTO 선언만 하고 구현체·사용처는 만들지 않았다** — `/workplan` 단계에서 완료 기준 문구를 Phase 경계보다 넓게 썼던 것으로 보이는 계획서 작성 실수다. 계획서 문구 자체는 고치지 않고(조용히 맞추지 않는다는 원칙) Phase 0 항목 아래에 결과 갱신 각주로 남겼다.
+
+### `/testrun REQ-11` — Phase 0 완료 기준 충족 확인
+
+REQ-11 접두사 케이스는 예상대로 0건(`src/test/` grep 재확인). `/testgen`이 지목한 규칙 3개(`FRAMEWORK_MUST_NOT_KNOW_DOMAIN`·`DomainBoundaryTest.NO_CROSS_DOMAIN_DEPENDENCY`·`DTO_NAMING`)를 재실행해 전부 통과 확인, 인용된 규칙 이름 3개도 소스에 그대로 존재함을 재확인(근거 소실 없음). **Phase 0 완료 기준 충족.**
+
+**남은 것 (REQ-11)** — Phase 1(gallery CRUD 4개 엔드포인트 단독 구현) 착수 전 `/testgen REQ-11`을 다시 돌려야 한다(그때부터 실제 케이스 시작). Phase 2(diary 통합)는 그 다음.
+
+> **계약 승격 — 2026-09-09 승인·반영 완료.** AGENTS.md §3 "framework가 인터페이스를 정의하고 business가 구현하는 패턴" 항목에 두 줄을 보탰다 — ① 포트가 반환하는 보조 타입은 `dto` 패키지에 두지 않는다(`DTO_NAMING` 충돌) ② framework 하위 패키지 이름에 도메인 이름을 쓰지 않는다(패턴 이름으로 묶는다). ②는 `framework/gallery` → `framework/port` 정정(위 2026-09-09 섹션)에서 직접 드러난 것이라 같이 승격했다.
 
 > **REQ-10 Phase 1·2 로컬 DB keyset 경계 실측 완료 — REQ-10 미결 0건으로 완전히 닫혔다.** 실측 첫 단계(카카오 자동가입)에서 바로 막혔는데, 원인이 REQ-10 범위 밖의 **프레임워크 전역 결함**이었다 — JPA Auditing이 `OffsetDateTime` 필드를 못 채워 엔티티 저장 자체가 500으로 죽고 있었다. `./gradlew test`가 DB를 안 타서(`CLAUDE.local.md`) 지금까지 한 번도 실행된 적 없던 경로다.
 

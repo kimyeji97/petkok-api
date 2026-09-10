@@ -13,6 +13,8 @@ import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.pagination.CursorCodec;
 import com.petkok.framework.pagination.CursorPage;
 import com.petkok.framework.pagination.CursorRequest;
+import com.petkok.framework.port.PhotoLookup;
+import com.petkok.framework.port.PhotoSummary;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
@@ -40,16 +42,19 @@ public class DiaryService {
   private final DiaryEntryRepository diaryEntryRepository;
   private final CursorCodec cursorCodec;
   private final Clock clock;
+  private final PhotoLookup photoLookup;
 
   public DiaryService(
       PetAccessGuard petAccessGuard,
       DiaryEntryRepository diaryEntryRepository,
       CursorCodec cursorCodec,
-      Clock clock) {
+      Clock clock,
+      PhotoLookup photoLookup) {
     this.petAccessGuard = petAccessGuard;
     this.diaryEntryRepository = diaryEntryRepository;
     this.cursorCodec = cursorCodec;
     this.clock = clock;
+    this.photoLookup = photoLookup;
   }
 
   @Transactional
@@ -64,7 +69,7 @@ public class DiaryService {
                 request.content(),
                 request.conditionTag(),
                 request.entryDate()));
-    return toResponse(saved);
+    return toDetailResponse(saved);
   }
 
   /** 목록. {@code conditionTag} 가 있으면 필터 전용 쿼리를 쓴다. {@code limit} 은 최대 {@value #DIARY_MAX_LIMIT}. */
@@ -98,7 +103,7 @@ public class DiaryService {
       DiaryEntry last = page.get(page.size() - 1);
       nextCursor = cursorCodec.encode(new DiaryCursor(last.getEntryDate(), last.getId()));
     }
-    return CursorPage.of(page.stream().map(DiaryService::toResponse).toList(), nextCursor, hasNext);
+    return CursorPage.of(page.stream().map(this::toListItemResponse).toList(), nextCursor, hasNext);
   }
 
   /** 수정 — 보낸 필드만 반영 (D10). */
@@ -116,7 +121,7 @@ public class DiaryService {
         request.conditionTag() != null ? request.conditionTag() : entry.getConditionTag(),
         entryDate);
 
-    return toResponse(entry);
+    return toDetailResponse(entry);
   }
 
   @Transactional
@@ -138,7 +143,12 @@ public class DiaryService {
         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
   }
 
-  private static DiaryResponse toResponse(DiaryEntry entry) {
+  /**
+   * 상세(생성·수정 응답) — {@code photos}를 채우고 {@code photoCount}는 비워 둔다(REQ-10-108이 뒤집힌 완료 기준). 검증 계약
+   * REQ-11-30.
+   */
+  private DiaryResponse toDetailResponse(DiaryEntry entry) {
+    List<PhotoSummary> photos = photoLookup.findByDiaryEntryId(entry.getId());
     return new DiaryResponse(
         entry.getId(),
         entry.getPetId(),
@@ -147,6 +157,27 @@ public class DiaryService {
         entry.getConditionTag(),
         entry.getEntryDate(),
         entry.getCreatedAt(),
-        entry.getUpdatedAt());
+        entry.getUpdatedAt(),
+        photos,
+        null);
+  }
+
+  /**
+   * 목록 항목 — {@code photoCount}만 채운다(REQ-10-109가 뒤집힌 완료 기준). 목록의 매 항목마다 전체 사진을 실으면 응답이 불필요하게 커져
+   * count만 쓴다(2026-09-09 결정, N+1 수용). 검증 계약 REQ-11-31.
+   */
+  private DiaryResponse toListItemResponse(DiaryEntry entry) {
+    int photoCount = photoLookup.countByDiaryEntryId(entry.getId());
+    return new DiaryResponse(
+        entry.getId(),
+        entry.getPetId(),
+        entry.getTitle(),
+        entry.getContent(),
+        entry.getConditionTag(),
+        entry.getEntryDate(),
+        entry.getCreatedAt(),
+        entry.getUpdatedAt(),
+        null,
+        photoCount);
   }
 }
