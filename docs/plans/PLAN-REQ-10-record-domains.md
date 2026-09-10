@@ -257,14 +257,18 @@ REQ-09 가 이 다섯 도메인이 **그대로 복제할 형태**를 확정해 �
 | REQ-10-105 | 〃 | `entry_date` 가 내일(미래) → 400 | 예외 | Phase 5 완료 기준 — "`entry_date` 미래 → 400" · 미결 질문(Phase 5) — "KST(`Asia/Seoul`) 자정" | 5 | ✅ |
 | REQ-10-106 | 〃 | `entry_date` 가 오늘 → 201 정상 저장 | 정상 | 〃 | 5 | ✅ |
 | REQ-10-107 | `DiaryService` | 응답에 `updated_at` 이 있다 | 불변식 | D11 — "diary 응답에는 `updated_at` 이 들어간다" | 5 | ✅ |
-| REQ-10-108 | 〃 | 상세 응답에 `photos` 가 없다 | 불변식 | D4 — "`photos` · `photo_count` 미포함" | 5 | ✅ |
-| REQ-10-109 | 목록 응답 | 목록 항목에 `photo_count` 가 없다 | 불변식 | 〃 | 5 | ✅ |
+| REQ-10-108 | 〃 | ~~상세 응답에 `photos` 가 없다~~ → **REQ-11 Phase 2 에서 뒤집힘**(상세 응답에 `photos` 배열이 있다) | 불변식 | D4 — "`photos` · `photo_count` 미포함" | 5 | ✅ |
+| REQ-10-109 | 목록 응답 | ~~목록 항목에 `photo_count` 가 없다~~ → **REQ-11 Phase 2 에서 뒤집힘**(목록 항목에 `photo_count` 가 있다) | 불변식 | 〃 | 5 | ✅ |
 | REQ-10-110 | `POST /diary` | `photo_ids` 를 보내도 무시되고 201 | 회귀 | D4 — "`photo_ids` 무시" | 5 | ✅ |
 | REQ-10-111 | `GET /diary` | `condition_tag` 필터가 걸린 목록도 keyset 이 유지된다(다음 페이지 조회에 `entry_date`·`id` 전달) | 회귀 | Phase 5 완료 기준 — "필터가 걸린 목록도 keyset 유지" | 5 | ✅ |
 | REQ-10-112 | 〃 | `condition_tag` 필터를 걸면 다른 태그 기록은 응답에 없다 | 정상 | 원본 Validation — "`condition_tag` (상태 태그 필터)" | 5 | ✅ |
 | REQ-10-113 | `POST /diary` | `condition_tag: "정상"` 요청이 `NORMAL` 로 파싱된다 | 정상 | 사용자 확정(2026-09-02) — "영문 상수 + `@JsonValue`/`@JsonCreator`" | 5 | ✅ |
 | REQ-10-114 | 응답 | `condition_tag` 가 한글로 직렬화된다(`NORMAL` → `"정상"`) | 정상 | 〃 | 5 | ✅ |
 
+> **REQ-10-108·109 뒤집힘 — 2026-09-09 (`/testgen REQ-11` Phase 2), 2026-09-10 통과 확인.** D4가 REQ-11로 이관해 둔 다이어리↔사진 연결이 실제로 구현되면서, 이 두 불변식(부재)이 반대로 뒤집혔다. `/testrun REQ-10`으로 재실행해 통과 확인(REQ-11 Phase 2와 같은 커밋 `d856cec`). 최신 케이스·근거는 [`PLAN-REQ-11` § 검증 계약 → Phase 2](PLAN-REQ-11-gallery-domain.md)를 볼 것. REQ-10-110(`photo_ids` 무시)은 그대로다.
+>
+> ⚠️ **REQ-10-15·38·49·74·100 재확인 필요 — 2026-09-10 발견.** 이번 `/testrun REQ-10`(REQ-11 Phase 2 검증 겸 전체 REQ-10 회귀 확인)에서 이 다섯 행("PATCH 요청 DTO에 `@NotNull`·`@NotBlank`가 없다", weight/activity/feeding/shed/diary 각 1건)에 해당하는 `[REQ-10-XX]` DisplayName 테스트가 코드에 없다는 게 드러났다. **동작 자체는 정상이다** — 다섯 DTO 파일을 직접 열어 확인한 결과 실제 애너테이션은 없고, 규약은 클래스 주석으로만 명시돼 있다(자동 회귀 가드는 없다는 뜻). 표의 `✅`는 2026-09-01~02 원래 `/testrun` 시점 기록을 그대로 둔 것 — 그때 어떻게 확인했는지는 이 세션에서 추적하지 않았다. REQ-11 작업과 무관해 지금 고치지 않았고, 다음에 이 다섯 도메인 중 하나를 건드릴 때 반영 검토.
+>
 > **2026-09-02 추가 — 94~114 (Phase 5, diary).** 착수 전 미결 4건(타임존·`limit`·거꾸리 경고·`ConditionTag` enum 설계)을 전부 대화로 확정한 뒤 썼다. `ConditionTag`는 이 프로젝트 첫 한글 값 enum이라 `Species`·`ActivityType`·`FoodSize`와 달리 전례가 없었다 — 영문 상수(`NORMAL`/`ACTIVE`/`FLOPPY_TAIL`/`VOMITING`) + `@JsonValue`/`@JsonCreator`로 정했다(AGENTS §5 "상수 UPPER_SNAKE_CASE"와 일관).
 > **결과 갱신: 2026-09-02 — 94~114 전부 `✅` (Phase 5, diary 완료).** `/implement`가 구현하고 `183f7e4`로 커밋·푸시(자체 실행 23/23 1차 통과). `/testrun REQ-10` 1차 실행에서 **REQ-10-107(응답에 `updated_at` 있음)이 표에는 있는데 코드가 없는 누락**으로 잡혔다 — `/testgen`이 `DiaryServiceTest`에 케이스를 추가하고(`/implement`가 `acf1299`로 커밋·푸시), 구현 자체는 이미 `entry.getUpdatedAt()`을 그대로 반환하고 있어 **소스 변경 없이** 통과했다. 재실행한 `/testrun REQ-10` — REQ-10 전체(weight·activity·feeding·shed·diary) **141 메서드 실행 · 실패 0** · 표 111행(01~114, Phase 0 프로브 3건 제외) ↔ 코드 111 ID 정확히 일치 · 근거 인용 표본 검사(REQ-10-104·105·107·113) 전건 원문 확인.
 

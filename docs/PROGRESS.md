@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-09 (**REQ-11 Phase 1(gallery CRUD) 완료 — 검증 계약 26건 전부 통과.** 자체 실행에서 3건 실패했으나 전부 테스트 결함으로 확인·수정)
+> 최종 갱신: 2026-09-10 (**REQ-11 전 Phase(0~2) 완료 — gallery 도메인 + diary↔사진 연결.** REQ-10-15·38·49·74·100 재확인 필요 발견 — 동작은 정상, 회귀 테스트 누락)
 
 ## 요구사항 인덱스
 
@@ -21,8 +21,8 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건) |
-| REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | — | 🟡 (Phase 0·1 완료 — gallery CRUD 4개 엔드포인트 · Phase 2 diary 통합 남음) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘, REQ-10-15·38·49·74·100 회귀 테스트 재확인 필요) |
+| REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
 | REQ-12 | timeline (다중 테이블 union — 앱 레벨 병합이 기본, QueryDSL은 병목 시 대안) | [api-list §10](specs/api-list.md) | — | ⏸ |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
@@ -34,6 +34,30 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-10
+
+> **REQ-11 전 Phase(0~2) 완료 — gallery 도메인 신설 + diary↔사진 연결까지 끝났다.** `/testgen`→`/implement`→`/testrun` 한 바퀴로 Phase 2를 마쳤고, 전체 스위트(REQ-10+REQ-11 168케이스, 프로젝트 전체 298케이스) 실패 0을 확인했다. REQ-11 착수(2026-09-08)부터 계산하면 워크플랜→3개 Phase까지 사흘 걸렸다.
+
+### `/testgen REQ-11` (Phase 2) — 계획서 완료 기준과 이미 확정한 결정이 충돌해 하나 더 물었다
+
+Phase 2 케이스를 뽑다가 계획서 완료 기준 문구("REQ-10-108/109/110 세 케이스를 뒤집는다")가 이미 승인된 결정("사진↔다이어리 연결은 사진 업로드 요청의 `diary_entry_id`에서만 한다")과 충돌하는 걸 발견했다 — `photo_ids`(REQ-10-110)를 진짜로 뒤집으려면 `DiaryCreateRequest`에 필드를 새로 만들어야 하는데, 그건 이미 기각한 안이다. 대화로 확정: **REQ-10-110은 그대로 무시 유지**, 실제로 뒤집는 건 108·109 둘뿐. Phase 0 때 겪었던 "완료 기준 문구가 Phase 경계보다 넓게 쓰였다"와 같은 종류의 실수가 계획서 안에서 또 나온 것 — 이번엔 결정 표와 완료 기준 사이의 불일치였다.
+
+**두 번째 질문 — `photo_count` 계산 방식.** `PhotoLookup` 포트(Phase 0)는 단일 ID 조회만 지원해서, 다이어리 목록의 매 항목마다 반복 호출(N+1)이 필요했다. 배치 메서드를 포트에 추가할지 물어 **N+1 그대로 수용**하기로 확정 — 페이지당 최대 50건이라 부담이 크지 않고, 나중에 실측에서 병목이 보이면 그때 배치로 바꾸기로 했다(REQ-10 D8/타임라인처럼 "지금은 단순하게, 필요해지면 최적화" 패턴 반복).
+
+**세 번째 결정 — ID 접두사 예외.** REQ-10-108·109는 이미 `DiaryControllerWebMvcTest.java`에 존재하는 테스트라, 새 REQ-11 ID를 붙이는 대신 **같은 ID를 유지한 채 단언만 뒤집기로** 했다(승인받음). 대신 `/testrun REQ-11`만으로는 이 두 건이 안 잡혀 `/testrun REQ-10`을 함께 돌려야 한다 — 계획서에 명시해 뒀다. `PLAN-REQ-10`의 원래 108·109 행도 취소선 + "REQ-11 Phase 2에서 뒤집힘" 각주로 고쳤다(원본을 틀린 채로 방치하지 않기 위함, 이 커맨드군의 원칙 그대로).
+
+### `/implement REQ-11 2` — PhotoLookup 구현체, DiaryResponse에 photos·photoCount 추가
+
+`PhotoService`가 `PhotoLookup`을 구현(`countByDiaryEntryId`·`findByDiaryEntryId`, `Photo` 엔티티 대신 `PhotoSummary`만 반환). `DiaryService`가 `PhotoLookup`을 주입받아 상세(생성·수정) 응답엔 `photos`를, 목록 항목엔 `photoCount`를 채우고 — 서로 반대쪽 필드는 비워 둔다(응답 하나가 두 얼굴을 갖는 형태, D4가 원래 그렇게 설계해 뒀던 것). 자체 실행 · 전체 스위트 298케이스 실패 0, 한 번에 커밋·푸시(`d856cec`).
+
+### `/testrun REQ-11 + REQ-10` — 168케이스 전부 통과, 부수적으로 REQ-10의 낡은 구멍 하나 발견
+
+REQ-11(31건) + REQ-10 전체(위 108·109 포함)를 함께 돌려 168케이스 전부 그린 확인. 계획서 표 ↔ 테스트 코드 ID 대조도 REQ-11 쪽은 정확히 일치.
+
+**⚠️ 발견 — REQ-10-15·38·49·74·100이 표에는 있는데 코드에 없다.** weight·activity·feeding·shed·diary 각 도메인의 "PATCH 요청 DTO에 `@NotNull`·`@NotBlank`가 없다"는 회귀 케이스 5건인데, 해당 `[REQ-10-XX]` DisplayName을 가진 테스트가 어디에도 없다. **동작 자체는 정상이다** — 다섯 DTO 파일을 직접 열어 실제 애너테이션이 없음을 재확인했다(주석으로만 규약이 적혀 있다). 표의 `✅`는 2026-09-01~02 원래 `/testrun` 시점 기록을 그대로 물려받은 것이라, 그때 어떻게 확인했는지는 이번 세션에서 추적하지 않았다. REQ-11 작업과 무관해 지금 고치지 않았다 — `PLAN-REQ-10`에 각주로 남기고, 다음에 이 다섯 도메인 중 하나를 건드릴 때 반영을 검토하기로 한다.
+
+**남은 것 (REQ-11)** — 없음. 미결 1건(presigned 응답 필드명)은 비차단으로 남아 있다(REQ-08·09 선례와 같은 성격). `feat/req11-phase0-photo-lookup-port` 브랜치는 PR #52에 Phase 0~2 커밋 전부 포함된 상태로 열려 있음 — 머지는 사람 판단.
 
 ## 2026-09-09
 
