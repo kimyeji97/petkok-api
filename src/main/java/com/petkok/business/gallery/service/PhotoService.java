@@ -14,6 +14,8 @@ import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.pagination.CursorCodec;
 import com.petkok.framework.pagination.CursorPage;
 import com.petkok.framework.pagination.CursorRequest;
+import com.petkok.framework.port.PhotoLookup;
+import com.petkok.framework.port.PhotoSummary;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,7 +49,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
  */
 @Slf4j
 @Service
-public class PhotoService {
+public class PhotoService implements PhotoLookup {
 
   private static final Set<String> ALLOWED_CONTENT_TYPES =
       Set.of("image/jpeg", "image/png", "image/webp");
@@ -168,6 +170,25 @@ public class PhotoService {
 
     photoRepository.delete(photo);
     log.info("Photo deleted. petId={}, photoId={}", petId, photoId);
+  }
+
+  /** {@link PhotoLookup} 구현(REQ-11 Phase 2). 검증 계약 REQ-11-27 · 28. */
+  @Override
+  public int countByDiaryEntryId(UUID diaryEntryId) {
+    return photoRepository.countByDiaryEntryId(diaryEntryId);
+  }
+
+  /** {@link PhotoLookup} 구현(REQ-11 Phase 2) — {@code Photo} 엔티티를 노출하지 않는다. 검증 계약 REQ-11-29. */
+  @Override
+  public List<PhotoSummary> findByDiaryEntryId(UUID diaryEntryId) {
+    return photoRepository.findByDiaryEntryId(diaryEntryId).stream()
+        .map(PhotoService::toSummary)
+        .toList();
+  }
+
+  private static PhotoSummary toSummary(Photo photo) {
+    return new PhotoSummary(
+        photo.getId(), photo.getImageUrl(), photo.getCaption(), photo.getTakenAt());
   }
 
   /** 사진 ↔ 펫 귀속 (REQ-10 D6 관례). 검증 계약 REQ-11-21. */

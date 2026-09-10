@@ -24,6 +24,8 @@ import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.pagination.CursorCodec;
 import com.petkok.framework.pagination.CursorPage;
 import com.petkok.framework.pagination.CursorRequest;
+import com.petkok.framework.port.PhotoLookup;
+import com.petkok.framework.port.PhotoSummary;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -45,8 +47,13 @@ import org.springframework.test.util.ReflectionTestUtils;
  * <p>⚠️ 이 파일은 {@code DiaryService} 등 Phase 5 대상 클래스가 아직 없어 컴파일되지 않는다. {@code /implement REQ-10 5} 가
  * 만든다.
  *
- * <p>가정한 계약 — {@code DiaryService(PetAccessGuard, DiaryEntryRepository, CursorCodec, Clock)}.
- * {@code list} 는 {@code ConditionTag} 필터(nullable)를 추가로 받아, 필터가 있으면 저장소의 필터 전용 쿼리 메서드를 쓴다.
+ * <p>가정한 계약 — {@code DiaryService(PetAccessGuard, DiaryEntryRepository, CursorCodec, Clock,
+ * PhotoLookup)}. {@code list} 는 {@code ConditionTag} 필터(nullable)를 추가로 받아, 필터가 있으면 저장소의 필터 전용 쿼리
+ * 메서드를 쓴다.
+ *
+ * <p>{@code PhotoLookup}은 REQ-11 Phase 2에서 추가된 포트다(REQ-11-30 · 31) — {@code create}가 반환하는 {@code
+ * photos}는 {@code findByDiaryEntryId}, {@code list} 항목의 {@code photoCount}는 {@code
+ * countByDiaryEntryId} 결과를 그대로 담는다.
  */
 class DiaryServiceTest {
 
@@ -67,7 +74,9 @@ class DiaryServiceTest {
   private final PetAccessGuard guard = mock(PetAccessGuard.class);
   private final DiaryEntryRepository repository = mock(DiaryEntryRepository.class);
   private final CursorCodec codec = new CursorCodec(new ObjectMapper().findAndRegisterModules());
-  private final DiaryService service = new DiaryService(guard, repository, codec, CLOCK);
+  private final PhotoLookup photoLookup = mock(PhotoLookup.class);
+  private final DiaryService service =
+      new DiaryService(guard, repository, codec, CLOCK, photoLookup);
 
   private static DiaryEntry entry(UUID id, LocalDate entryDate, ConditionTag tag) {
     DiaryEntry entry = DiaryEntry.of(PET_ID, null, null, tag, entryDate);
@@ -253,5 +262,38 @@ class DiaryServiceTest {
         service.list(OWNER, PET_ID, new CursorRequest(null, 20), ConditionTag.FLOPPY_TAIL);
 
     assertThat(page.items()).hasSize(1);
+  }
+
+  // ── 다이어리 ↔ 사진 연결 (REQ-11 Phase 2) ──────────────────────
+
+  @Test
+  @DisplayName("[REQ-11-30] 생성 응답의 photos 에 PhotoLookup 조회 결과가 그대로 담긴다")
+  void req_11_30_createResponseCarriesPhotosFromLookup() {
+    owned();
+    List<PhotoSummary> photos =
+        List.of(
+            new PhotoSummary(
+                UUID.fromString("aaaaaaaa-0000-0000-0000-000000000009"),
+                "https://img.petkok.com/photos/a.jpg",
+                null,
+                null));
+    when(photoLookup.findByDiaryEntryId(any())).thenReturn(photos);
+
+    DiaryResponse response = service.create(OWNER, PET_ID, create(TODAY));
+
+    assertThat(response.photos()).isEqualTo(photos);
+  }
+
+  @Test
+  @DisplayName("[REQ-11-31] 목록 항목의 photoCount 에 PhotoLookup 조회 결과가 담긴다")
+  void req_11_31_listItemCarriesPhotoCountFromLookup() {
+    owned();
+    when(repository.findFirstPage(eq(PET_ID), any()))
+        .thenReturn(List.of(entry(ENTRY_A, TODAY, null)));
+    when(photoLookup.countByDiaryEntryId(any())).thenReturn(3);
+
+    CursorPage<DiaryResponse> page = service.list(OWNER, PET_ID, new CursorRequest(null, 20), null);
+
+    assertThat(page.items().get(0).photoCount()).isEqualTo(3);
   }
 }

@@ -26,6 +26,7 @@ import com.petkok.framework.exception.ErrorCode;
 import com.petkok.framework.pagination.CursorCodec;
 import com.petkok.framework.pagination.CursorPage;
 import com.petkok.framework.pagination.CursorRequest;
+import com.petkok.framework.port.PhotoSummary;
 import java.net.URL;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -376,5 +377,38 @@ class PhotoServiceTest {
   @DisplayName("[REQ-11-26] Photo 는 소프트 딜리트 엔티티가 아니다")
   void req_11_26_entityHasNoSoftDelete() {
     assertThat(BaseSoftDeleteEntity.class.isAssignableFrom(Photo.class)).isFalse();
+  }
+
+  // ── PhotoLookup 구현 (Phase 2, diary 통합) ────────────────────────
+
+  @Test
+  @DisplayName("[REQ-11-27] 사진 3건이 연결된 다이어리 항목의 count 는 3이다")
+  void req_11_27_countReturnsAttachedPhotoCount() {
+    when(repository.countByDiaryEntryId(DIARY_ENTRY_ID)).thenReturn(3);
+
+    int count = service.countByDiaryEntryId(DIARY_ENTRY_ID);
+
+    assertThat(count).isEqualTo(3);
+  }
+
+  @Test
+  @DisplayName("[REQ-11-28] 연결된 사진이 없으면 count 는 0이다")
+  void req_11_28_countReturnsZeroWhenNoPhotosAttached() {
+    when(repository.countByDiaryEntryId(DIARY_ENTRY_ID)).thenReturn(0);
+
+    int count = service.countByDiaryEntryId(DIARY_ENTRY_ID);
+
+    assertThat(count).isZero();
+  }
+
+  @Test
+  @DisplayName("[REQ-11-29] 사진 목록을 PhotoSummary 로 반환한다 — Photo 엔티티를 노출하지 않는다")
+  void req_11_29_findReturnsPhotoSummaryNotEntity() {
+    when(repository.findByDiaryEntryId(DIARY_ENTRY_ID))
+        .thenReturn(List.of(photo(PHOTO_A, DIARY_ENTRY_ID, JUN_30)));
+
+    List<PhotoSummary> summaries = service.findByDiaryEntryId(DIARY_ENTRY_ID);
+
+    assertThat(summaries).containsExactly(new PhotoSummary(PHOTO_A, IMAGE_URL, null, null));
   }
 }

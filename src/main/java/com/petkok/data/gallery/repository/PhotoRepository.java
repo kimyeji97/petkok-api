@@ -21,6 +21,11 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
 
   Optional<Photo> findByIdAndPetId(UUID id, UUID petId);
 
+  /** {@code PhotoLookup} 포트 구현용(REQ-11 Phase 2) — 다이어리 상세·목록 응답을 채운다. */
+  int countByDiaryEntryId(UUID diaryEntryId);
+
+  List<Photo> findByDiaryEntryId(UUID diaryEntryId);
+
   /** 첫 페이지. {@code Pageable} 은 크기만 쓴다(정렬은 쿼리에 고정). */
   @Query("select p from Photo p where p.petId = :petId order by p.createdAt desc, p.id desc")
   List<Photo> findFirstPage(@Param("petId") UUID petId, Pageable pageable);
