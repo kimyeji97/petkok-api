@@ -41,30 +41,30 @@ public class WeightLog extends BaseCreatedEntity {
   @Column(name = "weight_g", nullable = false)
   private Integer weightG;
 
-  @Column(name = "measured_at", nullable = false)
-  private LocalDate measuredAt;
+  @Column(name = "measured_date", nullable = false)
+  private LocalDate measuredDate;
 
   @Column(name = "memo", length = 500)
   private String memo;
 
-  private WeightLog(UUID petId, Integer weightG, LocalDate measuredAt, String memo) {
+  private WeightLog(UUID petId, Integer weightG, LocalDate measuredDate, String memo) {
     this.petId = petId;
     this.weightG = weightG;
-    this.measuredAt = measuredAt;
+    this.measuredDate = measuredDate;
     this.memo = memo;
   }
 
-  public static WeightLog of(UUID petId, Integer weightG, LocalDate measuredAt, String memo) {
-    return new WeightLog(petId, weightG, measuredAt, memo);
+  public static WeightLog of(UUID petId, Integer weightG, LocalDate measuredDate, String memo) {
+    return new WeightLog(petId, weightG, measuredDate, memo);
   }
 
   /**
    * 수정. <b>받은 값을 그대로 쓴다</b> — {@code null} 에 "변경 없음" 의미를 두지 않는다 (AGENTS §5). 부분 반영 병합은 {@code
    * WeightService} 가 한다.
    */
-  public void update(Integer weightG, LocalDate measuredAt, String memo) {
+  public void update(Integer weightG, LocalDate measuredDate, String memo) {
     this.weightG = weightG;
-    this.measuredAt = measuredAt;
+    this.measuredDate = measuredDate;
     this.memo = memo;
   }
 }

@@ -118,7 +118,7 @@ public class PhotoService implements PhotoLookup {
                 request.diaryEntryId(),
                 request.imageUrl(),
                 request.caption(),
-                request.takenAt()));
+                request.takenDate()));
     return toResponse(saved);
   }
 
@@ -188,7 +188,7 @@ public class PhotoService implements PhotoLookup {
 
   private static PhotoSummary toSummary(Photo photo) {
     return new PhotoSummary(
-        photo.getId(), photo.getImageUrl(), photo.getCaption(), photo.getTakenAt());
+        photo.getId(), photo.getImageUrl(), photo.getCaption(), photo.getTakenDate());
   }
 
   /** 사진 ↔ 펫 귀속 (REQ-10 D6 관례). 검증 계약 REQ-11-21. */
@@ -210,7 +210,7 @@ public class PhotoService implements PhotoLookup {
         photo.getDiaryEntryId(),
         photo.getImageUrl(),
         photo.getCaption(),
-        photo.getTakenAt(),
+        photo.getTakenDate(),
         photo.getCreatedAt());
   }
 }

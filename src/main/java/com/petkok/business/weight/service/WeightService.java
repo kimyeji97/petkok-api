@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li><b>기록 ↔ 펫 귀속 = {@code findByIdAndPetId}</b> (D6). 없으면 {@code RESOURCE_NOT_FOUND}(404) — 남의
  *       기록이 존재한다는 정보를 흘리지 않는다
  *   <li><b>목록 = keyset 커서</b> (D8). {@code limit + 1} 건을 읽어 {@code has_next} 를 판정하고, 커서는 마지막 항목의
- *       {@code (measured_at, id)}
+ *       {@code (measured_date, id)}
  *   <li><b>삭제 = 행 삭제</b> (D7)
  * </ul>
  */
@@ -62,7 +62,7 @@ public class WeightService {
     OwnedPetResponse pet = petAccessGuard.getOwnedPet(petId, userId);
     WeightLog saved =
         weightLogRepository.save(
-            WeightLog.of(pet.id(), request.weightG(), request.measuredAt(), request.memo()));
+            WeightLog.of(pet.id(), request.weightG(), request.measuredDate(), request.memo()));
     return toResponse(saved, findPrevious(saved));
   }
 
@@ -82,7 +82,7 @@ public class WeightService {
     if (request.hasCursor()) {
       WeightCursor cursor = cursorCodec.decode(request.cursor(), WeightCursor.class);
       rows =
-          weightLogRepository.findPageAfter(pet.id(), cursor.measuredAt(), cursor.id(), pageable);
+          weightLogRepository.findPageAfter(pet.id(), cursor.measuredDate(), cursor.id(), pageable);
     } else {
       rows = weightLogRepository.findFirstPage(pet.id(), pageable);
     }
@@ -105,7 +105,7 @@ public class WeightService {
     String nextCursor = null;
     if (hasNext) {
       WeightLog last = page.get(page.size() - 1);
-      nextCursor = cursorCodec.encode(new WeightCursor(last.getMeasuredAt(), last.getId()));
+      nextCursor = cursorCodec.encode(new WeightCursor(last.getMeasuredDate(), last.getId()));
     }
     return CursorPage.of(items, nextCursor, hasNext);
   }
@@ -121,7 +121,7 @@ public class WeightService {
 
     entry.update(
         request.weightG() != null ? request.weightG() : entry.getWeightG(),
-        request.measuredAt() != null ? request.measuredAt() : entry.getMeasuredAt(),
+        request.measuredDate() != null ? request.measuredDate() : entry.getMeasuredDate(),
         request.memo() != null ? request.memo() : entry.getMemo());
 
     return toResponse(entry, findPrevious(entry));
@@ -143,11 +143,11 @@ public class WeightService {
         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
   }
 
-  /** 직전 기록 = {@code (measured_at, id)} 정렬에서 바로 다음 1건 (D3). 없으면 {@code null}. */
+  /** 직전 기록 = {@code (measured_date, id)} 정렬에서 바로 다음 1건 (D3). 없으면 {@code null}. */
   private WeightLog findPrevious(WeightLog entry) {
     List<WeightLog> previous =
         weightLogRepository.findPageAfter(
-            entry.getPetId(), entry.getMeasuredAt(), entry.getId(), ONE);
+            entry.getPetId(), entry.getMeasuredDate(), entry.getId(), ONE);
     return previous.isEmpty() ? null : previous.get(0);
   }
 
@@ -164,7 +164,7 @@ public class WeightService {
         entry.getId(),
         entry.getPetId(),
         entry.getWeightG(),
-        entry.getMeasuredAt(),
+        entry.getMeasuredDate(),
         entry.getMemo(),
         changeRate,
         warning,

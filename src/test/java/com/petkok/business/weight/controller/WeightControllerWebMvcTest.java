@@ -77,7 +77,7 @@ class WeightControllerWebMvcTest {
             MockMvcRequestBuilders.post(BASE)
                 .with(asUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"weight_g\":62,\"measured_at\":\"2026-06-30\"}"))
+                .content("{\"weight_g\":62,\"measured_date\":\"2026-06-30\"}"))
         .andExpect(status().isCreated());
   }
 
@@ -130,7 +130,7 @@ class WeightControllerWebMvcTest {
             MockMvcRequestBuilders.post(BASE)
                 .with(asUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"weight_g\":0,\"measured_at\":\"2026-06-30\"}"))
+                .content("{\"weight_g\":0,\"measured_date\":\"2026-06-30\"}"))
         .andExpect(status().isBadRequest());
   }
 
@@ -142,13 +142,13 @@ class WeightControllerWebMvcTest {
             MockMvcRequestBuilders.post(BASE)
                 .with(asUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"measured_at\":\"2026-06-30\"}"))
+                .content("{\"measured_date\":\"2026-06-30\"}"))
         .andExpect(status().isBadRequest());
   }
 
   @Test
-  @DisplayName("[REQ-10-14] measured_at 이 없으면 400 이다")
-  void req_10_14_missingMeasuredAtIsRejected() throws Exception {
+  @DisplayName("[REQ-10-14] measured_date 이 없으면 400 이다")
+  void req_10_14_missingMeasuredDateIsRejected() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post(BASE)

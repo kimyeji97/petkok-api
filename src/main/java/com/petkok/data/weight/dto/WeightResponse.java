@@ -18,7 +18,7 @@ public record WeightResponse(
     UUID id,
     UUID petId,
     Integer weightG,
-    LocalDate measuredAt,
+    LocalDate measuredDate,
     String memo,
     Double weightChangeRate,
     boolean isWeightWarning,
