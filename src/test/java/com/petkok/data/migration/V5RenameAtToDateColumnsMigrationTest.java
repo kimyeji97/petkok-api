@@ -49,10 +49,13 @@ class V5RenameAtToDateColumnsMigrationTest {
   @DisplayName(
       "[REQ-17-02] idx_weight_pet_measured_at 인덱스를 idx_weight_pet_measured_date 로 rename한다")
   void req_17_02_renamesWeightIndex() throws IOException {
+    // Postgres 의 인덱스 리네임 문법은 `ALTER INDEX <이름> RENAME TO <새 이름>` 이다 — `RENAME INDEX` 는
+    // 없는 문법이다(MySQL 과 혼동하기 쉽다). 기존 정규식이 이 순서를 잘못 가정해 REQ-17-02 를 실패시켰다
+    // (테스트 결함, /testrun 수정 — PLAN-REQ-17 §검증 계약).
     assertThat(flatSql())
         .as("컬럼만 바꾸고 인덱스명을 그대로 두면 인덱스명과 컬럼명이 어긋난 채 남는다 (PLAN-REQ-17 §제약·함정)")
         .containsPattern(
             Pattern.compile(
-                "rename\\s+index\\s+idx_weight_pet_measured_at\\s+to\\s+idx_weight_pet_measured_date"));
+                "alter\\s+index\\s+idx_weight_pet_measured_at\\s+rename\\s+to\\s+idx_weight_pet_measured_date"));
   }
 }
