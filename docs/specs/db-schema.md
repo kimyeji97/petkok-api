@@ -28,7 +28,7 @@
 | `created_at` / `updated_at` | JPA Auditing (`@CreatedDate` / `@LastModifiedDate`) — **DB 트리거 없음** |
 | FK | 명시적 `REFERENCES`, `ON DELETE`/`ON UPDATE` 미지정 |
 | 시각 컬럼 타입 (순간) | `timestamptz` — 저장 = 순간 · 노출 = `+09:00` · 계산 = `Asia/Seoul` (REQ-16, ADR-0002). `created_at`·`updated_at`·`deleted_at`·`fed_at`·`logged_at`·`expires_at`·`revoked_at` 19곳 |
-| 날짜만 있는 컬럼 | `date` 유지 — 타임존 개념 없음. `entry_date`·`shed_date`·`measured_at`·`birthday`·`adoption_date`·`taken_at` 6개 |
+| 날짜만 있는 컬럼 | `date` 유지 — 타임존 개념 없음. `entry_date`·`shed_date`·`measured_date`·`birthday`·`adoption_date`·`taken_date` 6개 |
 
 ## 테이블 목록
 
@@ -168,11 +168,11 @@
 | `id` | uuid | NOT NULL | `gen_random_uuid()` | PK |
 | `pet_id` | uuid | NOT NULL | — | FK → `pets.id` |
 | `weight_g` | int | NOT NULL | — | **그램 단위 통일** (게코 수십g ~ 대형견 수십kg) |
-| `measured_at` | date | NOT NULL | — | |
+| `measured_date` | date | NOT NULL | — | |
 | `memo` | varchar(500) | NULL | — | |
 | `created_at` | timestamptz | NOT NULL | `now()` | |
 
-- 인덱스 `idx_weight_pet_measured_at` (`pet_id, measured_at DESC`)
+- 인덱스 `idx_weight_pet_measured_date` (`pet_id, measured_date DESC`)
 
 ## 8. shed_records (🦎 게코 전용)
 
@@ -199,7 +199,7 @@
 | `diary_entry_id` | uuid | NULL | — | FK → `diary_entries.id`. NULL = 단독 갤러리 |
 | `image_url` | varchar(1000) | NOT NULL | — | Cloudflare R2 Custom Domain URL |
 | `caption` | varchar(500) | NULL | — | |
-| `taken_at` | date | NULL | — | |
+| `taken_date` | date | NULL | — | |
 | `created_at` | timestamptz | NOT NULL | `now()` | |
 
 | 인덱스 | 컬럼 | 조건 |

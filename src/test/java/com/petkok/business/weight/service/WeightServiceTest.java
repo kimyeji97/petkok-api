@@ -162,7 +162,7 @@ class WeightServiceTest {
   }
 
   @Test
-  @DisplayName("[REQ-10-10] 다음 페이지 조회는 measured_at 과 id 를 둘 다 저장소에 넘긴다")
+  @DisplayName("[REQ-10-10] 다음 페이지 조회는 measured_date 과 id 를 둘 다 저장소에 넘긴다")
   void req_10_10_nextPagePassesBothKeysToRepository() {
     ownedByMe();
     String cursor = codec.encode(new WeightCursor(JUN_30, LOG_B));
@@ -212,15 +212,15 @@ class WeightServiceTest {
   }
 
   @Test
-  @DisplayName("[REQ-10-16] memo 만 보내면 measured_at 도 유지된다")
-  void req_10_16_memoOnlyPatchKeepsMeasuredAt() {
+  @DisplayName("[REQ-10-16] memo 만 보내면 measured_date 도 유지된다")
+  void req_10_16_memoOnlyPatchKeepsMeasuredDate() {
     ownedByMe();
     WeightLog log = log(LOG_A, 50, JUN_30);
     when(repository.findByIdAndPetId(LOG_A, PET_ID)).thenReturn(Optional.of(log));
 
     service.update(OWNER, PET_ID, LOG_A, new WeightUpdateRequest(null, null, "아침"));
 
-    assertThat(log.getMeasuredAt()).isEqualTo(JUN_30);
+    assertThat(log.getMeasuredDate()).isEqualTo(JUN_30);
   }
 
   // ── 하드 삭제 (D7) ──────────────────────────────────────────

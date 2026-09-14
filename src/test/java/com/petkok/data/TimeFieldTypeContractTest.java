@@ -1,12 +1,14 @@
 package com.petkok.data;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.petkok.data.activity.entity.ActivityLog;
 import com.petkok.data.auth.entity.RefreshToken;
 import com.petkok.data.common.entity.BaseCreatedEntity;
 import com.petkok.data.common.entity.BaseSoftDeleteEntity;
 import com.petkok.data.common.entity.BaseTimeEntity;
+import com.petkok.data.gallery.entity.Photo;
 import com.petkok.data.pet.entity.Pet;
 import com.petkok.data.weight.entity.WeightLog;
 import java.lang.reflect.Field;
@@ -18,9 +20,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 엔티티 시각·날짜 필드의 타입 계약. 검증 계약 REQ-16-06 · 07 (PLAN-REQ-16 § 검증 계약).
+ * 엔티티 시각·날짜 필드의 타입 계약. 검증 계약 REQ-16-06 · 07 (PLAN-REQ-16 § 검증 계약) · REQ-17-03 · 04 (PLAN-REQ-17 §
+ * 검증 계약).
  *
  * <p><b>REQ-16-06 은 Phase 1 전까지 실패한다.</b> 여섯 필드가 아직 {@code LocalDateTime} 이다.
+ *
+ * <p><b>REQ-16-07 · REQ-17-03 · 04 는 REQ-17 Phase 2 전까지 실패한다.</b> {@code DATE_FIELDS} 가 아직 존재하지 않는
+ * {@code measuredDate}·{@code takenDate} 를 가리키고, 아직 남아 있는 구 이름 {@code measuredAt}·{@code takenAt} 은
+ * REQ-17-03·04 가 "없어야 한다"고 기대하기 때문이다.
  *
  * <p>06 이 <b>"{@code OffsetDateTime} 이다"가 아니라 "{@code LocalDateTime} 이 아니다"를 단언하는 이유</b> — 계획서
  * 범위—포함이 타입을 {@code D2 가 정하는 타입} 으로 열어 둔 채 케이스를 먼저 고정했기 때문이다. 여기서 잡아야 하는 사고는 <b>빠뜨린 필드</b>이고, 그건 고른
@@ -57,15 +64,20 @@ class TimeFieldTypeContractTest {
           new Target(ActivityLog.class, "loggedAt"));
 
   /**
-   * 계획서 범위—제외의 날짜 컬럼 5개 중 <b>엔티티가 존재하는 3개.</b>
+   * 계획서 범위—제외의 날짜 컬럼 6개 중 <b>엔티티가 존재하는 4개.</b>
    *
    * <p>{@code entryDate}(diary) · {@code shedDate}(shed) 는 도메인 자체가 아직 없다 — REQ-10 Phase 3~5 다. 없는
-   * 클래스를 참조하면 테스트 소스 전체가 컴파일되지 않으므로 여기서 빼고, 그 도메인이 들어올 때 이 목록에 추가한다. <b>지금 이 케이스는 5개가 아니라 3개를
+   * 클래스를 참조하면 테스트 소스 전체가 컴파일되지 않으므로 여기서 빼고, 그 도메인이 들어올 때 이 목록에 추가한다. <b>지금 이 케이스는 6개가 아니라 4개를
    * 덮는다.</b>
+   *
+   * <p>⚠️ {@code WeightLog} 필드명은 REQ-17 로 {@code measuredAt} → {@code measuredDate} 로 바뀐다(리네임 자체는
+   * 여전히 {@code LocalDate} 다). {@code Photo.takenDate} 는 REQ-11 이 {@code Photo} 엔티티를 들여왔을 때 이 목록에
+   * 추가됐어야 했는데 빠져 있던 것을 REQ-17 에서 함께 채운다.
    */
   private static final List<Target> DATE_FIELDS =
       List.of(
-          new Target(WeightLog.class, "measuredAt"),
+          new Target(WeightLog.class, "measuredDate"),
+          new Target(Photo.class, "takenDate"),
           new Target(Pet.class, "birthday"),
           new Target(Pet.class, "adoptionDate"));
 
@@ -93,5 +105,21 @@ class TimeFieldTypeContractTest {
     assertThat(DATE_FIELDS)
         .as("날짜만 있는 값에는 타임존 개념이 없다. 바꾸면 커서 정렬(REQ-10 D8)과 파생 필드 정의가 흔들린다")
         .allMatch(t -> t.type() == LocalDate.class);
+  }
+
+  @Test
+  @DisplayName("[REQ-17-03] WeightLog 의 구 필드명 measuredAt 이 더 이상 존재하지 않는다")
+  void req_17_03_weightLogOldFieldNameRemoved() {
+    assertThatThrownBy(() -> WeightLog.class.getDeclaredField("measuredAt"))
+        .as("PLAN-REQ-17 §범위—포함 — 엔티티 필드명이 measuredDate 로 리네임됐다면 구 이름은 남아 있으면 안 된다")
+        .isInstanceOf(NoSuchFieldException.class);
+  }
+
+  @Test
+  @DisplayName("[REQ-17-04] Photo 의 구 필드명 takenAt 이 더 이상 존재하지 않는다")
+  void req_17_04_photoOldFieldNameRemoved() {
+    assertThatThrownBy(() -> Photo.class.getDeclaredField("takenAt"))
+        .as("PLAN-REQ-17 §범위—포함 — 엔티티 필드명이 takenDate 로 리네임됐다면 구 이름은 남아 있으면 안 된다")
+        .isInstanceOf(NoSuchFieldException.class);
   }
 }

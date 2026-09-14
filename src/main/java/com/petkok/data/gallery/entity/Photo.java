@@ -47,19 +47,20 @@ public class Photo extends BaseCreatedEntity {
   @Column(name = "caption", length = 500)
   private String caption;
 
-  @Column(name = "taken_at")
-  private LocalDate takenAt;
+  @Column(name = "taken_date")
+  private LocalDate takenDate;
 
-  private Photo(UUID petId, UUID diaryEntryId, String imageUrl, String caption, LocalDate takenAt) {
+  private Photo(
+      UUID petId, UUID diaryEntryId, String imageUrl, String caption, LocalDate takenDate) {
     this.petId = petId;
     this.diaryEntryId = diaryEntryId;
     this.imageUrl = imageUrl;
     this.caption = caption;
-    this.takenAt = takenAt;
+    this.takenDate = takenDate;
   }
 
   public static Photo of(
-      UUID petId, UUID diaryEntryId, String imageUrl, String caption, LocalDate takenAt) {
-    return new Photo(petId, diaryEntryId, imageUrl, caption, takenAt);
+      UUID petId, UUID diaryEntryId, String imageUrl, String caption, LocalDate takenDate) {
+    return new Photo(petId, diaryEntryId, imageUrl, caption, takenDate);
   }
 }

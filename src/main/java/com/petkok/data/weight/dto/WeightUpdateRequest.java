@@ -11,4 +11,4 @@ import java.time.LocalDate;
  * {@code @Positive}·{@code @Size} 는 {@code null} 을 통과시킨다. 검증 계약 REQ-10-15.
  */
 public record WeightUpdateRequest(
-    @Positive Integer weightG, LocalDate measuredAt, @Size(max = 500) String memo) {}
+    @Positive Integer weightG, LocalDate measuredDate, @Size(max = 500) String memo) {}

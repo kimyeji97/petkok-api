@@ -102,7 +102,7 @@ class PhotoControllerWebMvcTest {
   }
 
   @Test
-  @DisplayName("[REQ-11-06] caption·taken_at·diary_entry_id 없이도 201 이다")
+  @DisplayName("[REQ-11-06] caption·taken_date·diary_entry_id 없이도 201 이다")
   void req_11_06_optionalFieldsOmittedStillCreates() throws Exception {
     when(photoService.create(any(), any(), any())).thenReturn(sample());
 

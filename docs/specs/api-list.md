@@ -121,7 +121,7 @@
 
 | Method | Path | 설명 |
 | --- | --- | --- |
-| GET | `/weight` | 목록 (커서, `measured_at` desc · `id` desc) |
+| GET | `/weight` | 목록 (커서, `measured_date` desc · `id` desc) |
 | POST | `/weight` | 기록 |
 | PATCH | `/weight/{log_id}` | 수정 |
 | DELETE | `/weight/{log_id}` | 삭제 |
@@ -129,7 +129,7 @@
 단위는 그램(g)으로 통일한다 (게코 수십g ~ 대형견 수십kg).
 
 > 이전 판에 있던 `GET /weights/chart`(기간별 추이)는 Notion API I/F에 없어 제거했다.
-> **파생 필드 (2026-08-28, Notion 「체중 목록」 행 확정)** — 목록 항목·201 응답에 `weight_change_rate`(직전 대비 %, 소수 1자리, 첫 기록 `null`) · `is_weight_warning`(`|변화율| >= 20`, 첫 기록 `false`). 직전 = `measured_at` desc, `id` desc 정렬의 바로 다음 1건. 저장하지 않고 조회 시 계산.
+> **파생 필드 (2026-08-28, Notion 「체중 목록」 행 확정)** — 목록 항목·201 응답에 `weight_change_rate`(직전 대비 %, 소수 1자리, 첫 기록 `null`) · `is_weight_warning`(`|변화율| >= 20`, 첫 기록 `false`). 직전 = `measured_date` desc, `id` desc 정렬의 바로 다음 1건. 저장하지 않고 조회 시 계산.
 
 ## 8. Shed `/api/v1/pets/{pet_id}/shed` 🦎
 
@@ -164,18 +164,43 @@ R2 2단계 업로드다 — presigned URL로 클라이언트가 직접 올린 �
 
 ## 10. Timeline `/api/v1/pets/{pet_id}/timeline`
 
+> ⚠️ **2026-09-11 Notion API I/F 원본(「통합 타임라인」 행) 재대조로 이 절 전체를 다시 썼다.** 이전 판은 "커서 기반 통합 시간순 목록"으로 적고 있었는데, 실제 원본은 **월 단위 캘린더 집계**다 — 커서 페이지네이션이 아예 없다. 아래는 원본을 그대로 옮긴 것이다.
+
 | Method | Path | 설명 |
 | --- | --- | --- |
-| GET | `/timeline` | 일기·급여·활동·체중·탈피 통합 시간순 (커서) |
+| GET | `/timeline` | 월간 캘린더 + 이벤트 집계 (급여·활동·체중·탈피·일지, `pet_id` + 날짜) |
 
-자체 테이블·엔티티·리포지토리가 없는 **read 전용 모델**이다. 각 도메인 리포지토리의 기간 조회를 조합한다.
+자체 테이블·엔티티·리포지토리가 없는 **read 전용 집계 뷰**다. "다이어리 화면의 월간 캘린더가 사용"한다(원본 콜아웃 그대로). 각 도메인 리포지토리의 기간 조회를 조합한다 — 방식은 여전히 **옵션 A(앱 레벨 병합)가 기본, 옵션 B(`UNION ALL`)는 병목 시 대안**이다(소스 구조 §9, 이 결정 자체는 이전 판이 맞았다).
 
-- **옵션 A (Notion 추천): 앱 레벨 병합** — 각 리포지토리 조회 후 Service에서 날짜순 merge/정렬. 도메인 경계 유지, 타입 안전
-- 옵션 B: 네이티브 `UNION ALL` — 성능은 낫지만 매핑 복잡도가 오른다. 무한스크롤 대량 조회에서 병목이 확인되면 도입
+**쿼리 파라미터** (원본 그대로 — `cursor`·`limit` 없음):
+- `year_month` — 조회 월, 예 `2026-06`
+- `type` — `all | feeding | activity | weight | shed | diary` (기본 `all`). **`gallery`/`photos`는 없다** — REQ-11 갤러리는 이 집계에 포함되지 않는다
 
-> 이전 판은 "QueryDSL 활성화 시점이 이 API"라고 적었으나, Notion은 옵션 A를 추천하고 옵션 B를 병목 시 대안으로 둔다. **QueryDSL 도입은 옵션 B를 택할 때의 이야기다.**
+**응답 `200`** (원본 예시 그대로):
 
-**캘린더 도트**(월 단위, 날짜별 status 요약 + 최대 3 dot + `+N`)는 Notion 소스 구조 §9에 설계만 있고 **API I/F에 엔드포인트가 정의되지 않았다.** 구현 전 Notion에 추가가 필요하다.
+```json
+{
+  "data": {
+    "days": [
+      {
+        "date": "2026-06-30",
+        "markers": ["diary", "feeding", "activity", "weight"],
+        "events": [
+          { "type": "diary", "ref_id": "uuid", "occurred_at": "2026-06-30T09:12:00+09:00", "summary": "오늘의 두부", "condition_tag": "활발" },
+          { "type": "feeding", "ref_id": "uuid", "occurred_at": "2026-06-30T18:00:00+09:00", "summary": "귀뚜라미(M) 5마리", "is_refused": false },
+          { "type": "weight", "ref_id": "uuid", "occurred_at": "2026-06-30T21:00:00+09:00", "summary": "62g" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- `markers` — 캘린더 셀 색 점 렌더용(그날 존재하는 기록 유형). **이전 판이 "API I/F에 정의 안 됨·Notion에 추가 필요"라고 적었던 "캘린더 도트"가 바로 이 필드다** — 별도 미정의 기능이 아니라 이 엔드포인트 응답의 일부였다
+- `events` — 선택일 상세 타임라인용(시간순 정렬)
+- 거식·탈피 상태는 feeding·shed 원본에서 파생되어 이벤트로 표기
+- ⚠️ **원본이 스스로 미확정으로 남겨 둔 것** — "펫 필터 `전체`(모든 펫 통합, 다이어리·갤러리)는 user 스코프 집계 필요 — 엔드포인트 스코프 미확정." 이 문서가 아니라 Notion 원본 자체의 미결이다
+- ⚠️ **이 문서에 없는 것 — `occurred_at`의 시각 출처.** `diary_entries.entry_date`·`weight_logs.measured_date`·`shed_records.shed_date`는 DB에 **날짜만** 있고 시각이 없다(예시의 `09:12:00`은 실제로 저장되지 않는 값). feeding·activity만 `timestamptz`(`fed_at`·`logged_at`)라 실제 시각이 있다. 날짜만 있는 세 도메인의 `occurred_at`을 무엇으로 채울지는 원본에도 없다 — 구현 시 확정 필요(`PLAN-REQ-12` 미결 참고)
 
 ---
 

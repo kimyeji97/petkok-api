@@ -11,5 +11,5 @@ public record PhotoResponse(
     UUID diaryEntryId,
     String imageUrl,
     String caption,
-    LocalDate takenAt,
+    LocalDate takenDate,
     OffsetDateTime createdAt) {}

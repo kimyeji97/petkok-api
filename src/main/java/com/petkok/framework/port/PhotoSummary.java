@@ -10,4 +10,4 @@ import java.util.UUID;
  * <p>{@code dto} 패키지가 아니라 {@link PhotoLookup} 과 같은 위치에 둔 것도 의도적이다 — {@code ..dto..} 에 두면 {@code
  * DTO_NAMING} 규칙({@code Request}/{@code Response} 로 끝나야 함)에 걸린다.
  */
-public record PhotoSummary(UUID id, String imageUrl, String caption, LocalDate takenAt) {}
+public record PhotoSummary(UUID id, String imageUrl, String caption, LocalDate takenDate) {}
