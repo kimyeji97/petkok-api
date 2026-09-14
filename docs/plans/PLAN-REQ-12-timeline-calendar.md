@@ -1,6 +1,6 @@
 # PLAN-REQ-12 · timeline (월간 캘린더 + 이벤트 집계)
 
-> 출처: 2026-09-10~11 세션(`/workplan req-12`, Notion API I/F 원본 재대조) · 작성: 2026-09-11 · 상태: 📝 초안(미결 전부 확정 · 착수 전제였던 REQ-17 `main` 병합이 2026-09-14 완료(PR #53) — Phase 1 착수 가능)
+> 출처: 2026-09-10~11 세션(`/workplan req-12`, Notion API I/F 원본 재대조) · 작성: 2026-09-11 · 상태: 🟡 진행 (미결 전부 확정 · 착수 전제였던 REQ-17 `main` 병합 완료 · `/testgen` Phase 1 검증 계약 33건 작성 완료, 구현 전)
 
 ## 배경
 
@@ -50,6 +50,7 @@ REQ-12는 개발 순서상 마지막 도메인(auth → user → pet → 기록 
 - [x] **`events[]` 항목의 타입별 부가 필드 스키마 — 확정(2026-09-11).** 도메인별 선택 필드 허용(근거는 `## 결정` 표)
 - [x] **`summary` 텍스트 생성 규칙 — 확정(2026-09-11).** 도메인별 조합 규칙(근거는 `## 결정` 표)
 - [x] **`type` 필터가 걸렸을 때 `markers`도 필터링되는지 — 확정(2026-09-11).** markers도 type으로 필터링(근거는 `## 결정` 표)
+- [ ] **feeding summary의 "필드 누락 시 정확한 생략 형태" — 미확정(2026-09-14, `/testgen` 발견).** 원본 예시(`"귀뚜라미(M) 5마리"`)는 전 필드가 있는 경우뿐이라 `foodSize`·`amount`·`amountUnit` 중 일부가 없을 때 `()`·공백을 정확히 어떻게 생략하는지 근거가 없다. `/testgen`은 전 필드 케이스(REQ-12-13)만 쓰고 부분 누락 조합은 테스트하지 않았다 — 구현 시 확정 필요, 확정되면 검증 계약에 케이스 추가
 
 ## 작업 단계
 
@@ -58,9 +59,51 @@ REQ-12는 개발 순서상 마지막 도메인(auth → user → pet → 기록 
       > ⚠️ **착수 전제 — 미결 5건 전부 확정(2026-09-11)됐지만, 착수는 REQ-17 Phase 2(컬럼 리네임 `measured_date`·`taken_date`)가 `main`에 들어온 뒤로 미룬다.** 지금 `measured_at` 기준으로 짜면 곧 다시 고쳐야 한다 — 위 occurred_at 행의 구현 시 주의 참고.
       > ✅ **전제 충족(2026-09-14) — PR #53 머지로 `main`에 새 컬럼명이 들어왔다. Phase 1 착수 가능.**
 
+## 검증 계약
+
+> 작성: 2026-09-14 · 스펙: `docs/specs/api-list.md` §10 · 이 계획서(별도 스펙 문서 없음) · 검증: `/testrun REQ-12`
+
+| ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
+|----|------|--------|:--:|------|:--:|:--:|
+| REQ-12-01 | `TimelineMerger` | 여러 도메인 기록이 같은 날 있으면 markers 에 그 타입이 모두 모인다 / 다른 날짜 기록은 서로 다른 day 로 분리된다 | 정상 | api-list.md §10 예시 — `"markers": ["diary","feeding","activity","weight"]` | 1 | — |
+| REQ-12-02 | `TimelineMerger` | `type=weight` 면 `events` 엔 weight 만 남는다 | 정상 | PLAN §작업 단계 Phase 1 완료 기준 — "`type` 필터 시 해당 도메인만 `events`에 포함" | 1 | — |
+| REQ-12-03 | `TimelineMerger` | `type=weight` 면 `markers` 도 weight 만 남는다 | 정상 | PLAN §결정 — "markers도 type으로 필터링(확정)" | 1 | — |
+| REQ-12-04 | `TimelineMerger` | 하루 안 `events` 는 `occurred_at` 시간순 정렬 | 정상 | api-list.md §10 — "events — 선택일 상세 타임라인용(시간순 정렬)" | 1 | — |
+| REQ-12-05 | `TimelineMerger` | diary `occurred_at` 은 KST 자정 고정 | 정상 | PLAN §결정 — "diary·weight·shed ... KST 자정(00:00:00+09:00)으로 고정" | 1 | — |
+| REQ-12-06 | `TimelineMerger` | weight `occurred_at` 도 KST 자정 고정 | 정상 | 상동 | 1 | — |
+| REQ-12-07 | `TimelineMerger` | shed `occurred_at` 도 KST 자정 고정 | 정상 | 상동 | 1 | — |
+| REQ-12-08 | `TimelineMerger` | feeding `occurred_at` 은 `fed_at` 그대로 | 정상 | PLAN §결정 — "feeding·activity는 실제 timestamptz를 그대로 쓴다" | 1 | — |
+| REQ-12-09 | `TimelineMerger` | activity `occurred_at` 은 `logged_at` 그대로 | 정상 | 상동 | 1 | — |
+| REQ-12-10 | `TimelineMerger` | diary summary — title 있으면 그대로 | 정상 | PLAN §결정 — "title(없으면 content 앞 20자, 둘 다 없으면 '일지 기록')" | 1 | — |
+| REQ-12-11 | `TimelineMerger` | diary summary — title 없고 content 있으면 앞 20자 | 경계 | 상동 | 1 | — |
+| REQ-12-12 | `TimelineMerger` | diary summary — 둘 다 없으면 "일지 기록" | 경계 | 상동 | 1 | — |
+| REQ-12-13 | `TimelineMerger` | feeding summary — 원본 예시("귀뚜라미(M) 5마리") 재현 | 정상 | api-list.md §10 예시 | 1 | — |
+| REQ-12-14 | `TimelineMerger` | weight summary — 원본 예시("62g") 재현 | 정상 | api-list.md §10 예시 | 1 | — |
+| REQ-12-15 | `TimelineMerger` | activity summary — durationMinutes 있으면 "{타입} {분}분" | 정상 | PLAN §결정 — `"{activityType} {durationMinutes}분"` | 1 | — |
+| REQ-12-16 | `TimelineMerger` | activity summary — durationMinutes 없으면 타입명만 | 경계 | PLAN §결정 — "durationMinutes 없으면 타입명만" | 1 | — |
+| REQ-12-17 | `TimelineMerger` | shed summary — complete·not-assisted → "탈피 완료" | 정상 | PLAN §결정 — "'탈피 완료'/'탈피 도와줌'/'탈피 진행 중'" | 1 | — |
+| REQ-12-18 | `TimelineMerger` | shed summary — not-complete·assisted → "탈피 도와줌" | 정상 | 상동 | 1 | — |
+| REQ-12-19 | `TimelineMerger` | shed summary — not-complete·not-assisted → "탈피 진행 중" | 정상 | 상동 | 1 | — |
+| REQ-12-20 | `TimelineMerger` | shed summary — complete·assisted(둘 다 true) → "탈피 도와줌"(is_assisted 우선) | 경계 | `docs/PROGRESS.md` 2026-09-03 — "`shed_records.is_assisted` 자체가 이미 '탈피도와줌' 상태의 단일 출처" (ADR-0001) | 1 | — |
+| REQ-12-21 | `TimelineMerger` | diary 이벤트에 `condition_tag` 포함 | 정상 | PLAN §결정 — "diary→condition_tag" | 1 | — |
+| REQ-12-22 | `TimelineMerger` | feeding 이벤트에 `is_refused` 포함 | 정상 | PLAN §결정 — "feeding→is_refused" | 1 | — |
+| REQ-12-23 | `TimelineMerger` | weight 이벤트엔 도메인 선택 필드 없음(summary만) | 정상 | PLAN §결정 — "weight→없음(summary만)" | 1 | — |
+| REQ-12-24 | `TimelineService` | 남의 펫이면 가드의 PET_FORBIDDEN 그대로 전파 | 예외 | PLAN §작업 단계 Phase 1 완료 기준 — "PetAccessGuard로 403/404 검증" | 1 | — |
+| REQ-12-25 | `TimelineService` | 없는 펫이면 가드의 PET_NOT_FOUND 그대로 전파 | 예외 | 상동 | 1 | — |
+| REQ-12-26 | `TimelineService` | feeding·activity 월 조회는 KST 월 경계로 변환(반열린 구간) | 경계 | CLAUDE.md 시각 처리 절 — "계산 = Asia/Seoul"(ADR-0002) | 1 | — |
+| REQ-12-27 | `TimelineController` | `GET /timeline?year_month=...` 200 + `data.days` 배열 | 정상 | PLAN §범위 — 엔드포인트·응답 형태 | 1 | — |
+| REQ-12-28 | `TimelineController` | `type` 생략 시 서비스에 `ALL` 전달 | 정상 | api-list.md §10 — "type ...(기본 all)" | 1 | — |
+| REQ-12-29 | `TimelineController` | `type=weight`(소문자) → 서비스에 `WEIGHT` 전달 | 정상 | api-list.md §10 — "all\|feeding\|activity\|weight\|shed\|diary" | 1 | — |
+| REQ-12-30 | `TimelineController` | 남의 펫 → 403·`error.code=PET_FORBIDDEN` | 예외 | PLAN Phase1 완료 기준(REQ-09-12 동형) | 1 | — |
+| REQ-12-31 | `TimelineController` | 없는 펫 → 404·`error.code=PET_NOT_FOUND` | 예외 | 상동 | 1 | — |
+| REQ-12-32 | `TimelineController` | 응답 이벤트 키가 snake_case(`ref_id`,`occurred_at` 등) | 정상 | api-list.md §10 응답 예시 | 1 | — |
+| REQ-12-33 | `DomainBoundaryTest` | `business.timeline` cross-domain 예외가 실제로 작동 — 예외를 걷어낸 원본 규칙에서는 FAIL | **프로브(수동)** | PLAN §작업 단계 Phase 1 완료 기준 — "`business.timeline` ArchUnit 예외가 실제로 작동함을 프로브로 확인" | 1 | — |
+
+**REQ-12-33은 코드로 안 쓴다** — REQ-10-01~03과 같은 방식(`docs/plans/PLAN-REQ-10-record-domains.md` 참고)으로, `/implement` 단계에서 실제 timeline 코드가 cross-domain 참조를 하게 된 뒤 `git stash`로 `DomainBoundaryTest`의 `ignoreDependency(resideInAPackage("com.petkok.business.timeline.."), alwaysTrue())` 줄을 걷어내고 같은 프로브가 FAIL 하는지 수동 확인한다. `결과` 열엔 확인 후 "✅ 수동"을 적는다(`/checkpoint`).
+
 ## 제약·함정
 
 - **이 엔드포인트는 `CursorRequest`/`CursorPage`를 쓰지 않는다.** 다른 9개 도메인이 전부 이 패턴이라 습관적으로 커서 파라미터를 넣기 쉽다 — 실제로 레포 파생 문서(`api-list.md` 이전 판)가 이 실수를 이미 한 번 했다(2026-09-11 발견·정정)
-- **날짜 전용 컬럼과 타임스탬프 컬럼이 섞여 있다.** `fed_at`·`logged_at`(feeding·activity)은 `timestamptz`지만 `entry_date`·`measured_at`·`shed_date`(diary·weight·shed)는 `date`다 — 5개 도메인을 하나의 `occurred_at` 필드로 통일하려는 순간 이 차이가 정면으로 걸린다(미결 1)
+- **날짜 전용 컬럼과 타임스탬프 컬럼이 섞여 있다.** `fed_at`·`logged_at`(feeding·activity)은 `timestamptz`지만 `entry_date`·`measured_date`·`shed_date`(diary·weight·shed)는 `date`다 — 5개 도메인을 하나의 `occurred_at` 필드로 통일하려는 순간 이 차이가 정면으로 걸린다(미결 1)
 - **`business.timeline`의 `DomainBoundaryTest` 예외는 지금까지 공허했다.** 대상 코드가 0개라 "예외가 실제로 작동하는지" 한 번도 검증된 적이 없다(REQ-09 Phase 0 이후 계속 공허 상태로 알고 남겨 둔 것 — `DomainBoundaryTest.java` 주석 참고). 이번이 처음 실제로 쓰이는 시점이라, 다른 새 ArchUnit 예외를 추가할 때처럼 프로브로 확인해야 한다
 - **gallery(photos)를 "포함하는 게 자연스러워 보여서" 넣지 않는다.** `type` enum에 없다는 게 원본 확인 사항이다 — REQ-11이 방금 끝나 있어서 timeline에도 사진을 얹고 싶어질 수 있지만 원본 범위 밖이다

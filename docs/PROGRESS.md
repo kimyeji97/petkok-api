@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-14 (**REQ-17 `main` 병합 완료(PR #53, squash) — `_at`/`_date` 컬럼 네이밍 정합화 전부 종료.** REQ-12의 유일한 착수 전제(REQ-17 Phase 2가 `main`에 들어올 것)가 충족돼 Phase 1 착수 가능)
+> 최종 갱신: 2026-09-14 (**REQ-17 `main` 병합 완료(PR #53) 이어서 REQ-12 Phase 1 `/testgen` 완료 — 검증 계약 33건(정상 23·경계 5·예외 4·프로브 1) 계획서에 기입.** 테스트 파일 3개는 대상 클래스가 아직 없어 컴파일 안 되는 상태로 미커밋·미푸시 — `/implement REQ-12 1`이 이어받는다)
 
 ## 요구사항 인덱스
 
@@ -23,7 +23,7 @@
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘, REQ-10-15·38·49·74·100 회귀 테스트 재확인 필요) |
 | REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
-| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | — | ⏸ (미결 5건 전부 확정 · 착수 전제였던 REQ-17 `main` 병합이 2026-09-14 완료 — Phase 1 착수 가능) |
+| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | — | 🟡 (미결 5건 전부 확정 · 착수 전제 충족 · `/testgen` Phase 1 검증 계약 33건 작성 완료, 구현 전) |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 | REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록만 사람 손 대기) |
@@ -66,6 +66,18 @@
 ### Notion 작업 이력 3일치 누락 발견·소급 등록 (2026-09-07·09-11·09-14)
 
 `/checkpoint` 관례대로 Notion `All Tasks History`에 upsert하려다, 세 날짜 모두 History 행 자체가 없다는 걸 발견했다 — 이전 세션들이 레포 문서(`PROGRESS.md`)는 갱신했지만 Notion 동기화 절을 누락한 것으로 보인다(추적 안 함). `V01JTQ` 관계로 REQ-10(09-07)·REQ-17+REQ-12(09-11, 09-14) Task에 연결해 3건 소급 생성, REQ-17 Task 상태를 `시작 전`→`완료`로 전이(인덱스 ✅와 일치). 쓴 뒤 재조회로 관계·상태 반영 확인. 부수로 REQ-12 Task 이름이 낡은 스펙("다중 테이블 union")을 그대로 갖고 있던 것도 인덱스 문구("월간 캘린더 + 이벤트 집계")로 맞춰 정정.
+
+### `/testgen REQ-12` — Phase 1 검증 계약 33건 승인·기입
+
+REQ-17 병합으로 착수 전제가 풀리자 바로 이어서 REQ-12 Phase 1(`GET /pets/{pet_id}/timeline`) 케이스를 뽑았다. 케이스 표를 먼저 제시해 사용자 승인을 받은 뒤 테스트 코드를 썼다(이 커맨드군의 5절 원칙 그대로).
+
+- **클래스 설계를 이번에 확정** — `TimelineMerger`(순수 병합·요약, I/O 없음) + `TimelineService`(가드 위임 + 저장소 5개 조합, 병합은 Merger에 위임) + `TimelineController`. 계획서엔 패키지 구조(`business/timeline` + `data/timeline/dto`)만 있고 클래스 단위 설계는 없었어서, `AnorexiaStreakCalculator` 선례(순수 계산과 I/O를 분리)를 그대로 따랐다.
+- **탈피 요약 4번째 조합(`isComplete=true, isAssisted=true`)을 근거 있게 확정** — `PLAN-REQ-12` 결정표만으론 모호했는데, `PROGRESS.md`(2026-09-03, ADR-0001)의 "`is_assisted`가 이미 '탈피도와줌' 상태의 단일 출처" 문구를 근거로 `is_assisted` 우선으로 정했다. 다른 문서에서 근거를 끌어와 미결을 닫은 사례.
+- **feeding summary의 "필드 부분 누락 시 정확한 생략 형태"는 근거가 없어 테스트를 안 씀** — 원본 예시가 전 필드 있는 케이스뿐이다. 사용자 확인 후 `PLAN-REQ-12` 미결 질문에 신규 항목으로 올렸다(닫히면 검증 계약에 케이스 추가).
+- **REQ-10-01~03(PetAccessGuard 예외 프로브) 선례를 그대로 재사용** — `business.timeline` ArchUnit cross-domain 예외가 실제로 작동하는지 확인하는 항목(REQ-12-33)은 코드로 안 쓰고 `유형: 프로브(수동)`으로만 검증 계약에 올렸다. `/implement` 때 실제 코드가 생긴 뒤 `git stash`로 예외 줄을 걷어내고 FAIL을 확인하는 수동 절차다.
+- 부수로 `PLAN-REQ-12`의 낡은 `measured_at` 표기(제약·함정 절, REQ-17 리네임 전 흔적) 1곳도 `measured_date`로 정정.
+
+**남은 것** — 테스트 파일 3개(`TimelineMergerTest`·`TimelineServiceTest`·`TimelineControllerWebMvcTest`)는 대상 프로덕션 클래스가 아직 없어 **컴파일되지 않는 상태로 미커밋**이다(Java 특성상 이 Phase의 전체 테스트 소스가 빨간불 — CLAUDE.md에 이미 문서화된 제약). 커밋은 `/implement`가 코드와 함께 한다. 오늘 세션은 여기서 종료 — 미커밋·미푸시 상태 그대로 둔다(사용자 지시).
 
 ## 2026-09-11
 
