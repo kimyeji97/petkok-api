@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-10 (**REQ-11 전 Phase(0~2) 완료 — gallery 도메인 + diary↔사진 연결.** REQ-10-15·38·49·74·100 재확인 필요 발견 — 동작은 정상, 회귀 테스트 누락)
+> 최종 갱신: 2026-09-14 (**REQ-17 Phase 1·2 전부 완료 — `_at`/`_date` 컬럼 네이밍 정합화.** 검증 계약 4건 전부 통과, 관련 REQ-10·REQ-11 회귀 62건 재확인. `main` 미병합 — PR 미생성. REQ-12는 계획 확정됐으나 REQ-17이 `main`에 들어올 때까지 착수 보류)
 
 ## 요구사항 인덱스
 
@@ -23,9 +23,10 @@
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘, REQ-10-15·38·49·74·100 회귀 테스트 재확인 필요) |
 | REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
-| REQ-12 | timeline (다중 테이블 union — 앱 레벨 병합이 기본, QueryDSL은 병목 시 대안) | [api-list §10](specs/api-list.md) | — | ⏸ |
+| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | — | ⏸ (미결 5건 전부 확정 · REQ-17 Phase 2가 `main`에 들어올 때까지 착수 보류) |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
+| REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · Notion DB 탭 DDL 코드블록만 사람 손 대기 · `main` 미병합) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -34,6 +35,48 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-14
+
+> **REQ-17 Phase 2 판정 재확인 — `/testrun REQ-17`.** 2026-09-11 세션이 이미 (a) 1건(REQ-17-02 정규식 결함)을 고쳐 4건 전부 통과까지 확인해 뒀지만, 그 결과가 커밋 메시지에만 남고 이 로그·계획서에는 한 번도 반영되지 않은 채 사흘이 지나 있었다. `/progress 전주`로 그 사실(검증 계약 `결과` 열 공란)을 먼저 확인한 뒤, `--rerun`으로 캐시를 무시하고 실제 재실행해 지금도 유효함을 검증했다.
+
+### 재확인 결과 — 전부 그린, 새로 고친 것 없음
+
+- `V5RenameAtToDateColumnsMigrationTest`(REQ-17-01·02) · `TimeFieldTypeContractTest`(REQ-17-03·04, 부수로 REQ-16-06·07·REQ-16-13도 포함) 62건 중 REQ-17 신규 4건 전부 통과
+- Phase 2 완료 기준의 나머지 절반 — `./gradlew build -x test` 통과, 기존 REQ-10·REQ-11 관련 스위트(`WeightServiceTest` 21·`WeightControllerWebMvcTest` 10·`WeightDtoContractTest` 1·`PhotoServiceTest` 25·`PhotoControllerWebMvcTest` 5)가 새 필드명(`measuredDate`·`takenDate`)으로 전부 통과 — 도 `--rerun`으로 재확인
+- 근거 인용 4건 전부 계획서 원문에서 재확인, 소실 없음
+- **함정 재확인** — `./gradlew test`는 소스가 안 바뀌면 캐시로 `UP-TO-DATE`를 반환하고 XML 결과도 갱신하지 않는다(`build/test-results/test/*.xml` 타임스탬프가 지난 실행 그대로였다). `--rerun`을 붙여야 실제 재실행임을 타임스탬프로 확인할 수 있었다 — "테스트가 통과했다"를 콘솔 종료 코드만으로 판단하면 며칠 전 결과를 오늘 결과로 착각하기 쉽다
+- **CLAUDE.md 파이프 함정 재발** — `./gradlew test ... | tee file; echo $?`로 먼저 확인했다가 종료 코드가 `tee`의 것으로 나와(0) 실제 gradlew 성공 여부를 증명하지 못했다는 걸 뒤늦게 알아차렸다. 리다이렉트(`> file 2>&1`)로 바꿔 다시 확인 — CLAUDE.md에 이미 문서화된 함정을 실전에서 한 번 더 밟은 사례
+
+**REQ-17 Phase 1·2 완료 기준 전부 충족 확정.** `main` 미병합·PR 미생성 상태는 그대로다(아래 「진행 중」).
+
+### 문서 정합성 — `## 2026-09-07` 헤딩 유실 발견·복원
+
+`/progress 전주`로 확인하다가, 커밋 `983c8df`(2026-09-07)가 추가했던 `## 2026-09-07` 로그 헤딩이 현재 파일에 없다는 걸 발견했다 — 내용(JPA Auditing 결함 발견·수정, REQ-10 keyset 실측)은 `## 2026-09-08` 절 아래에 헤딩 없이 섞여 남아 있었다. 원인은 추적하지 않았다(2026-09-02 때와 같은 종류의 헤딩 유실로 보이나 그때처럼 재현 경로를 특정하지 못함). 이번에 헤딩만 복원했다 — 내용 자체는 원래도 존재했으므로 유실된 기록은 없다.
+
+## 2026-09-11
+
+> **REQ-17 착수 — `_at`/`_date` 컬럼 네이밍 정합화.** DB 네이밍 컨벤션을 "`_at`=시각(`timestamptz`)·`_date`=날짜(`date`)"로 못 박자는 요청에서 전수조사, 어긋난 컬럼 2건(`weight_logs.measured_at`, `photos.taken_at`) 발견해 계획서 작성부터 코드 리네임까지 한 세션에 진행했다. 같은 세션에서 REQ-12 계획서도 Notion 원본 재대조로 다시 썼다.
+
+### `/workplan REQ-17` — 미결 3건, 당일 전부 확정
+
+`measured_at`·`taken_at`을 타입은 그대로 두고 이름만 `measured_date`·`taken_date`로 리네임하기로 결정(ADR 승격은 안 함 — 국소적이고 되돌리기 쉬운 결정이라 계획서 `## 결정` 표로 충분하다고 판단). 미결 3건(배포 의존성 없음·인덱스 동반 리네임·Notion 역반영 순서)을 대화로 확정 — 셋 다 세부는 `PLAN-REQ-17` 참고.
+
+### Phase 1 — Notion 역반영 먼저 진행, 완료
+
+AGENTS.md §0 원칙(Notion이 원본)대로 코드보다 먼저 「테이블 정의서」 4곳·「API I/F」 4행을 갱신하고 `fetch` 재조회로 반영 확인, `docs/specs/db-schema.md`·`api-list.md` 동반 갱신. **닫지 못한 것** — 「설계」→DB 탭의 DDL 코드블록은 탭 객체라 API로 못 고쳐 사람 손 대기(`docs/specs/db-schema.md:290` 선례와 동일 케이스).
+
+### Phase 2 — DB 마이그레이션 + 코드 리네임, `/testrun`에서 (a) 1건 수정
+
+`V5__rename_at_to_date_columns.sql`(컬럼 2개+인덱스 1개)과 엔티티·DTO·Repository·Service 필드명을 함께 바꿨다. 첫 실행(`wip`, 커밋 `d11a79d`)에서 REQ-17-02(인덱스 rename 케이스)만 실패 — 원인은 프로덕션 SQL이 아니라 **테스트 정규식**이 PostgreSQL에 없는 `RENAME INDEX x TO y` 문법을 찾고 있었던 것(실제 문법은 `ALTER INDEX x RENAME TO y`, `V5`는 처음부터 맞게 작성돼 있었다) — (a) 테스트 결함으로 분류해 정규식만 수정(커밋 `bb4db17`), 재실행해 REQ-17-01~04 전부 통과 확인. 부수로 `TimeFieldTypeContractTest`(REQ-16-07 소유)의 `DATE_FIELDS`에 `WeightLog "measuredDate"`·`Photo "takenDate"`를 반영(REQ-11이 `Photo`를 들여왔을 때 빠져 있던 것도 이번에 채움).
+
+### `/workplan REQ-12` — Notion API I/F 원본 재대조로 전면 재작성
+
+이전 판(`docs/specs/api-list.md` §10)이 "커서 기반 통합 시간순 목록"으로 적고 있었는데, Notion 「API I/F」의 「통합 타임라인」 행 원본을 다시 대조하니 실제로는 **월 단위 캘린더 집계**(`year_month`+`type` 쿼리, 커서 없음)였다 — 이전 판이 원본을 잘못 옮긴 것으로 보인다. `docs/plans/PLAN-REQ-12-timeline-calendar.md` 신설, 미결 5건(occurred_at 처리·펫 필터 범위·events 스키마·summary 규칙·markers 필터링)을 대화로 전부 확정했다.
+
+**⚠️ 착수를 REQ-17 뒤로 미룸** — REQ-12 Phase 1 구현이 `measured_at`/`taken_at` 필드를 참조하게 될 텐데, 마침 같은 세션에서 그 이름을 바꾸는 REQ-17이 진행 중이었다. 지금 옛 이름 기준으로 짜면 곧 다시 고쳐야 해서, **REQ-17 Phase 2가 `main`에 들어온 뒤 착수**하기로 계획서에 명시했다.
+
+**정리하지 못한 것** — 이 세션 작업(REQ-17 Phase 1 문서 갱신, REQ-12 계획서·스펙 재작성)이 이번 체크포인트 전까지 미커밋 상태로 사흘간 남아 있었다. `/implement`·`/checkpoint`가 REQ-17 Phase 2 코드 커밋 시점(09-11 당일)에 바로 이어지지 않은 게 원인으로 보인다 — 다음엔 같은 세션 안에서 `/checkpoint`까지 마치는 걸 권장.
 
 ## 2026-09-10
 
@@ -130,6 +173,8 @@ REQ-11 접두사 케이스는 예상대로 0건(`src/test/` grep 재확인). `/t
 **남은 것 (REQ-11)** — Phase 1(gallery CRUD 4개 엔드포인트 단독 구현) 착수 전 `/testgen REQ-11`을 다시 돌려야 한다(그때부터 실제 케이스 시작). Phase 2(diary 통합)는 그 다음.
 
 > **계약 승격 — 2026-09-09 승인·반영 완료.** AGENTS.md §3 "framework가 인터페이스를 정의하고 business가 구현하는 패턴" 항목에 두 줄을 보탰다 — ① 포트가 반환하는 보조 타입은 `dto` 패키지에 두지 않는다(`DTO_NAMING` 충돌) ② framework 하위 패키지 이름에 도메인 이름을 쓰지 않는다(패턴 이름으로 묶는다). ②는 `framework/gallery` → `framework/port` 정정(위 2026-09-09 섹션)에서 직접 드러난 것이라 같이 승격했다.
+
+## 2026-09-07
 
 > **REQ-10 Phase 1·2 로컬 DB keyset 경계 실측 완료 — REQ-10 미결 0건으로 완전히 닫혔다.** 실측 첫 단계(카카오 자동가입)에서 바로 막혔는데, 원인이 REQ-10 범위 밖의 **프레임워크 전역 결함**이었다 — JPA Auditing이 `OffsetDateTime` 필드를 못 채워 엔티티 저장 자체가 500으로 죽고 있었다. `./gradlew test`가 DB를 안 타서(`CLAUDE.local.md`) 지금까지 한 번도 실행된 적 없던 경로다.
 
