@@ -1,6 +1,6 @@
 # PLAN-REQ-17 · `_at`/`_date` 컬럼 네이밍 정합화 (measured_at → measured_date, taken_at → taken_date)
 
-> 출처: 현재 세션 대화 · 작성: 2026-09-11 · 상태: ✅ 완료 (Phase 1·2 전부 완료, 2026-09-14 `/testrun` 재확인 — `main` 미병합)
+> 출처: 현재 세션 대화 · 작성: 2026-09-11 · 상태: ✅ 완료 (Phase 1·2 전부 완료, 2026-09-14 `/testrun` 재확인 · PR #53 `main` 병합 완료)
 
 ## 배경
 

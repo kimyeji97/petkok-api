@@ -1,6 +1,6 @@
 # PLAN-REQ-12 · timeline (월간 캘린더 + 이벤트 집계)
 
-> 출처: 2026-09-10~11 세션(`/workplan req-12`, Notion API I/F 원본 재대조) · 작성: 2026-09-11 · 상태: 📝 초안(미결 전부 확정 · REQ-17 Phase 2 선행 대기 중 착수 보류)
+> 출처: 2026-09-10~11 세션(`/workplan req-12`, Notion API I/F 원본 재대조) · 작성: 2026-09-11 · 상태: 📝 초안(미결 전부 확정 · 착수 전제였던 REQ-17 `main` 병합이 2026-09-14 완료(PR #53) — Phase 1 착수 가능)
 
 ## 배경
 
@@ -45,6 +45,7 @@ REQ-12는 개발 순서상 마지막 도메인(auth → user → pet → 기록 
 
 - [x] **`occurred_at`의 날짜 전용 도메인 처리 — 확정.** diary·weight·shed는 `occurred_at`을 KST 자정(`00:00:00+09:00`)으로 고정한다(2026-09-11). 별건으로 진행되던 컬럼명 조사가 **"이름만 변경"(`_at`인데 `date`형인 컬럼의 이름을 바꾼다 — 예: `measured_at` → `measured_date`)으로 결론 났다**(타입 변경 아님) — 그래서 이 결정은 그대로 유효하다.
       > ⚠️ **구현 시 주의 — 컬럼·필드명이 바뀐 뒤에 착수한다.** 사용자가 별도로 이 이름 변경 작업(PLAN-REQ-17)을 진행 중이고 **Notion 역반영은 이미 완료(2026-09-11)**했다. REQ-12 Phase 1은 REQ-17 **Phase 2(DB 마이그레이션 + 코드 리네임)가 끝난 뒤**, 바뀐 이름(`measured_date`·`taken_date`)을 기준으로 구현해야 한다 — 지금 `measured_at` 기준으로 코드를 쓰면 곧 다시 고쳐야 한다. 착수 전 `PLAN-REQ-17-at-date-column-naming.md` Phase 2가 `main`에 들어왔는지 확인할 것
+      > ✅ **충족(2026-09-14) — PR #53으로 REQ-17 Phase 2가 `main`에 병합됐다.** 이제 `measured_date`·`taken_date` 기준으로 구현하면 된다.
 - [x] **"펫 필터 전체" 범위 재확인 — 확정(2026-09-11).** 제외 유지, 별도 REQ로 미룬다(근거는 `## 결정` 표)
 - [x] **`events[]` 항목의 타입별 부가 필드 스키마 — 확정(2026-09-11).** 도메인별 선택 필드 허용(근거는 `## 결정` 표)
 - [x] **`summary` 텍스트 생성 규칙 — 확정(2026-09-11).** 도메인별 조합 규칙(근거는 `## 결정` 표)
@@ -55,6 +56,7 @@ REQ-12는 개발 순서상 마지막 도메인(auth → user → pet → 기록 
 - [ ] **Phase 1** — `GET /pets/{pet_id}/timeline` 구현 (월별 집계, 앱 레벨 병합)
       완료 기준: `year_month`+`type` 파라미터로 5개 도메인 조회 후 날짜별 `{date, markers, events}`로 병합 · `PetAccessGuard`로 403/404 검증 · `type` 필터 시 해당 도메인만 `events`에 포함하고 `markers`도 같은 타입으로 필터링 · diary·weight·shed의 `occurred_at`은 KST 자정 고정, feeding·activity는 실제 `timestamptz` · `events[]` 부가 필드는 도메인별 선택 필드(위 `## 결정` 표) · `summary`는 확정된 도메인별 조합 규칙 적용 · gallery 미포함 · "펫 필터 전체" 미구현 · `business.timeline` ArchUnit 예외가 실제로 작동함을 프로브로 확인(예외를 걷어낸 원본 규칙에서 정상 사용이 FAIL인지)
       > ⚠️ **착수 전제 — 미결 5건 전부 확정(2026-09-11)됐지만, 착수는 REQ-17 Phase 2(컬럼 리네임 `measured_date`·`taken_date`)가 `main`에 들어온 뒤로 미룬다.** 지금 `measured_at` 기준으로 짜면 곧 다시 고쳐야 한다 — 위 occurred_at 행의 구현 시 주의 참고.
+      > ✅ **전제 충족(2026-09-14) — PR #53 머지로 `main`에 새 컬럼명이 들어왔다. Phase 1 착수 가능.**
 
 ## 제약·함정
 

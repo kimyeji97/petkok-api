@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-14 (**REQ-17 Phase 1·2 전부 완료 — `_at`/`_date` 컬럼 네이밍 정합화.** 검증 계약 4건 전부 통과, 관련 REQ-10·REQ-11 회귀 62건 재확인. `main` 미병합 — PR 미생성. REQ-12는 계획 확정됐으나 REQ-17이 `main`에 들어올 때까지 착수 보류)
+> 최종 갱신: 2026-09-14 (**REQ-17 `main` 병합 완료(PR #53, squash) — `_at`/`_date` 컬럼 네이밍 정합화 전부 종료.** REQ-12의 유일한 착수 전제(REQ-17 Phase 2가 `main`에 들어올 것)가 충족돼 Phase 1 착수 가능)
 
 ## 요구사항 인덱스
 
@@ -23,10 +23,10 @@
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘, REQ-10-15·38·49·74·100 회귀 테스트 재확인 필요) |
 | REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
-| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | — | ⏸ (미결 5건 전부 확정 · REQ-17 Phase 2가 `main`에 들어올 때까지 착수 보류) |
+| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | — | ⏸ (미결 5건 전부 확정 · 착수 전제였던 REQ-17 `main` 병합이 2026-09-14 완료 — Phase 1 착수 가능) |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
-| REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · Notion DB 탭 DDL 코드블록만 사람 손 대기 · `main` 미병합) |
+| REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록만 사람 손 대기) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -53,6 +53,19 @@
 ### 문서 정합성 — `## 2026-09-07` 헤딩 유실 발견·복원
 
 `/progress 전주`로 확인하다가, 커밋 `983c8df`(2026-09-07)가 추가했던 `## 2026-09-07` 로그 헤딩이 현재 파일에 없다는 걸 발견했다 — 내용(JPA Auditing 결함 발견·수정, REQ-10 keyset 실측)은 `## 2026-09-08` 절 아래에 헤딩 없이 섞여 남아 있었다. 원인은 추적하지 않았다(2026-09-02 때와 같은 종류의 헤딩 유실로 보이나 그때처럼 재현 경로를 특정하지 못함). 이번에 헤딩만 복원했다 — 내용 자체는 원래도 존재했으므로 유실된 기록은 없다.
+
+### `feat/req17-phase2-at-date-rename` → `main` 머지 (PR #53)
+
+체크포인트 커밋(`cc3d8f9`) 직후 같은 세션에서 PR #53을 만들고 머지까지 진행했다 — 사용자가 "pr -> 머지해줘"로 명시 요청.
+
+- **머지 전 로컬 게이트 재현** — `build -x test`·`spotlessCheck`·`checkstyleMain checkstyleTest -PciStrict`·전체 테스트(`--rerun`, 302건·실패 0) 전부 통과 확인 후 PR 생성
+- **AGENTS §4의 "PR head SHA와 로컬 HEAD 대조" 원칙을 실제로 적용** — `gh pr view 53 --json headRefOid`로 받은 SHA(`cc3d8f9...`)가 로컬 `git rev-parse HEAD`와 일치함을 확인한 뒤에만 진행. CI도 `gh run list --json headSha`로 같은 SHA에서 도는 실행인지 확인하고 `gh run watch`로 완주까지 지켜봄(과거 "이전 실행분을 통과로 오인" 사고 재발 방지)
+- squash 머지 + `--delete-branch`로 원격·로컬 feature 브랜치 동시 삭제 — "머지 후 브랜치 안 지우면 로컬에 낡은 브랜치가 조용히 남는다"(AGENTS §4) 케이스를 애초에 안 만듦
+- 머지 커밋 `d581701`, `main` 파스트포워드. **REQ-12의 유일한 착수 전제(REQ-17 Phase 2가 `main`에 들어올 것)가 이걸로 충족** — 계획서·인덱스의 "main 미병합" 문구를 이번에 정정
+
+### Notion 작업 이력 3일치 누락 발견·소급 등록 (2026-09-07·09-11·09-14)
+
+`/checkpoint` 관례대로 Notion `All Tasks History`에 upsert하려다, 세 날짜 모두 History 행 자체가 없다는 걸 발견했다 — 이전 세션들이 레포 문서(`PROGRESS.md`)는 갱신했지만 Notion 동기화 절을 누락한 것으로 보인다(추적 안 함). `V01JTQ` 관계로 REQ-10(09-07)·REQ-17+REQ-12(09-11, 09-14) Task에 연결해 3건 소급 생성, REQ-17 Task 상태를 `시작 전`→`완료`로 전이(인덱스 ✅와 일치). 쓴 뒤 재조회로 관계·상태 반영 확인. 부수로 REQ-12 Task 이름이 낡은 스펙("다중 테이블 union")을 그대로 갖고 있던 것도 인덱스 문구("월간 캘린더 + 이벤트 집계")로 맞춰 정정.
 
 ## 2026-09-11
 
