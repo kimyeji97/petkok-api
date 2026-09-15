@@ -2,6 +2,7 @@ package com.petkok.architecture;
 
 import static com.tngtech.archunit.base.DescribedPredicate.alwaysTrue;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -36,8 +37,11 @@ final class DomainBoundaryTest {
    *
    * <ul>
    *   <li>{@code data.common} — 베이스 엔티티 등 도메인 공용. 누구나 참조할 수 있다
-   *   <li>{@code business.timeline} — 여러 도메인 Repository 를 조합하는 read 전용 모델. 유일한 cross-domain 허용처. 다만
-   *       <b>대상 코드가 아직 0개라 REQ-12 까지는 공허하다</b> — 알고 두는 것과 모르고 두는 것은 다르므로 남긴다
+   *   <li>{@code timeline}({@code business.timeline} + {@code data.timeline}) — 여러 도메인 Repository 를
+   *       조합하는 read 전용 모델. 유일한 cross-domain 허용처. {@code data.timeline.dto} 도 함께 연다 — 응답 DTO( {@code
+   *       TimelineEventResponse})가 도메인별 선택 필드(diary 의 {@code ConditionTag}, activity 의 {@code
+   *       ActivityType})를 원본 타입 그대로 실어야 해서 {@code business.timeline} 만으로는 부족했다(REQ-12 Phase 1 실측,
+   *       2026-09-15 — 최초 대상 코드가 생기며 처음 드러남). 예외가 실제로 작동함(원본 규칙에서 FAIL)은 REQ-12-33 프로브로 확인한다
    *   <li>{@code framework} — <b>도메인이 아니다.</b> 아래 참고
    *   <li>{@code business.auth → data.user} — 소셜 자동가입. 아래 참고
    *   <li>{@code * → business.pet.service · data.pet.dto · data.pet.enums} — {@code PetAccessGuard}
@@ -69,7 +73,9 @@ final class DomainBoundaryTest {
           .notDependOnEachOther()
           .ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.data.common.."))
           .ignoreDependency(alwaysTrue(), resideInAPackage("com.petkok.framework.."))
-          .ignoreDependency(resideInAPackage("com.petkok.business.timeline.."), alwaysTrue())
+          .ignoreDependency(
+              resideInAnyPackage("com.petkok.business.timeline..", "com.petkok.data.timeline.."),
+              alwaysTrue())
           // ⬇️ 설계 결정 (2026-07-31 승격, PLAN-REQ-08 D4). 원래 "임시" 딱지가 붙어 있었다.
           //    소셜 자동가입은 본질적으로 user 프로비저닝이므로 auth 가 users 행을 만드는 것은
           //    우회가 아니라 제 일이다. 이 참조를 없애려면 business/user 에 프로비저닝 진입점을

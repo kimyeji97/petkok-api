@@ -33,4 +33,8 @@ public interface FeedingLogRepository extends JpaRepository<FeedingLog, UUID> {
 
   /** 거식 스트릭 계산용 — 마지막 정상 급여(거식이 아닌 가장 최근 기록). 검증 계약 REQ-10-59 ~ 65. */
   Optional<FeedingLog> findFirstByPetIdAndIsRefusedFalseOrderByFedAtDesc(UUID petId);
+
+  /** timeline 월간 집계용(REQ-12) — KST 월 경계, 반열린 구간(ADR-0002 "계산은 KST 기준"). */
+  List<FeedingLog> findByPetIdAndFedAtGreaterThanEqualAndFedAtLessThan(
+      UUID petId, OffsetDateTime from, OffsetDateTime toExclusive);
 }

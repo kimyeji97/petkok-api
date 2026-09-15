@@ -30,4 +30,8 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, UUID> 
       @Param("loggedAt") OffsetDateTime loggedAt,
       @Param("id") UUID id,
       Pageable pageable);
+
+  /** timeline 월간 집계용(REQ-12) — KST 월 경계, 반열린 구간(ADR-0002 "계산은 KST 기준"). */
+  List<ActivityLog> findByPetIdAndLoggedAtGreaterThanEqualAndLoggedAtLessThan(
+      UUID petId, OffsetDateTime from, OffsetDateTime toExclusive);
 }
