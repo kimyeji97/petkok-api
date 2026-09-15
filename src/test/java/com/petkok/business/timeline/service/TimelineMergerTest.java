@@ -282,7 +282,7 @@ class TimelineMergerTest {
   @Test
   @DisplayName("[REQ-12-11] diary summary — title 없고 content 있으면 앞 20자다")
   void req_12_11_diarySummaryFallsBackToContentPrefix() {
-    String content = "가나다라마바사아자차카타파하가나다라마바사아자차카타파하".substring(0, 30);
+    String content = "가나다라마바사아자차카타파하가나다라마바사아자차카타파하";
 
     List<TimelineDayResponse> days =
         TimelineMerger.merge(
