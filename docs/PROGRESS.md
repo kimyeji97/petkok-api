@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-15 (**REQ-12 Phase 1(유일한 Phase) 구현·검증 완료 — 검증 계약 33건 전부 `✅`.** ArchUnit `DomainBoundaryTest`의 timeline 예외를 `business.timeline`에서 `data.timeline`까지 넓히는 결정이 구현 중에 나왔다(사용자 확인). 코드는 커밋됐으나 **아직 미푸시** — 남은 `/testrun` (a) 수정 1건이 미커밋 상태로 남아 있어 재커밋·조건 재확인 후 푸시해야 한다)
+> 최종 갱신: 2026-09-15 (**REQ-12 Phase 1(유일한 Phase) 구현·검증·푸시 완료 — 검증 계약 33건 전부 `✅`.** ArchUnit `DomainBoundaryTest`의 timeline 예외를 `business.timeline`에서 `data.timeline`까지 넓히는 결정이 구현 중에 나왔다(사용자 확인). `/testrun` (a) 수정을 별도 커밋으로 합쳐 `feat/req12-phase1-timeline-calendar` 브랜치를 원격에 푸시했다 — PR은 아직 미생성)
 
 ## 요구사항 인덱스
 
@@ -23,7 +23,7 @@
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘, REQ-10-15·38·49·74·100 회귀 테스트 재확인 필요) |
 | REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
-| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | 2026-09-15 | ✅ (Phase 1(유일) 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — feeding summary 부분 누락 포맷 · 브랜치 `feat/req12-phase1-timeline-calendar` 커밋은 됐으나 미푸시) |
+| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | 2026-09-15 | ✅ (Phase 1(유일) 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — feeding summary 부분 누락 포맷 · 브랜치 `feat/req12-phase1-timeline-calendar` 푸시 완료, PR 미생성) |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 | REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록만 사람 손 대기) |
@@ -38,7 +38,7 @@
 
 ## 2026-09-15
 
-> **REQ-12 Phase 1 구현·검증 완료.** `/implement REQ-12 1`로 timeline 월간 집계를 구현하는 중 계획서가 예상 못 한 ArchUnit 구조 문제를 만나 사용자 확인을 거쳤고, `/testrun REQ-12`로 33/33 전부 통과까지 확인했다. Phase 1이 이 REQ의 유일한 Phase라 사실상 REQ-12 전체가 끝났다 — 단 **코드는 미푸시**(아래 「진행 중」).
+> **REQ-12 Phase 1 구현·검증·푸시 완료.** `/implement REQ-12 1`로 timeline 월간 집계를 구현하는 중 계획서가 예상 못 한 ArchUnit 구조 문제를 만나 사용자 확인을 거쳤고, `/testrun REQ-12`로 33/33 전부 통과까지 확인했다. Phase 1이 이 REQ의 유일한 Phase라 REQ-12 전체가 끝났다. 같은 날 이어서 `/checkpoint` → `/implement`(무인자) → `/checkpoint`로 미커밋 잔여분을 정리하고 브랜치를 원격에 푸시했다(아래 「진행 중」) — PR은 미생성.
 
 ### `/implement REQ-12 1` — 구현 + ArchUnit 예외 확장(사용자 확인)
 
@@ -56,10 +56,16 @@
 - **전수 대조** — 계획서 표 ID(REQ-12-01~33)와 테스트 `@DisplayName`을 1:1로 맞춰 누락·오타 없음을 확인. REQ-12-01은 표 1행에 테스트 2개(markers 수집·날짜 분리)가 걸려 있는데 계획서 의도와 일치. 근거 인용 5건(REQ-12-01·13·14·20·26)을 원문에서 재확인 — 스펙 드리프트 없음.
 - **풀 스위트 재확인** — `./gradlew test` 335건 전부 통과(회귀 없음).
 
-### 진행 중 — 미푸시, 미커밋 잔여 1건
+### `/implement` 재호출(무인자) — (a) 수정 합류 커밋 + 푸시
 
-- 브랜치 `feat/req12-phase1-timeline-calendar`, 커밋 `0ca691b`는 로컬에만 있다 — `/implement` 8절 조건(Phase 케이스 전부 통과)이 커밋 시점엔 32/33이라 푸시를 안 했다.
-- `/testrun`의 (a) 수정(`TimelineMergerTest.java`)은 아직 **미커밋**이다 — `/testrun`은 커밋하지 않는 커맨드라 그대로 남겨 뒀다. 다음 세션은 `/implement`로 돌아가 이 수정을 Phase 1 커밋에 합쳐 재커밋하고, 33/33 확인 후 푸시해야 한다.
+같은 날 이어서 `/checkpoint`가 남긴 미커밋 잔여분(`TimelineMergerTest.java`의 (a) 수정)을 마무리했다. 인자 없이 호출됐지만 "가장 최근 계획서·미완료 Phase"를 새로 찾기보다, 현재 브랜치가 이미 `feat/req12-phase1-timeline-calendar`이고 그 위에 미커밋 변경이 남아 있는 상태 자체를 이어서 끝낼 작업으로 읽었다.
+
+- REQ-11 선례(`ce09f33 test(req11): Phase 1 — /testrun (a) 수정 반영`)를 그대로 따라 **별도 커밋**으로 분리 — amend 안 함(커밋 `67dfc45`). 재실행으로 REQ-12-01~33 33건 전부(+REQ-12-33 프로브) 통과 재확인.
+- ⚠️ **푸시 직전 함정 — upstream이 `origin/main`으로 잡혀 있었다.** `git checkout -b feat/req12-phase1-timeline-calendar origin/main`으로 브랜치를 판 부작용으로, 브랜치명과 upstream 브랜치명이 달라졌다. 관례대로 무인자 `git push`를 쳤다면 `push.default=simple`(이 레포엔 명시 설정 없음, git 기본값)이 이름 불일치로 거부했겠지만 — 실패로 끝나는지 확신할 수 없어 애초에 `git push -u origin HEAD`로 명시해 `origin/feat/req12-phase1-timeline-calendar`에 정확히 올리고 upstream도 바로잡았다. **`origin/main`으로 잘못 올라갈 뻔한 상황은 아니었지만(이름 불일치 시 git이 막아준다), 확인 없이 기본 형태(`git push`)를 믿지 않은 판단.**
+
+### 진행 중
+
+- 브랜치 `feat/req12-phase1-timeline-calendar`가 원격에 푸시됐고 `origin/main` 대비 커밋 3개(`0ca691b`·`363bcc7`·`67dfc45`)가 전부 올라가 있다. **PR은 아직 안 만들었다** — 사용자 요청이 있으면 다음에.
 - **미결 1건, 비차단** — feeding summary 필드 부분 누락 시 정확한 생략 형태(`PLAN-REQ-12` 미결 질문 마지막 항목). 원본 예시가 전 필드 케이스뿐이라 근거가 없다. 구현은 크래시 없이 동작하지만 정확한 포맷은 미확정 상태로 남겨 뒀다.
 
 ## 2026-09-14
