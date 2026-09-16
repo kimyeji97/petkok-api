@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-16 (**REQ-12 PR #54 `main` 병합 완료 — 스쿼시 머지.** 전날 "푸시 완료"로 기록했던 마지막 문서 커밋이 실제로는 원격에 안 올라가 있던 걸 발견해 먼저 푸시, PR 생성 → 머지 → `main` 실착지 확인까지 마쳤다)
+> 최종 갱신: 2026-09-16 (**REQ-12 PR #54 `main` 병합 완료 — 스쿼시 머지.** 전날 "푸시 완료"로 기록했던 마지막 문서 커밋이 실제로는 원격에 안 올라가 있던 걸 발견해 먼저 푸시, PR 생성 → 머지 → `main` 실착지 확인까지 마쳤다. 이어서 `/progress 예정` 조회가 찾은 REQ-09 인덱스 문구 불일치도 정정)
 
 ## 요구사항 인덱스
 
@@ -20,7 +20,7 @@
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
-| REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
+| REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 0건 — D3 예외 3건은 REQ-10 Phase 0 D5에서 처리돼 해소, 2026-09-16 정정) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘, REQ-10-15·38·49·74·100 회귀 테스트 재확인 필요) |
 | REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
 | REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | 2026-09-16 | ✅ (Phase 1(유일) 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — feeding summary 부분 누락 포맷 · `main` 병합 완료(PR #54, 스쿼시)) |
@@ -45,6 +45,10 @@
 - **⚠️ 새로 드러난 함정 — 스쿼시 머지에서는 원본 브랜치 커밋 SHA가 `main`의 조상이 되지 않는다.** 머지 후 로컬 정리하며 `git branch -d feat/req12-phase1-timeline-calendar`를 쳤더니 "merged to origin/feat/... but not yet merged to HEAD" 경고가 떴다 — 브랜치가 안전하게 머지됐는데도 뜨는 경고다. `git merge-base --is-ancestor 23c8e3c HEAD`도 실제로 `false`를 반환했다. **원인은 GitHub의 스쿼시 머지가 원본 커밋들을 조상으로 엮지 않고 새 커밋(diff 하나)을 만들기 때문** — AGENTS §4가 적어 둔 "`git log --oneline origin/main..origin/<브랜치>`가 비어야 한다" 판정은 **일반 머지(merge commit)** 기준이고, 스쿼시 머지에서는 이 조건이 애초에 성립하지 않는다(브랜치 자체가 원격에서 삭제되어 비교 대상도 없어진다). 이번엔 `git pull`이 보여준 파일 diff(18개 파일 생성/수정 내역이 PR 변경분과 일치)로 내용을 직접 대조해 안전을 확인했다. **다음에 같은 경고를 보면 "머지 실패"로 오판하지 말고 머지 방식(merge/squash/rebase)부터 확인할 것.**
 - 로컬 정리: `main`을 `origin/main`(`3471a5b`)으로 fast-forward, 머지된 로컬 feature 브랜치 삭제.
 - REQ-12 전체 종결 — 코드가 `main`에 안전하게 반영됐다. 미결 1건(feeding summary 부분 누락 포맷)은 비차단으로 계획서에 그대로 남겨 둔다.
+
+### 인덱스 정정 — REQ-09 "미결 1건"이 이미 해소된 채로 방치돼 있었다
+
+`/progress 예정` 조회 중 발견. 요구사항 인덱스 REQ-09 행이 "미결 1건 — D3 예외 3건은 REQ-10 Phase 0"라고 적혀 있었는데, REQ-10이 2026-09-03에 이미 `✅` 완료됐고 `PLAN-REQ-10` D5("REQ-09 D3·D4. ArchUnit 예외 3건이 정확히 이 형태만 허용한다")가 그 처리 내역까지 담고 있어 실질적으로는 닫힌 항목이었다. 인덱스 문구만 REQ-10 완료 시점에 안 따라간 것 — `PLAN-REQ-10` 헤더가 한번 똑같이 갈렸던 사례(2026-09-03, 이 로그 참고)와 같은 유형의 누락이다. `미결 0건`으로 정정.
 
 ## 2026-09-15
 
