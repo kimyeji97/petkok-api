@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-15 (**REQ-12 Phase 1(유일한 Phase) 구현·검증·푸시 완료 — 검증 계약 33건 전부 `✅`.** ArchUnit `DomainBoundaryTest`의 timeline 예외를 `business.timeline`에서 `data.timeline`까지 넓히는 결정이 구현 중에 나왔다(사용자 확인). `/testrun` (a) 수정을 별도 커밋으로 합쳐 `feat/req12-phase1-timeline-calendar` 브랜치를 원격에 푸시했다 — PR은 아직 미생성)
+> 최종 갱신: 2026-09-16 (**REQ-12 PR #54 `main` 병합 완료 — 스쿼시 머지.** 전날 "푸시 완료"로 기록했던 마지막 문서 커밋이 실제로는 원격에 안 올라가 있던 걸 발견해 먼저 푸시, PR 생성 → 머지 → `main` 실착지 확인까지 마쳤다)
 
 ## 요구사항 인덱스
 
@@ -23,7 +23,7 @@
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 1건 — D3 예외 3건은 REQ-10 Phase 0) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘, REQ-10-15·38·49·74·100 회귀 테스트 재확인 필요) |
 | REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
-| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | 2026-09-15 | ✅ (Phase 1(유일) 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — feeding summary 부분 누락 포맷 · 브랜치 `feat/req12-phase1-timeline-calendar` 푸시 완료, PR 미생성) |
+| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | 2026-09-16 | ✅ (Phase 1(유일) 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — feeding summary 부분 누락 포맷 · `main` 병합 완료(PR #54, 스쿼시)) |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 | REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록만 사람 손 대기) |
@@ -35,6 +35,16 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-16
+
+> **REQ-12 PR #54 `main` 병합 완료.** 전날 기록("브랜치 푸시 완료")과 실제 원격 상태가 어긋나 있던 걸 `/progress` 조회 중 발견 → 푸시 → PR 생성 → 머지 → 로컬 정리까지 이어서 처리했다.
+
+- **어제 기록의 "푸시 완료"가 부분적으로만 사실이었다.** `0ca691b`·`363bcc7`·`67dfc45` 3개는 실제로 올라가 있었지만, 그 사실을 기록한 문서 커밋 `23c8e3c` 자신은 그 뒤에 만들어져 안 실려 있었다 — `git fetch` 재확인으로 드러남. 먼저 `23c8e3c`을 푸시해 로컬·원격을 맞춘 뒤 PR #54(`feat/req12-phase1-timeline-calendar` → `main`)를 생성했다.
+- **PR 머지 확인 — AGENTS §4 경고("머지 표시만으로 안심하지 말 것")를 실측으로 한 번 더 확인.** `gh pr view`가 `MERGED`를 반환해도 그 자체는 증거가 아니라서, `git fetch` 후 `merge-base --is-ancestor <머지 커밋> origin/main`으로 실제 도달 가능성을 확인했다. 이번엔 정상 반영(과거 PR #22 사고와 달리 문제 없었음).
+- **⚠️ 새로 드러난 함정 — 스쿼시 머지에서는 원본 브랜치 커밋 SHA가 `main`의 조상이 되지 않는다.** 머지 후 로컬 정리하며 `git branch -d feat/req12-phase1-timeline-calendar`를 쳤더니 "merged to origin/feat/... but not yet merged to HEAD" 경고가 떴다 — 브랜치가 안전하게 머지됐는데도 뜨는 경고다. `git merge-base --is-ancestor 23c8e3c HEAD`도 실제로 `false`를 반환했다. **원인은 GitHub의 스쿼시 머지가 원본 커밋들을 조상으로 엮지 않고 새 커밋(diff 하나)을 만들기 때문** — AGENTS §4가 적어 둔 "`git log --oneline origin/main..origin/<브랜치>`가 비어야 한다" 판정은 **일반 머지(merge commit)** 기준이고, 스쿼시 머지에서는 이 조건이 애초에 성립하지 않는다(브랜치 자체가 원격에서 삭제되어 비교 대상도 없어진다). 이번엔 `git pull`이 보여준 파일 diff(18개 파일 생성/수정 내역이 PR 변경분과 일치)로 내용을 직접 대조해 안전을 확인했다. **다음에 같은 경고를 보면 "머지 실패"로 오판하지 말고 머지 방식(merge/squash/rebase)부터 확인할 것.**
+- 로컬 정리: `main`을 `origin/main`(`3471a5b`)으로 fast-forward, 머지된 로컬 feature 브랜치 삭제.
+- REQ-12 전체 종결 — 코드가 `main`에 안전하게 반영됐다. 미결 1건(feeding summary 부분 누락 포맷)은 비차단으로 계획서에 그대로 남겨 둔다.
 
 ## 2026-09-15
 
