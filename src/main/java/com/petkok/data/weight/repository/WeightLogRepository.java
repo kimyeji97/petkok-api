@@ -21,6 +21,9 @@ public interface WeightLogRepository extends JpaRepository<WeightLog, UUID> {
 
   Optional<WeightLog> findByIdAndPetId(UUID id, UUID petId);
 
+  /** timeline 월간 집계용(REQ-12) — 양 끝 포함. */
+  List<WeightLog> findByPetIdAndMeasuredDateBetween(UUID petId, LocalDate from, LocalDate to);
+
   /** 첫 페이지. {@code Pageable} 은 크기만 쓴다(정렬은 쿼리에 고정). */
   @Query("select w from WeightLog w where w.petId = :petId order by w.measuredDate desc, w.id desc")
   List<WeightLog> findFirstPage(@Param("petId") UUID petId, Pageable pageable);

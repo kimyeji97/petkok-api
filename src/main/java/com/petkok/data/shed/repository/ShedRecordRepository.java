@@ -18,6 +18,9 @@ public interface ShedRecordRepository extends JpaRepository<ShedRecord, UUID> {
 
   Optional<ShedRecord> findByIdAndPetId(UUID id, UUID petId);
 
+  /** timeline 월간 집계용(REQ-12) — 양 끝 포함. */
+  List<ShedRecord> findByPetIdAndShedDateBetween(UUID petId, LocalDate from, LocalDate to);
+
   /** 첫 페이지. 탈피 예측(최근 3건)도 이 메서드를 {@code Pageable(0, 3)} 으로 재사용한다. */
   @Query("select s from ShedRecord s where s.petId = :petId order by s.shedDate desc, s.id desc")
   List<ShedRecord> findFirstPage(@Param("petId") UUID petId, Pageable pageable);

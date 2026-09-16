@@ -19,6 +19,9 @@ public interface DiaryEntryRepository extends JpaRepository<DiaryEntry, UUID> {
 
   Optional<DiaryEntry> findByIdAndPetId(UUID id, UUID petId);
 
+  /** timeline 월간 집계용(REQ-12) — 양 끝 포함. */
+  List<DiaryEntry> findByPetIdAndEntryDateBetween(UUID petId, LocalDate from, LocalDate to);
+
   @Query("select d from DiaryEntry d where d.petId = :petId order by d.entryDate desc, d.id desc")
   List<DiaryEntry> findFirstPage(@Param("petId") UUID petId, Pageable pageable);
 
