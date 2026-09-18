@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-18 (`/testgen REQ-10`이 REQ-10 인덱스의 "REQ-10-15·38·49·74·100 재확인 필요" 문구를 조사 — 2026-09-10 발견이 오판이었음을 확인하고 정정)
+> 최종 갱신: 2026-09-18 (REQ-08 Phase 4 "미인증 401" 테스트 공백을 `/testgen`→`/testrun`으로 닫음 — `REQ-08-30` 추가·전건 통과)
 
 ## 요구사항 인덱스
 
@@ -19,7 +19,7 @@
 | REQ-13 | ~~MySQL 전환~~ — 2026-07-27 기각 (PostgreSQL 유지) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | — | ❌ |
 | REQ-14 | 패키지 구조 재설계 + 이행 (`business`/`data`/`framework` 3분할) | [PLAN-REQ-14](plans/PLAN-REQ-14-package-structure-migration.md) | 2026-07-28 | ✅ |
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
-| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
+| REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후 — Phase 4 "미인증 401" 테스트 공백은 2026-09-18 REQ-08-30으로 닫힘) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 0건 — D3 예외 3건은 REQ-10 Phase 0 D5에서 처리돼 해소, 2026-09-16 정정) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘 · REQ-10-15·38·49·74·100은 2026-09-18 재확인 — 테스트 이미 존재·통과, 2026-09-10 발견은 오판이었음) |
 | REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
@@ -52,6 +52,14 @@ REQ-17 `main` 병합 마무리(09-14) → REQ-12 Phase 1 구현·병합(09-16) �
 - `--tests` 클래스명 지정 + XML 결과(`build/test-results/test/*.xml`)로 재실행 확인 — 5건 전부 `tests="1" failures="0" errors="0"`. 표의 케이스(수정 요청 DTO에 `@NotNull`·`@NotBlank`가 없다)를 정확히 검증하는 형태라 느슨한 가짜 테스트도 아니다
 - **2026-09-10 발견의 원인은 추적하지 않았다** — 이 레포에 이미 문서화된 `--tests` 글롭·grep 패턴 함정(`CLAUDE.md` 「로컬 검증」)과 같은 유형으로 놓쳤을 가능성이 높아 보이나 확정하지 않는다
 - 새 테스트 코드를 쓰지 않았다 — 제1원칙("통과하는 가짜 테스트는 없는 테스트보다 나쁘다")에 따라 이미 존재·통과하는 케이스를 중복 생성하지 않음. 인덱스·계획서의 낡은 문구만 정정(이 커밋)
+
+### `/testgen REQ-08` → `/testrun REQ-08` — Phase 4 "미인증 401" 공백, 이번엔 실제 공백이라 닫음
+
+REQ-10과 같은 방식으로 REQ-08의 남은 미결 2건("관찰 후" 트리거 대기)을 확인하러 계획서를 다시 읽다가, 검증 계약 절이 스스로 적어 둔 다른 공백을 발견했다 — "완료 기준 중 '미인증 401'(Phase 4)은 케이스가 없어 테스트로는 고정되지 않았다"(2026-08-27 기록). REQ-10과 달리 **이번엔 실제로 비어 있었다**: `UserControllerWebMvcTest`를 대조하니 `REQ-15-05/06`은 `GET /users/me`만 미인증을 덮고, `DELETE /users/me/profile-image`는 204 케이스(`REQ-08-21`)뿐이었다.
+
+- `REQ-08-30`(토큰 없는 `DELETE /users/me/profile-image` → 401, 상태코드+에러코드 2 메서드) 추가 — 근거는 Phase 4 완료 기준 원문의 "미인증 401" 그대로, 기존 `REQ-15-05` 패턴을 그대로 복제
+- `/testrun REQ-08` — 관련 테스트 7파일 47건 전부 실행, 실패 0, 수정 루프 0회(1차 통과라 (a) 수정 자체가 없었다). 표 30행 ↔ 코드 29 ID 일치(`REQ-08-11`은 계획서가 애초에 자동화하지 않기로 한 수동 검증이라 코드 없음이 정상) · 근거 인용 표본 5건 전건 원문 존재
+- **REQ-08 두 미결(필터 조회 비용 · 탈퇴 계정 refresh)은 이번에도 손대지 않았다** — 둘 다 "관찰 후" 트리거(첫 배포 실측 · 클라이언트 앱 확인)가 아직 발생하지 않은 상태
 
 ## 2026-09-16
 
