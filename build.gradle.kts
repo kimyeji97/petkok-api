@@ -14,6 +14,11 @@ version = "0.0.1-SNAPSHOT"
 // 로컬·운영(Supabase PostgreSQL 17) 에서 "upgrade recommended" 경고를 낸다. 상향 고정.
 extra["flyway.version"] = "10.22.0"
 
+// Spring Boot 3.3.5 BOM 이 고정하는 Testcontainers 1.19.8(docker-java 3.3.6)은 API 버전을 1.32로
+// 못박아, colima 같은 최신 Docker 데몬(최소 API 1.40 요구)에서 "client version 1.32 is too old"로
+// 컨테이너 기동 자체가 실패한다(REQ-18 Phase 1 실측, 2026-09-18). PLAN-REQ-18 결정대로 override.
+extra["testcontainers.version"] = "1.21.4"
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -66,6 +71,12 @@ dependencies {
 
     // 구조 강제 — business/data/framework 3분할과 레이어 방향을 테스트로 고정 (AGENTS.md §3·§6)
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
+
+    // Testcontainers — DB 실물 대조 통합 테스트 (REQ-18, REQ-16 미결⑥ 해소).
+    // 버전 미명시 — org.postgresql:postgresql 과 같은 이유로 Spring Boot BOM 에 맡긴다.
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.testcontainers:junit-jupiter")
 }
 
 // ─── Spotless (google-java-format) ──────────────────────────
