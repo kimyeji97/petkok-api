@@ -1,6 +1,6 @@
 # PLAN-REQ-11 · gallery 도메인 (R2 presigned 업로드)
 
-> 출처: 2026-09-08 세션(`/progress` REQ-11/12 순서 논의 직후) · 작성: 2026-09-08 · 최종 갱신: 2026-09-18 · 상태: ✅ 완료 (Phase 0~2 전부 완료 · 미결 1건 해소(필드명) · 새 미결 1건 등록(응답 스키마 불일치, 비차단))
+> 출처: 2026-09-08 세션(`/progress` REQ-11/12 순서 논의 직후) · 작성: 2026-09-08 · 최종 갱신: 2026-09-18 · 상태: ✅ 완료 (Phase 0~2 전부 완료 · 미결 0건 — 필드명·응답 스키마 불일치 둘 다 2026-09-18 Notion 재대조로 해소)
 
 ## 배경
 
@@ -45,7 +45,7 @@ REQ-11을 REQ-12(timeline)보다 먼저 하기로 했다 — R2 인프라가 이
 
 - [x] **presigned 응답의 정확한 필드명**(예: `upload_url`/`image_url`) — 2026-09-09 당시엔 "계획서·스펙 어디에도 근거가 없다"로 기록됐으나, **2026-09-18 Notion 원본(「R2 업로드 URL 발급」 행, `api-list.md`가 아니라 페이지 본문)을 직접 열어보니 처음부터 있었다.** `page_last_edited_at: 2026-07-04`(REQ-06 API 설계 초안 시점) — 파생 문서 `api-list.md §9`가 바디 스키마를 아예 안 옮겨 적어 그동안 아무도 못 본 것으로 보인다. 원본 응답 예시가 `upload_url`/`image_url`을 그대로 쓰고 있어 `/implement`가 임의 확정한 이름(`PhotoPresignedUrlResponse(uploadUrl, imageUrl)`)과 **우연히 일치** — 확정 완료, 코드 변경 없음. 컨트롤러 테스트에 필드명 단언 추가(REQ-11-32, `/testgen`~`/testrun` 완료)
       ⚠️ **같은 원본 페이지에서 새 불일치를 발견했다 — 아래 새 미결 항목 참고.**
-- [ ] **presigned 요청·응답이 Notion 원본과 스키마 자체가 다르다 — 2026-09-18 발견.** 원본(「R2 업로드 URL 발급」 행)의 응답은 `upload_url`·`image_url`·**`expires_in`**(presigned URL 만료 초) 3개인데 구현(`PhotoPresignedUrlResponse`)엔 `expires_in`이 없다. 요청도 원본은 `pet_id`·`file_name`·`content_type`인데 구현(`PhotoPresignedUrlRequest`)은 `content_type`·`content_length`로 **완전히 다른 모양**이다 — `pet_id`·`file_name`이 없고 원본에 없는 `content_length`가 있다. REQ-11 결정 표의 "presigned는 pet 경로 밖이라 `pet_id`를 안 받는다"(2026-09-08 대화)는 이 원본 바디를 대조하지 않은 채 URL 경로 설계만 보고 내려진 판단으로 보인다 — 어느 쪽이 맞는지, `expires_in`을 추가할지는 **사람 판단이 필요**하다(2026-09-18 세션에서 "지금은 보류"로 확정, 코드 변경 없이 이 항목만 등록). 비차단 — 재검토 시 요청 DTO 재설계가 필요할 수 있어 `/workplan` 규모
+- [x] **presigned 요청·응답이 Notion 원본과 스키마 자체가 다르다 — 2026-09-18 발견, 같은 날 해소.** 원본(「R2 업로드 URL 발급」 행, `page_last_edited_at: 2026-07-04`)의 응답은 `upload_url`·`image_url`·`expires_in` 3개, 요청은 `pet_id`·`file_name`·`content_type`이었는데, 구현(2026-09-08 결정)은 응답 2개(`expires_in` 없음)·요청 `content_type`·`content_length`로 달랐다. **사용자 확인 후 "현재 구현을 공식으로, Notion을 정정"으로 결정** — 2026-09-08 결정("presigned는 pet 경로 밖이라 `pet_id` 불필요, 인증만 확인")이 원본 초안보다 늦고 더 근거가 탄탄하다고 판단(원본은 REQ-06 설계 초안 시점의 스케치일 뿐 REQ-11 착수 당시 재검토된 적이 없었다). Notion 「R2 업로드 URL 발급」 원본을 구현대로 재작성하고(요청 `{content_type, content_length}` · 응답 `{upload_url, image_url}`, `expires_in`·`pet_id`·`file_name` 제거) 정정 사유를 콜아웃으로 남겼다. 부수로 그 페이지의 `개발상태`가 "시작 전"으로 방치돼 있던 것도 "완료"로 정정. `docs/specs/api-list.md §9`에도 이번에 처음으로 이 엔드포인트의 바디 스키마를 옮겨 적었다(이전 판은 메서드·경로만 있어 이 불일치가 아무에게도 안 보였다). 코드 변경 없음
 
 ## 작업 단계
 

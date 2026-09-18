@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-18 (REQ-11 presigned 필드명·REQ-12 feeding summary 부분 누락 미결 2건 확정 — REQ-11은 Notion 원본에 처음부터 있던 걸 이번에 발견, 새 불일치(`expires_in` 등)는 별도 미결로 등록)
+> 최종 갱신: 2026-09-18 (REQ-11 presigned 스키마 불일치 해소 — Notion 원본을 구현대로 정정. REQ-08 2건은 배포·클라이언트 앱 부재로, REQ-17은 Notion 탭 API 제약으로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -22,7 +22,7 @@
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후 — Phase 4 "미인증 401" 테스트 공백은 2026-09-18 REQ-08-30으로 닫힘) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 0건 — D3 예외 3건은 REQ-10 Phase 0 D5에서 처리돼 해소, 2026-09-16 정정) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘 · REQ-10-15·38·49·74·100은 2026-09-18 재확인 — 테스트 이미 존재·통과, 2026-09-10 발견은 오판이었음) |
-| REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 34건 전부 통과 · 필드명 미결은 2026-09-18 해소(Notion 원본 재대조) · 새 미결 1건은 비차단 — presigned 요청·응답 스키마가 원본과 다름(`expires_in` 등)) |
+| REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 34건 전부 통과 · 미결 0건 — 2026-09-18 필드명·응답 스키마 불일치 둘 다 해소, Notion 「R2 업로드 URL 발급」 원본 구현대로 정정) |
 | REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | 2026-09-16 | ✅ (Phase 1(유일) 완료 · 검증 계약 37건 전부 통과 · 미결 0건 — feeding summary 부분 누락 포맷은 2026-09-18 해소 · `main` 병합 완료(PR #54, 스쿼시)) |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
@@ -83,6 +83,16 @@ REQ-10과 같은 방식으로 REQ-08의 남은 미결 2건("관찰 후" 트리�
 - Notion 역반영은 하지 않았다 — 원본이 이미 전 필드 예시만 갖고 있는 건 "부분 케이스를 명시 안 한 것"이지 "틀린 것"이 아니라서, 다른 summary 규칙들처럼 레포 계획서 안에서만 확정해도 되는 성격으로 판단
 
 **공통** — 두 항목 다 코드 변경 없이 **테스트로 기존 동작을 계약으로 고정**하는 형태였다. `spotlessApply`·`checkstyleMain/Test -PciStrict`·전체 테스트(`--rerun`) 통과 확인 — 343건 전부 통과(회귀 없음). REQ-08-30(지난 체크포인트부터 미커밋으로 남아 있던 테스트)도 이번에 같이 커밋한다 — 별도로 미룰 이유가 없어졌다.
+
+### REQ-11 presigned 스키마 불일치 — "현재 구현을 공식으로, Notion 정정"
+
+위에서 새로 등록한 미결(요청·응답 스키마가 Notion 원본과 다름)을 같은 세션에서 이어서 닫았다. **2026-09-08 결정(인증만 확인, `pet_id` 불필요)이 원본(2026-07-04 초안)보다 늦고 더 근거가 탄탄하다**고 판단해 원본을 구현에 맞춰 정정하는 쪽을 택했다.
+
+- Notion 「R2 업로드 URL 발급」 페이지 본문을 `replace_content`로 재작성 — 요청 `{content_type, content_length}` · 응답 `{upload_url, image_url}`(`expires_in`·`pet_id`·`file_name` 제거), 정정 사유를 콜아웃으로 남김
+  - ⚠️ **첫 시도에서 콜아웃 태그를 HTML 엔티티로 잘못 이스케이프**(`&lt;callout&gt;`)해 렌더링이 깨졌다 — `update_content`로 즉시 재수정, `fetch` 재조회로 정상 렌더 확인. **Notion 콜아웃·블록 태그는 리터럴 `<`·`>`를 써야 한다** — 이스케이프하면 태그가 아니라 텍스트로 저장된다(새로운 함정, CLAUDE.md 승격 후보)
+  - 부수로 그 페이지의 `개발상태`가 "시작 전"으로 방치돼 있던 것도 발견 — REQ-11이 이미 완료됐는데 이 필드만 안 따라간 것(다른 완료된 엔드포인트, 예: 「카카오 로그인」은 `완료`로 정상). "완료"로 정정
+- `docs/specs/api-list.md §9`에 이 엔드포인트의 요청·응답 스키마를 처음으로 옮겨 적었다 — 이전 판은 메서드·경로만 있어 이번 불일치가 아무에게도 안 보였던 근본 원인이었다
+- `PLAN-REQ-11` 미결 체크, 헤더·인덱스 "미결 0건"으로 정정. 코드 변경 없음
 
 ## 2026-09-16
 

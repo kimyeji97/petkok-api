@@ -160,6 +160,8 @@
 R2 2단계 업로드다 — presigned URL로 클라이언트가 직접 올린 뒤 메타데이터만 서버에 저장한다.
 `photos.diary_entry_id`가 `NULL`이면 단독 갤러리, 값이 있으면 일기 첨부다.
 
+**`POST /photos/presigned-url`** — 요청 `{content_type, content_length}` · 응답 `{upload_url, image_url}`(2026-09-18 Notion 재대조 확정, PLAN-REQ-11 참고). 인증만 확인하고 pet 소유권은 검증하지 않는다 — `pet_id`를 안 받는 이유.
+
 > 이전 판의 `/photos/upload-url`(경로 오기), `GET /photos/{id}`(상세), `PATCH /photos/{id}`(캡션 수정)는 Notion API I/F에 없어 제거했다.
 
 ## 10. Timeline `/api/v1/pets/{pet_id}/timeline`
