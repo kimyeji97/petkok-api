@@ -27,6 +27,7 @@
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 | REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록만 사람 손 대기) |
+| REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | — | 🟡 (계획서 확정 · 결정·미결 3건 전부 확정, 미결 0건 · Phase 착수 전) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
