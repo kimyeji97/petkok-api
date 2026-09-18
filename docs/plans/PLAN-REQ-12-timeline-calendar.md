@@ -1,6 +1,6 @@
 # PLAN-REQ-12 · timeline (월간 캘린더 + 이벤트 집계)
 
-> 출처: 2026-09-10~11 세션(`/workplan req-12`, Notion API I/F 원본 재대조) · 작성: 2026-09-11 · 상태: ✅ 완료 (2026-09-15 — Phase 1(유일한 Phase) 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — feeding summary 부분 누락 포맷)
+> 출처: 2026-09-10~11 세션(`/workplan req-12`, Notion API I/F 원본 재대조) · 작성: 2026-09-11 · 최종 갱신: 2026-09-18 · 상태: ✅ 완료 (2026-09-15 — Phase 1(유일한 Phase) 완료 · 검증 계약 37건 전부 통과 · 미결 0건 — feeding summary 부분 누락 포맷은 2026-09-18 해소)
 
 ## 배경
 
@@ -50,7 +50,7 @@ REQ-12는 개발 순서상 마지막 도메인(auth → user → pet → 기록 
 - [x] **`events[]` 항목의 타입별 부가 필드 스키마 — 확정(2026-09-11).** 도메인별 선택 필드 허용(근거는 `## 결정` 표)
 - [x] **`summary` 텍스트 생성 규칙 — 확정(2026-09-11).** 도메인별 조합 규칙(근거는 `## 결정` 표)
 - [x] **`type` 필터가 걸렸을 때 `markers`도 필터링되는지 — 확정(2026-09-11).** markers도 type으로 필터링(근거는 `## 결정` 표)
-- [ ] **feeding summary의 "필드 누락 시 정확한 생략 형태" — 미확정(2026-09-14, `/testgen` 발견).** 원본 예시(`"귀뚜라미(M) 5마리"`)는 전 필드가 있는 경우뿐이라 `foodSize`·`amount`·`amountUnit` 중 일부가 없을 때 `()`·공백을 정확히 어떻게 생략하는지 근거가 없다. `/testgen`은 전 필드 케이스(REQ-12-13)만 쓰고 부분 누락 조합은 테스트하지 않았다 — 구현 시 확정 필요, 확정되면 검증 계약에 케이스 추가
+- [x] **feeding summary의 "필드 누락 시 정확한 생략 형태" — 확정(2026-09-18).** 원본 예시(`"귀뚜라미(M) 5마리"`)는 전 필드가 있는 경우뿐이라 근거가 없었지만, `TimelineMerger.feedingSummary`가 이미 결정적 규칙으로 동작 중이었다 — `foodType`(있으면)+`"(foodSize)"`(있으면)+`" amount+unit"`(있으면, 공백은 앞에 내용이 있을 때만) 순서로 각 조각을 조건부로 이어 붙인다. 이 동작을 그대로 공식 계약으로 확정하고 검증 계약 REQ-12-34~37로 고정했다(코드 변경 없음)
 
 ## 작업 단계
 
@@ -98,8 +98,14 @@ REQ-12는 개발 순서상 마지막 도메인(auth → user → pet → 기록 
 | REQ-12-31 | `TimelineController` | 없는 펫 → 404·`error.code=PET_NOT_FOUND` | 예외 | 상동 | 1 | ✅ |
 | REQ-12-32 | `TimelineController` | 응답 이벤트 키가 snake_case(`ref_id`,`occurred_at` 등) | 정상 | api-list.md §10 응답 예시 | 1 | ✅ |
 | REQ-12-33 | `DomainBoundaryTest` | `business.timeline` cross-domain 예외가 실제로 작동 — 예외를 걷어낸 원본 규칙에서는 FAIL | **프로브(수동)** | PLAN §작업 단계 Phase 1 완료 기준 — "`business.timeline` ArchUnit 예외가 실제로 작동함을 프로브로 확인" | 1 | ✅ 수동 |
+| REQ-12-34 | `TimelineMerger.feedingSummary` | `foodSize` 없으면 `"{foodType} {amount}{unit}"`이다 | 경계 | 미결 질문 — "필드 누락 시 정확한 생략 형태" 확정(2026-09-18) | 1 | ✅ |
+| REQ-12-35 | 〃 | `amount`(+unit) 없으면 `"{foodType}({foodSize})"`다 | 경계 | 〃 | 1 | ✅ |
+| REQ-12-36 | 〃 | `foodType` 없으면 `"({foodSize}) {amount}{unit}"`이다 | 경계 | 〃 | 1 | ✅ |
+| REQ-12-37 | 〃 | 전 필드 누락이면 빈 문자열이다 | 경계 | 〃 | 1 | ✅ |
 
 **REQ-12-33은 코드로 안 쓴다** — REQ-10-01~03과 같은 방식(`docs/plans/PLAN-REQ-10-record-domains.md` 참고)으로, `/implement` 단계에서 실제 timeline 코드가 cross-domain 참조를 하게 된 뒤 예외 줄을 걷어내고 같은 프로브가 FAIL 하는지 수동 확인한다. `결과` 열엔 확인 후 "✅ 수동"을 적는다(`/checkpoint`).
+
+> **결과 갱신: 2026-09-18 — REQ-12-34~37 `✅`.** 미결이던 feeding summary 부분 누락 규칙을 "현재 구현(`TimelineMerger.feedingSummary`)대로 확정"으로 결정 — `TimelineMergerTest` 재실행 28/28 통과(`--rerun`, 신규 4건 포함). 원본(Notion 「통합 타임라인」)엔 전 필드 케이스만 있어 부분 누락 조합은 여전히 원본 근거가 없다 — 이번 확정은 원본이 아니라 **이미 동작 중인 구현을 공식 계약으로 승격**한 것(같은 결의 다른 summary 규칙들과 동일한 방식, 위 `## 결정` 표 참고).
 
 > ✅ **완료(2026-09-15, `/implement` Phase 1).** 계획대로 착수했으나 **예외 범위가 이 문서가 가정한 것보다 넓어야 했다** — `TimelineEventResponse`(`data.timeline.dto`)가 `ConditionTag`(diary)·`ActivityType`(activity)을 원본 타입 그대로 실어야 하는데, 기존 예외는 `com.petkok.business.timeline..`만 열어 뒀지 `com.petkok.data.timeline..`은 안 열어 뒀다(같은 "timeline" 슬라이스인데도). 사용자 확인 후 `ignoreDependency(resideInAnyPackage("com.petkok.business.timeline..", "com.petkok.data.timeline.."), alwaysTrue())`로 넓혔다. 프로브 방법도 계획과 다르다 — `git stash` 대신 **`cp` 백업**으로 되돌렸다(CLAUDE.local.md 「`git checkout`은 미스테이지 변경을 함께 삼킨다」 경고를 상시 적용). 예외 제거 → FAIL 확인 → 백업 복원 → PASS 재확인까지 완료.
 

@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-18 (`/progress 예정,미결` 조회가 찾은 `PLAN-REQ-09` 낡은 체크박스 정정 — 인덱스는 2026-09-16에 이미 고쳐졌는데 계획서 원본만 안 따라갔던 것)
+> 최종 갱신: 2026-09-18 (REQ-11 presigned 필드명·REQ-12 feeding summary 부분 누락 미결 2건 확정 — REQ-11은 Notion 원본에 처음부터 있던 걸 이번에 발견, 새 불일치(`expires_in` 등)는 별도 미결로 등록)
 
 ## 요구사항 인덱스
 
@@ -22,8 +22,8 @@
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후 — Phase 4 "미인증 401" 테스트 공백은 2026-09-18 REQ-08-30으로 닫힘) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 0건 — D3 예외 3건은 REQ-10 Phase 0 D5에서 처리돼 해소, 2026-09-16 정정) |
 | REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘 · REQ-10-15·38·49·74·100은 2026-09-18 재확인 — 테스트 이미 존재·통과, 2026-09-10 발견은 오판이었음) |
-| REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
-| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | 2026-09-16 | ✅ (Phase 1(유일) 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — feeding summary 부분 누락 포맷 · `main` 병합 완료(PR #54, 스쿼시)) |
+| REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 34건 전부 통과 · 필드명 미결은 2026-09-18 해소(Notion 원본 재대조) · 새 미결 1건은 비차단 — presigned 요청·응답 스키마가 원본과 다름(`expires_in` 등)) |
+| REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | 2026-09-16 | ✅ (Phase 1(유일) 완료 · 검증 계약 37건 전부 통과 · 미결 0건 — feeding summary 부분 누락 포맷은 2026-09-18 해소 · `main` 병합 완료(PR #54, 스쿼시)) |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 | REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록만 사람 손 대기) |
@@ -67,6 +67,22 @@ REQ-10과 같은 방식으로 REQ-08의 남은 미결 2건("관찰 후" 트리�
 
 - `docs/PROGRESS.md` 인덱스는 이미 2026-09-16(REQ-12 세션)에 "미결 0건"으로 정정된 상태였는데, **계획서 원본 체크박스와 헤더 "미결 1건 잔존" 문구만 안 따라간 채 이틀 넘게 남아 있었다** — 인덱스 정정이 원본 문서로 역전파되지 않은 사례. REQ-10 인덱스 문구의 오판(오늘 앞선 항목)과는 다른 종류의 불일치 — 이쪽은 실제로 해소된 사실이 한쪽 문서에만 반영되고 다른 쪽에 안 옮겨간 것
 - 체크박스를 `[x]`로 바꾸고 정정 사유·헤더 미결 카운트를 함께 고쳤다(`PLAN-REQ-09`). 코드 변경 없음
+
+### 예정 작업 목록 중 REQ-11·REQ-12 비차단 미결 2건 확정 — 사용자 요청("두 개만 진행하자")
+
+`/progress 예정,미정`이 보고한 6건 중 즉시 처리 가능한 2건(나머지 4건은 배포·클라이언트 앱·Testcontainers 도입·Notion 사람 손 같은 외부 트리거 대기라 이 세션에서 처리 불가)을 사용자 확인 후 닫았다.
+
+**REQ-11 presigned 응답 필드명** — Notion 원본을 직접 열어보기 전엔 "계획서·스펙 어디에도 근거 없음"으로 알고 있었는데, **실제로는 원본(「R2 업로드 URL 발급」 행, `page_last_edited_at: 2026-07-04` — REQ-06 API 설계 초안 시점)에 처음부터 있었다.** `docs/specs/api-list.md §9`가 바디 스키마를 아예 안 옮겨 적어(메서드·경로만 있음) 그동안 아무도 못 본 것으로 보인다.
+
+- 원본 응답 예시가 `upload_url`/`image_url`을 그대로 쓰고 있어, `/implement`가 2026-09-09에 임의 확정한 이름(`PhotoPresignedUrlResponse(uploadUrl, imageUrl)`)과 **우연히 일치** — 코드 변경 없이 확정, `REQ-11-32`로 필드명 단언 테스트 추가
+- ⚠️ **같은 원본 페이지에서 더 큰 불일치를 새로 발견했다.** 원본 응답엔 `expires_in`(만료 초)이 있는데 구현엔 없고, 원본 요청은 `pet_id`·`file_name`·`content_type`인데 구현은 `content_type`·`content_length`로 **모양 자체가 다르다.** 2026-09-08 결정("presigned는 pet 경로 밖이라 `pet_id` 불필요")은 이 원본 바디를 안 보고 URL 경로 설계만으로 내린 판단으로 보인다. **사용자 확인 후 지금은 보류 — 새 미결로 `PLAN-REQ-11`에 등록**(재검토 시 요청 DTO 재설계가 필요해 `/workplan` 규모)
+
+**REQ-12 feeding summary 부분 누락 포맷** — Notion 원본(「통합 타임라인」)은 여전히 전 필드 예시(`"귀뚜라미(M) 5마리"`)뿐이라 이쪽은 원본에서 답이 나오지 않았다. 대신 `TimelineMerger.feedingSummary`를 직접 읽어보니 이미 결정적 규칙으로 동작 중이었다 — 없는 필드는 그 부분만 건너뛴다(`foodType` → `"(foodSize)"` → `" amount+unit"` 순서로 조건부 결합). 사용자 확인 후 **이 동작을 그대로 공식 계약으로 승격** — 같은 문서의 다른 summary 규칙들(diary·activity·shed)도 전부 이런 식으로 구현을 보고 확정한 전례라 같은 결.
+
+- `TimelineMergerTest`에 `REQ-12-34~37`(foodSize 없음·amount 없음·foodType 없음·전부 없음) 추가, 트레이스대로 4건 전부 1차 통과
+- Notion 역반영은 하지 않았다 — 원본이 이미 전 필드 예시만 갖고 있는 건 "부분 케이스를 명시 안 한 것"이지 "틀린 것"이 아니라서, 다른 summary 규칙들처럼 레포 계획서 안에서만 확정해도 되는 성격으로 판단
+
+**공통** — 두 항목 다 코드 변경 없이 **테스트로 기존 동작을 계약으로 고정**하는 형태였다. `spotlessApply`·`checkstyleMain/Test -PciStrict`·전체 테스트(`--rerun`) 통과 확인 — 343건 전부 통과(회귀 없음). REQ-08-30(지난 체크포인트부터 미커밋으로 남아 있던 테스트)도 이번에 같이 커밋한다 — 별도로 미룰 이유가 없어졌다.
 
 ## 2026-09-16
 

@@ -1,6 +1,6 @@
 # PLAN-REQ-11 · gallery 도메인 (R2 presigned 업로드)
 
-> 출처: 2026-09-08 세션(`/progress` REQ-11/12 순서 논의 직후) · 작성: 2026-09-08 · 상태: ✅ 완료 (Phase 0~2 전부 완료 · 미결 1건은 비차단)
+> 출처: 2026-09-08 세션(`/progress` REQ-11/12 순서 논의 직후) · 작성: 2026-09-08 · 최종 갱신: 2026-09-18 · 상태: ✅ 완료 (Phase 0~2 전부 완료 · 미결 1건 해소(필드명) · 새 미결 1건 등록(응답 스키마 불일치, 비차단))
 
 ## 배경
 
@@ -43,7 +43,9 @@ REQ-11을 REQ-12(timeline)보다 먼저 하기로 했다 — R2 인프라가 이
 
 ## 미결 질문
 
-- [ ] **presigned 응답의 정확한 필드명**(예: `upload_url`/`image_url`) — 계획서·스펙 어디에도 근거가 없다(`/testgen` 2026-09-09 발견). `POST /photos/presigned-url` 컨트롤러 테스트는 상태 코드만 확인하고 필드명은 단언하지 않았다. `/implement`가 `PhotoPresignedUrlResponse(uploadUrl, imageUrl)`로 임의 확정해 실사용 중(2026-09-09, `8c3080c`) — 테스트가 필드명을 단언하지 않아 바꿔도 재검증 부담은 없다. REQ-08·09 선례(관찰 후 재검토 미결)와 같은 성격으로 REQ-11 완료 판정을 막지 않는다. 확정이 필요하면 Notion에 먼저 값을 정하고 역반영할 것
+- [x] **presigned 응답의 정확한 필드명**(예: `upload_url`/`image_url`) — 2026-09-09 당시엔 "계획서·스펙 어디에도 근거가 없다"로 기록됐으나, **2026-09-18 Notion 원본(「R2 업로드 URL 발급」 행, `api-list.md`가 아니라 페이지 본문)을 직접 열어보니 처음부터 있었다.** `page_last_edited_at: 2026-07-04`(REQ-06 API 설계 초안 시점) — 파생 문서 `api-list.md §9`가 바디 스키마를 아예 안 옮겨 적어 그동안 아무도 못 본 것으로 보인다. 원본 응답 예시가 `upload_url`/`image_url`을 그대로 쓰고 있어 `/implement`가 임의 확정한 이름(`PhotoPresignedUrlResponse(uploadUrl, imageUrl)`)과 **우연히 일치** — 확정 완료, 코드 변경 없음. 컨트롤러 테스트에 필드명 단언 추가(REQ-11-32, `/testgen`~`/testrun` 완료)
+      ⚠️ **같은 원본 페이지에서 새 불일치를 발견했다 — 아래 새 미결 항목 참고.**
+- [ ] **presigned 요청·응답이 Notion 원본과 스키마 자체가 다르다 — 2026-09-18 발견.** 원본(「R2 업로드 URL 발급」 행)의 응답은 `upload_url`·`image_url`·**`expires_in`**(presigned URL 만료 초) 3개인데 구현(`PhotoPresignedUrlResponse`)엔 `expires_in`이 없다. 요청도 원본은 `pet_id`·`file_name`·`content_type`인데 구현(`PhotoPresignedUrlRequest`)은 `content_type`·`content_length`로 **완전히 다른 모양**이다 — `pet_id`·`file_name`이 없고 원본에 없는 `content_length`가 있다. REQ-11 결정 표의 "presigned는 pet 경로 밖이라 `pet_id`를 안 받는다"(2026-09-08 대화)는 이 원본 바디를 대조하지 않은 채 URL 경로 설계만 보고 내려진 판단으로 보인다 — 어느 쪽이 맞는지, `expires_in`을 추가할지는 **사람 판단이 필요**하다(2026-09-18 세션에서 "지금은 보류"로 확정, 코드 변경 없이 이 항목만 등록). 비차단 — 재검토 시 요청 DTO 재설계가 필요할 수 있어 `/workplan` 규모
 
 ## 작업 단계
 
@@ -119,10 +121,10 @@ Phase 1(gallery CRUD)·Phase 2(diary 통합)에서 실제 요청/응답 로직�
 | REQ-11-24 | `PhotoService.delete` | R2 삭제 실패 → 예외 그대로 전파(500) | 회귀 | PLAN §결정 — "R2 삭제가 실패하면 DB 행은 그대로 두고 500 반환" | 1 | ✅ |
 | REQ-11-25 | `PhotoService.delete` | R2 삭제 성공 → 저장소 `delete` 호출(정상 경로) | 정상 | 〃 | 1 | ✅ |
 | REQ-11-26 | `Photo`(entity) | 소프트 딜리트 엔티티가 아니다 | 불변식 | AGENTS §5 — "users`·`pets`만 `deleted_at`" | 1 | ✅ |
-
-**미결(코드로 안 씀)** — presigned 응답의 정확한 필드명(`upload_url`/`image_url` 등). 계획서·스펙 어디에도 근거가 없다. `/implement`가 정하고, 컨트롤러 테스트는 상태 코드만 확인한다.
+| REQ-11-32 | `POST /photos/presigned-url` | 응답 키가 `upload_url`·`image_url`이다(snake_case) | 정상 | Notion 「R2 업로드 URL 발급」 원본 — "upload_url로 PUT 요청 후 /photos에 image_url 저장" | 1 | ✅ |
 
 > **결과 갱신: 2026-09-09.** 자체 실행 27건 중 3건 실패(REQ-11-01·14·15) — `/testrun`이 전부 (a) 테스트 결함으로 확인·수정(구현 변경 없음). 재실행 27/27 통과. Phase 1 완료 기준 충족.
+> **결과 갱신: 2026-09-18 — REQ-11-32 `✅`.** Notion 원본 재대조로 presigned 필드명 미결이 닫히면서 추가한 케이스. `PhotoControllerWebMvcTest` 재실행 7/7 통과(`--rerun`). 응답 스키마 자체의 나머지 불일치(`expires_in` 누락 등)는 별도 미결로 등록했고 이 케이스 범위 밖이다.
 
 ### Phase 2 (diary 통합)
 

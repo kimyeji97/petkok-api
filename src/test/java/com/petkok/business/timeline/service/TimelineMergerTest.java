@@ -335,6 +335,91 @@ class TimelineMergerTest {
   }
 
   @Test
+  @DisplayName("[REQ-12-34] feeding summary — foodSize 없으면 \"{foodType} {amount}{unit}\"이다")
+  void req_12_34_feedingSummaryOmitsMissingFoodSize() {
+    List<TimelineDayResponse> days =
+        TimelineMerger.merge(
+            List.of(),
+            List.of(
+                feeding(
+                    id("000000000034"),
+                    JUN_30_MIDNIGHT_KST,
+                    "귀뚜라미",
+                    null,
+                    new BigDecimal("5"),
+                    "마리",
+                    false)),
+            List.of(),
+            List.of(),
+            List.of(),
+            TimelineType.ALL);
+
+    assertThat(dayOf(days, JUN_30).events().get(0).summary()).isEqualTo("귀뚜라미 5마리");
+  }
+
+  @Test
+  @DisplayName("[REQ-12-35] feeding summary — amount 없으면 \"{foodType}({foodSize})\"이다")
+  void req_12_35_feedingSummaryOmitsMissingAmount() {
+    List<TimelineDayResponse> days =
+        TimelineMerger.merge(
+            List.of(),
+            List.of(
+                feeding(
+                    id("000000000035"),
+                    JUN_30_MIDNIGHT_KST,
+                    "귀뚜라미",
+                    FoodSize.M,
+                    null,
+                    null,
+                    false)),
+            List.of(),
+            List.of(),
+            List.of(),
+            TimelineType.ALL);
+
+    assertThat(dayOf(days, JUN_30).events().get(0).summary()).isEqualTo("귀뚜라미(M)");
+  }
+
+  @Test
+  @DisplayName("[REQ-12-36] feeding summary — foodType 없으면 \"({foodSize}) {amount}{unit}\"이다")
+  void req_12_36_feedingSummaryOmitsMissingFoodType() {
+    List<TimelineDayResponse> days =
+        TimelineMerger.merge(
+            List.of(),
+            List.of(
+                feeding(
+                    id("000000000036"),
+                    JUN_30_MIDNIGHT_KST,
+                    null,
+                    FoodSize.M,
+                    new BigDecimal("5"),
+                    "마리",
+                    false)),
+            List.of(),
+            List.of(),
+            List.of(),
+            TimelineType.ALL);
+
+    assertThat(dayOf(days, JUN_30).events().get(0).summary()).isEqualTo("(M) 5마리");
+  }
+
+  @Test
+  @DisplayName("[REQ-12-37] feeding summary — 전 필드 누락이면 빈 문자열이다")
+  void req_12_37_feedingSummaryIsEmptyWhenAllFieldsMissing() {
+    List<TimelineDayResponse> days =
+        TimelineMerger.merge(
+            List.of(),
+            List.of(
+                feeding(id("000000000037"), JUN_30_MIDNIGHT_KST, null, null, null, null, false)),
+            List.of(),
+            List.of(),
+            List.of(),
+            TimelineType.ALL);
+
+    assertThat(dayOf(days, JUN_30).events().get(0).summary()).isEmpty();
+  }
+
+  @Test
   @DisplayName("[REQ-12-14] weight summary — 원본 예시(\"62g\")를 재현한다")
   void req_12_14_weightSummaryReproducesOriginalExample() {
     List<TimelineDayResponse> days =

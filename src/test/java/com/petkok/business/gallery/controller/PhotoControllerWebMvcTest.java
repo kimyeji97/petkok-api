@@ -33,13 +33,14 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * gallery 도메인의 <b>HTTP 계약</b>. 검증 계약 REQ-11-01 · 05 · 06 · 11 · 18 (PLAN-REQ-11 § 검증 계약).
+ * gallery 도메인의 <b>HTTP 계약</b>. 검증 계약 REQ-11-01 · 05 · 06 · 11 · 18 · 32 (PLAN-REQ-11 § 검증 계약).
  *
  * <p>설정은 AGENTS §6 관례 — {@code @Import({SecurityConfig, JacksonConfig})} · {@link
  * UserStatusChecker} 는 이 슬라이스에 {@code UserService} 가 없으므로 따로 목. {@code message} 는 단언하지 않는다.
  *
- * <p>⚠️ presigned 응답의 정확한 필드명(예: {@code upload_url}/{@code image_url})은 계획서·스펙 어디에도 근거가 없어 <b>미결로
- * 남겼다</b> — 여기서는 상태 코드만 확인하고 응답 바디 필드는 단언하지 않는다.
+ * <p>presigned 응답 필드명({@code upload_url}/{@code image_url})은 2026-09-18 Notion 원본 재대조로
+ * 확정됐다(REQ-11-32) — 원본 「R2 업로드 URL 발급」 행이 애초에 이 이름을 갖고 있었다. 응답 스키마 전체가 원본과 일치하는지는 별도 미결(PLAN-REQ-11
+ * 참고).
  */
 @WebMvcTest(PhotoController.class)
 @Import({SecurityConfig.class, JacksonConfig.class})
@@ -87,6 +88,40 @@ class PhotoControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"content_type\":\"image/jpeg\",\"content_length\":1000000}"))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("[REQ-11-32] POST /photos/presigned-url 응답 키가 upload_url 이다 (snake_case)")
+  void req_11_32_presignedUrlResponseUsesSnakeCaseUploadUrl() throws Exception {
+    when(photoService.createPresignedUrl(any()))
+        .thenReturn(
+            new PhotoPresignedUrlResponse(
+                "https://r2.example.com/upload", "https://img.petkok.com/a.jpg"));
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/api/v1/photos/presigned-url")
+                .with(asUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content_type\":\"image/jpeg\",\"content_length\":1000000}"))
+        .andExpect(jsonPath("$.data.upload_url").exists());
+  }
+
+  @Test
+  @DisplayName("[REQ-11-32] POST /photos/presigned-url 응답 키가 image_url 이다 (snake_case)")
+  void req_11_32_presignedUrlResponseUsesSnakeCaseImageUrl() throws Exception {
+    when(photoService.createPresignedUrl(any()))
+        .thenReturn(
+            new PhotoPresignedUrlResponse(
+                "https://r2.example.com/upload", "https://img.petkok.com/a.jpg"));
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/api/v1/photos/presigned-url")
+                .with(asUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content_type\":\"image/jpeg\",\"content_length\":1000000}"))
+        .andExpect(jsonPath("$.data.image_url").exists());
   }
 
   @Test

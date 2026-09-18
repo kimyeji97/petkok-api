@@ -212,6 +212,22 @@ class UserControllerWebMvcTest {
   }
 
   @Test
+  @DisplayName("[REQ-08-30] 토큰 없는 DELETE /users/me/profile-image 요청은 401 이다")
+  void req_08_30_unauthenticatedRemoveProfileImageIsUnauthorized() throws Exception {
+    mockMvc
+        .perform(MockMvcRequestBuilders.delete("/api/v1/users/me/profile-image"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("[REQ-08-30] 토큰 없는 DELETE /users/me/profile-image 의 에러 코드는 UNAUTHORIZED 다")
+  void req_08_30_unauthenticatedRemoveProfileImageHasErrorCode() throws Exception {
+    mockMvc
+        .perform(MockMvcRequestBuilders.delete("/api/v1/users/me/profile-image"))
+        .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+  }
+
+  @Test
   @DisplayName("[REQ-08-25] PATCH 로 profile_image_url: null 을 보내면 서비스에 null 로 전달된다 (변경 없음 의미론 유지)")
   void req_08_25_explicitNullImageReachesServiceAsNull() throws Exception {
     // 병합("null = 변경 없음")은 REQ-08-05 가 서비스에서 고정한다. 여기서는 명시적 null 이
