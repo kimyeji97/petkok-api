@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-16 (**REQ-12 PR #54 `main` 병합 완료 — 스쿼시 머지.** 전날 "푸시 완료"로 기록했던 마지막 문서 커밋이 실제로는 원격에 안 올라가 있던 걸 발견해 먼저 푸시, PR 생성 → 머지 → `main` 실착지 확인까지 마쳤다. 이어서 `/progress 예정` 조회가 찾은 REQ-09 인덱스 문구 불일치도 정정)
+> 최종 갱신: 2026-09-18 (`/testgen REQ-10`이 REQ-10 인덱스의 "REQ-10-15·38·49·74·100 재확인 필요" 문구를 조사 — 2026-09-10 발견이 오판이었음을 확인하고 정정)
 
 ## 요구사항 인덱스
 
@@ -21,7 +21,7 @@
 | REQ-07 | auth 도메인 + DB 환경 구성 (Kakao 로그인 · refresh 로테이션 · V2 `refresh_tokens`) | [PLAN-REQ-07](plans/PLAN-REQ-07-auth-and-db-environment.md) | 2026-08-07 | ✅ (미결 0건 — 2026-08-27 해소) |
 | REQ-08 | user 도메인 (내 프로필 조회·수정 · 회원 탈퇴 · 프로필 이미지 제거 · 닉네임 규칙) | [PLAN-REQ-08](plans/PLAN-REQ-08-user-domain.md) | 2026-08-27 | ✅ (Phase 0~5 · 미결 2건은 관찰 후) |
 | REQ-09 | pet 도메인 + `PetAccessGuard` (소유권 앵커) | [PLAN-REQ-09](plans/PLAN-REQ-09-pet-domain.md) | 2026-08-27 | ✅ (미결 0건 — D3 예외 3건은 REQ-10 Phase 0 D5에서 처리돼 해소, 2026-09-16 정정) |
-| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘, REQ-10-15·38·49·74·100 회귀 테스트 재확인 필요) |
+| REQ-10 | 기록 도메인 5종 (weight/activity/feeding/shed/diary) + 계산기 2 | [PLAN-REQ-10](plans/PLAN-REQ-10-record-domains.md) | 2026-09-03 | ✅ (Phase 0~5 전부 완료 · 검증 계약 111건 전부 · Notion 역반영 4건 전부 완료 · Phase 1·2 로컬 DB keyset 경계 실측도 2026-09-07 완료 — 미결 0건 · REQ-10-108·109는 2026-09-10 REQ-11 Phase 2에서 뒤집힘 · REQ-10-15·38·49·74·100은 2026-09-18 재확인 — 테스트 이미 존재·통과, 2026-09-10 발견은 오판이었음) |
 | REQ-11 | gallery (R2 presigned 업로드) — diary↔사진 연결(D4 이관분) 포함 | [PLAN-REQ-11](plans/PLAN-REQ-11-gallery-domain.md) | 2026-09-10 | ✅ (Phase 0~2 전부 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — presigned 응답 필드명) |
 | REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | 2026-09-16 | ✅ (Phase 1(유일) 완료 · 검증 계약 33건 전부 통과 · 미결 1건은 비차단 — feeding summary 부분 누락 포맷 · `main` 병합 완료(PR #54, 스쿼시)) |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
@@ -35,6 +35,23 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-18
+
+> **`/testgen REQ-10`가 2026-09-10 발견("PATCH DTO 회귀 테스트 5건 누락")이 오판이었음을 확인·정정.** 코드 변경 없음 — `/progress 금주` 조회의 예정 작업 목록에서 이 항목이 다시 걸려, 다섯 도메인 중 하나를 건드리기 전에 먼저 사실 확인부터 했다.
+
+### `/progress 금주,예정,미정` — 이번 주 요약 조회
+
+REQ-17 `main` 병합 마무리(09-14) → REQ-12 Phase 1 구현·병합(09-16) → REQ-09 인덱스 정정(09-16) 흐름을 확인. Notion Task 상태(REQ-09·12·17 = `완료`)도 인덱스와 대조해 불일치 없음을 확인했다. 예정 작업 목록에서 REQ-10의 "회귀 테스트 재확인 필요" 항목이 유일한 미해소 후속으로 걸려 이어서 조사했다.
+
+### `/testgen REQ-10` — "테스트 없음" 발견이 오판이었다
+
+**2026-09-10 세션이 "REQ-10-15·38·49·74·100(다섯 도메인의 PATCH DTO `@NotNull`·`@NotBlank` 금지 회귀 케이스)에 해당하는 `[REQ-10-XX]` 테스트가 코드에 없다"고 기록해 뒀는데, 실제로는 다섯 파일(`WeightDtoContractTest`·`ActivityDtoContractTest`·`FeedingDtoContractTest`·`ShedDtoContractTest`·`DiaryDtoContractTest`) 전부 처음부터 있었다.**
+
+- `git log --follow`로 대조 — 다섯 파일 모두 **각 Phase의 원래 구현 커밋에서 이미 생성**됐다(`WeightDtoContractTest`는 Phase 1 커밋 `acde9ab`, 2026-08-28). 그 뒤로 수정 이력 자체가 없다 — 나중에 채워진 게 아니라 처음부터 있었다는 뜻
+- `--tests` 클래스명 지정 + XML 결과(`build/test-results/test/*.xml`)로 재실행 확인 — 5건 전부 `tests="1" failures="0" errors="0"`. 표의 케이스(수정 요청 DTO에 `@NotNull`·`@NotBlank`가 없다)를 정확히 검증하는 형태라 느슨한 가짜 테스트도 아니다
+- **2026-09-10 발견의 원인은 추적하지 않았다** — 이 레포에 이미 문서화된 `--tests` 글롭·grep 패턴 함정(`CLAUDE.md` 「로컬 검증」)과 같은 유형으로 놓쳤을 가능성이 높아 보이나 확정하지 않는다
+- 새 테스트 코드를 쓰지 않았다 — 제1원칙("통과하는 가짜 테스트는 없는 테스트보다 나쁘다")에 따라 이미 존재·통과하는 케이스를 중복 생성하지 않음. 인덱스·계획서의 낡은 문구만 정정(이 커밋)
 
 ## 2026-09-16
 
