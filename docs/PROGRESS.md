@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-21 (REQ-18 Phase 1 판정 — `/testrun REQ-18`로 REQ-18-01 통과·풀 스위트 회귀 없음 확인. REQ-08 2건은 배포·클라이언트 앱 부재로, REQ-17은 Notion 탭 API 제약으로 여전히 보류)
+> 최종 갱신: 2026-09-21 (REQ-18 전체 완료 — Phase 2 스모크 테스트·프로브까지 통과, REQ-16 미결⑥ 해소·`CLAUDE.md` 문구 정정. REQ-08 2건은 배포·클라이언트 앱 부재로, REQ-17은 Notion 탭 API 제약으로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -27,7 +27,7 @@
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 | REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록만 사람 손 대기) |
-| REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | — | 🟡 (Phase 1 완료 · 검증 계약 REQ-18-01 통과, 풀 스위트 344건 회귀 없음 · Phase 2 착수 전) |
+| REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | 2026-09-21 | ✅ (Phase 1·2 전부 완료 · 검증 계약 REQ-18-01·02 통과 + REQ-18-03 수동 프로브 통과, 풀 스위트 345건 회귀 없음 · 미결 0건 · REQ-16 미결⑥ 해소 · `CLAUDE.md` 문구 정정 완료) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -51,7 +51,15 @@
 
 `PLAN-REQ-18` 검증 계약 REQ-18-01 `결과` 열 ✅, Phase 1 체크박스 `[x]`, 계획서 상태 🟡 진행으로 갱신(아래 3.5절과 동일 내용).
 
-**남은 것** — Phase 2(스모크 통합 테스트 + 프로브 검증)는 착수 전. 계획서가 명시한 대로 `/testgen REQ-18`을 다시 돌려 Phase 2 검증 계약을 먼저 추가해야 한다.
+### `/testgen REQ-18` → `/implement REQ-18 2` → `/testrun REQ-18` — Phase 2, REQ-18 전체 완료
+
+같은 세션에서 이어서 Phase 2(스모크 통합 테스트 + 프로브)까지 마쳤다.
+
+- **REQ-18-02(정상 케이스)** — `UserRepositoryContainerTest` 작성. `User`를 실 컨테이너 DB에 저장→조회해 JPA Auditing이 채운 `createdAt`을 확인한다. **`/implement`가 별도 프로덕션 코드 없이 1차 통과시켰다** — Phase 1까지 이미 갖춰진 `User`·`UserRepository`·`JpaAuditingConfig`가 완료 기준을 그대로 충족했기 때문
+- **REQ-18-03(프로브, 수동) — 계획서가 예시로 든 방법이 실제로는 안 통했다.** `/testgen`이 적어 둔 "`BaseCreatedEntity.createdAt` 필드 타입을 `OffsetDateTime`→`LocalDateTime`으로 되돌리면 FAIL한다"는 실측에서 **FAIL하지 않았다** — Spring의 `ObjectToObjectConverter`가 `LocalDateTime.from(OffsetDateTime)`으로 오프셋만 버리고 조용히 변환에 성공했다. **대신 실제 역사적 결함의 반대 방향**(`JpaAuditingConfig`의 `dateTimeProviderRef`를 빼 기본 `LocalDateTime`-only 프로바이더로 되돌리기)으로 시도하자 REQ-10 2026-09-07 실측(PR #51)과 **문구까지 동일한 예외**(`Cannot convert unsupported date type java.time.LocalDateTime to java.time.OffsetDateTime`)로 FAIL — `cp` 백업으로 원복 후 PASS 재확인까지 완료. `PLAN-REQ-18` 검증 계약의 `대상`·`케이스` 열을 실제로 검증한 방법으로 정정했다(계획서를 조용히 맞추지 않고 이 사실을 남긴다)
+- **`/testrun REQ-18`** — REQ-18-02 자체 재실행 통과, 풀 스위트(`--rerun`) 345건 전부 통과(REQ-18-02 1건 늘어 344→345). (a)·(b) 없음. 근거 인용도 원문과 일치, 스펙 드리프트 없음
+- **REQ-16 미결⑥ 해소** — `PLAN-REQ-16` § 미결 질문 ⑥에 REQ-18 완료 각주 추가. `CLAUDE.md` 「시각 처리」 절의 "그 구멍은 Testcontainers 도입 전까지 열려 있다"는 낡은 문구를 정정 — 이제 스모크 1건(User) 범위로 메워졌고, keyset 경계 등 나머지는 여전히 사람 손 실측이라는 것을 명시했다(같은 커밋)
+- `PLAN-REQ-18` — REQ-18-02·03 결과 열 채움, Phase 2 체크박스 `[x]`, 계획서 상태 ✅ 완료로 갱신. **미결 0건, REQ-18 전체 종결.**
 
 ## 2026-09-18
 
