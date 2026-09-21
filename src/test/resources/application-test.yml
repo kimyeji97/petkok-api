@@ -1,0 +1,16 @@
+# test 프로파일 — Testcontainers 통합 테스트 전용(REQ-18).
+#   db.schema 는 여전히 기본값이 없다(application.yml 원칙 그대로) — 여기서 petkok_test 로 명시한다.
+#   spring.datasource.* 는 @ServiceConnection(TestcontainersConfig)이 컨테이너 접속 정보로
+#   덮어쓰므로 실제로 쓰이지 않는다 — 다만 ${DB_URL} 같은 플레이스홀더가 해석되지 않아 기동이
+#   막히는 것을 피하려고 리터럴 더미 값을 둔다.
+db:
+  schema: petkok_test
+
+spring:
+  datasource:
+    url: jdbc:postgresql://placeholder/placeholder
+    username: placeholder
+    password: placeholder
+
+jwt:
+  secret: test-secret-change-me-please-0123456789abcdef

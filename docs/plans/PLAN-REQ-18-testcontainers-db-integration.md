@@ -1,6 +1,6 @@
 # PLAN-REQ-18 · Testcontainers 도입 — DB 실물 대조 통합 테스트
 
-> 출처: 2026-09-18 세션(REQ-11 마무리 후 남은 백로그 정리 중 REQ-16 미결⑥ 논의) · 작성: 2026-09-18 · 최종 갱신: 2026-09-18 · 상태: 📝 초안 (결정·미결 전부 확정, 미결 0건 — Phase 착수 전)
+> 출처: 2026-09-18 세션(REQ-11 마무리 후 남은 백로그 정리 중 REQ-16 미결⑥ 논의) · 작성: 2026-09-18 · 최종 갱신: 2026-09-21 · 상태: ✅ 완료 (Phase 1·2 전부 완료 · 검증 계약 REQ-18-01·02 통과 + REQ-18-03 수동 프로브 통과, 풀 스위트 345건 회귀 없음 · 미결 0건)
 
 ## 배경
 
@@ -51,11 +51,11 @@ CLAUDE.md도 이걸 "Testcontainers 도입 전까지 열려 있는 구멍"으로
 
 ## 작업 단계
 
-- [ ] **Phase 1 — 의존성·컨테이너 배선**
-      완료 기준: `build.gradle.kts`에 세 의존성 추가 · 싱글톤 컨테이너 설정 클래스 작성 · Flyway 마이그레이션이 컨테이너 기동 시 자동 적용됨을 확인(컨테이너 안에 `flyway_schema_history` 테이블·마이그레이션 행이 실제로 생김) · `./gradlew test` 전체가 기존과 동일하게 통과(회귀 없음, 컨테이너 관련 신규 실패 0건)
+- [x] **Phase 1 — 의존성·컨테이너 배선**
+      완료 기준: `build.gradle.kts`에 세 의존성 추가 · 싱글톤 컨테이너 설정 클래스 작성 · Flyway 마이그레이션이 컨테이너 기동 시 자동 적용됨을 확인(컨테이너 안에 `flyway_schema_history` 테이블·마이그레이션 행이 실제로 생김) · `./gradlew test` 전체가 기존과 동일하게 통과(회귀 없음, 컨테이너 관련 신규 실패 0건) — **2026-09-21 `/testrun REQ-18`로 확인, 전부 충족**
 
-- [ ] **Phase 2 — 스모크 통합 테스트 + 프로브 검증**
-      완료 기준: `User` 엔티티를 실제 컨테이너에 저장 → 조회하는 통합 테스트 최소 1건 추가(카카오 자동가입 경로 재현) · 엔티티 타입을 일부러 깨서 테스트가 FAIL하는 것 확인(프로브) → 원복 → PASS 재확인 · REQ-16 미결⑥ 체크 · `CLAUDE.md`의 "Testcontainers 도입 전까지 열려 있다"는 문구 정정 제안
+- [x] **Phase 2 — 스모크 통합 테스트 + 프로브 검증**
+      완료 기준: `User` 엔티티를 실제 컨테이너에 저장 → 조회하는 통합 테스트 최소 1건 추가(카카오 자동가입 경로 재현) · 엔티티 타입을 일부러 깨서 테스트가 FAIL하는 것 확인(프로브) → 원복 → PASS 재확인 · REQ-16 미결⑥ 체크 · `CLAUDE.md`의 "Testcontainers 도입 전까지 열려 있다"는 문구 정정 제안 — **2026-09-21 `/testrun REQ-18`·`/checkpoint`로 확인, 전부 충족.** REQ-16 미결⑥은 `PLAN-REQ-16` § 미결 질문에 REQ-18 완료 각주 추가, `CLAUDE.md` 「시각 처리」 절 문구도 정정(둘 다 이 커밋)
 
 ## 검증 계약
 
@@ -65,7 +65,13 @@ CLAUDE.md도 이걸 "Testcontainers 도입 전까지 열려 있는 구멍"으로
 
 | ID | 대상 | 케이스 | 유형 | 근거 | Phase | 결과 |
 |----|------|--------|:--:|------|:--:|:--:|
-| REQ-18-01 | `Flyway` 빈(Testcontainers 통합) | 컨테이너 기동 후 마이그레이션이 자동 적용된다(`info().applied()`가 비어 있지 않다) | 정상 | Phase 1 완료 기준 — "Flyway 마이그레이션이 컨테이너 기동 시 자동 적용됨을 확인(컨테이너 안에 `flyway_schema_history` 테이블·마이그레이션 행이 실제로 생김)" | 1 | — |
+| REQ-18-01 | `Flyway` 빈(Testcontainers 통합) | 컨테이너 기동 후 마이그레이션이 자동 적용된다(`info().applied()`가 비어 있지 않다) | 정상 | Phase 1 완료 기준 — "Flyway 마이그레이션이 컨테이너 기동 시 자동 적용됨을 확인(컨테이너 안에 `flyway_schema_history` 테이블·마이그레이션 행이 실제로 생김)" | 1 | ✅ |
+| REQ-18-02 | `UserRepository`(실 컨테이너 DB) | `User`를 저장→조회하면 JPA Auditing이 채운 `createdAt`이 채워져 있다(카카오 자동가입 경로 재현) | 정상 | Phase 2 완료 기준 — "`User` 엔티티를 실제 컨테이너에 저장 → 조회하는 통합 테스트 최소 1건 추가(카카오 자동가입 경로 재현)" | 2 | ✅ |
+| REQ-18-03 | `JpaAuditingConfig.dateTimeProviderRef` | 커스텀 `DateTimeProvider`를 빼 기본(LocalDateTime-only)으로 되돌리면 REQ-18-02가 실제로 FAIL한다 → 원복 → PASS 재확인 | 프로브(수동) | Phase 2 완료 기준 — "엔티티 타입을 일부러 깨서 테스트가 FAIL하는 것 확인(프로브) → 원복 → PASS 재확인" | 2 | ✅ 수동 |
+
+**REQ-18-03은 코드로 안 쓴다** — REQ-12-33·REQ-10-01~03과 같은 방식(`docs/plans/PLAN-REQ-12-timeline-calendar.md` §검증 계약 참고)으로 `/implement` 단계에서 수행했다. `결과` 열엔 확인 후 "✅ 수동"을 적는다(`/checkpoint`).
+
+> ⚠️ **2026-09-21 `/implement` 실측 — 이 표가 원래 적었던 구체적 방법("`BaseCreatedEntity.createdAt` 필드 타입을 `OffsetDateTime`→`LocalDateTime`으로 되돌린다")은 실제로 FAIL하지 않았다.** Spring의 `ObjectToObjectConverter`가 `LocalDateTime.from(OffsetDateTime)`으로 오프셋만 버리고 조용히 변환에 성공했기 때문 — `대상`·`케이스` 열을 실제로 FAIL을 재현한 방법(`JpaAuditingConfig`의 `dateTimeProviderRef`를 빼 기본 `DateTimeProvider`로 되돌리는 것)으로 위와 같이 정정했다. `cp` 백업으로 두 버전 다 되돌렸다(`git checkout <파일>`은 미스테이지 변경을 함께 삼킨다, CLAUDE.local.md). 재현된 예외는 `Cannot convert unsupported date type java.time.LocalDateTime to java.time.OffsetDateTime` — REQ-10 2026-09-07 실측(PR #51)과 문구까지 동일해, 이 스모크 테스트가 **정확히 그 결함 클래스를 잡아낸다**는 것이 실측으로 확인됐다.
 
 ## 제약·함정
 
