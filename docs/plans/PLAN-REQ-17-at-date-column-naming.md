@@ -28,8 +28,10 @@ DB 네이밍 컨벤션을 "`_at` = 시각(`timestamptz`) · `_date` = 날짜(`da
 - 문서 갱신: `docs/specs/db-schema.md`, `docs/specs/api-list.md`
 - Notion 원본 역반영: 「테이블 정의서」(개요 행·weight_logs/photos 컬럼·인덱스 행) ·
   「API I/F」 4행(체중 목록·체중 기록·갤러리 목록·사진 메타데이터 저장) —
-  **코드 변경보다 먼저 진행(미결 ③ 결정), 2026-09-11 완료.** DB 탭 DDL 코드블록은 탭 객체라
-  API로 못 고쳐 사람 손 대기(선례: `docs/specs/db-schema.md:290`)
+  **코드 변경보다 먼저 진행(미결 ③ 결정), 2026-09-11 완료.** DB 탭 DDL 코드블록은 당시
+  탭 객체라 API로 못 고친다고 보고 사람 손 대기로 남겼으나(선례로 인용한 `docs/specs/db-schema.md:290`도
+  같은 착오), **2026-09-21 정정** — 실제로는 최상위 페이지에 인라인으로 박힌 콘텐츠라 API로 반영 완료
+  (`## 작업 단계` Phase 1 참고)
 
 **제외**
 - 컬럼 타입 변경 없음 — `date`/`LocalDate` 그대로. REQ-16/ADR-0002가 이미 확정한 부분이라
@@ -64,8 +66,9 @@ DB 네이밍 컨벤션을 "`_at` = 시각(`timestamptz`) · `_date` = 날짜(`da
       「API I/F」 4행(체중 목록·체중 기록·갤러리 목록·사진 메타데이터 저장)을
       `measured_date`·`taken_date`로 갱신 후 `fetch` 재조회로 반영 확인 ✅ ·
       `docs/specs/db-schema.md`·`api-list.md` 동반 갱신 ✅.
-      **닫지 못한 것** — 「설계」→ DB 탭의 DDL 코드블록(탭 객체라 API로 수정 불가, 사람 손 대기 —
-      `docs/specs/db-schema.md:290`의 선례와 동일 케이스)
+      **2026-09-21 닫힘** — 「설계」→ DB 탭의 DDL 코드블록도 반영 완료. 애초에 탭 객체가 아니라 최상위 페이지
+      본문에 인라인으로 박힌 콘텐츠였다 — 최상위 페이지에 `update_content`를 쓰니 정상 반영됐다(`CLAUDE.md`
+      「Notion 편집 함정」 정정 참고). Phase 1 남은 항목 없음
 - [x] **Phase 2 — DB 마이그레이션 + 코드 리네임** — 완료 2026-09-11(코드) · 2026-09-14(`/testrun` 재확인)
       완료 기준: `V5__rename_at_to_date_columns.sql`(컬럼 2개 + 인덱스 1개) 적용 후
       `./gradlew build -x test` 통과 ✅, `WeightLog`·`Photo` 및 관련 DTO·Repository·Service 전부

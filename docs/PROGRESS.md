@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-21 (REQ-18 전체 완료 — Phase 2 스모크 테스트·프로브까지 통과, REQ-16 미결⑥ 해소·`CLAUDE.md` 문구 정정. REQ-08 2건은 배포·클라이언트 앱 부재로, REQ-17은 Notion 탭 API 제약으로 여전히 보류)
+> 최종 갱신: 2026-09-21 (REQ-18 전체 완료 — Phase 2 스모크 테스트·프로브까지 통과, REQ-16 미결⑥ 해소. REQ-17 마지막 미결(Notion DB 탭 DDL)도 API로 닫혀 남은 활성 항목 없음 — 이전에 "탭은 API로 안 됨"이라 믿었던 CLAUDE.md 문구가 틀렸던 것으로 드러나 정정. REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -26,7 +26,7 @@
 | REQ-12 | timeline (월간 캘린더 + 이벤트 집계, 다중 테이블 앱 레벨 병합) | [PLAN-REQ-12](plans/PLAN-REQ-12-timeline-calendar.md) | 2026-09-16 | ✅ (Phase 1(유일) 완료 · 검증 계약 37건 전부 통과 · 미결 0건 — feeding summary 부분 누락 포맷은 2026-09-18 해소 · `main` 병합 완료(PR #54, 스쿼시)) |
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
-| REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록만 사람 손 대기) |
+| REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록도 2026-09-21 API로 반영 완료 — 남은 것 없음) |
 | REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | 2026-09-21 | ✅ (Phase 1·2 전부 완료 · 검증 계약 REQ-18-01·02 통과 + REQ-18-03 수동 프로브 통과, 풀 스위트 345건 회귀 없음 · 미결 0건 · REQ-16 미결⑥ 해소 · `CLAUDE.md` 문구 정정 완료) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
@@ -60,6 +60,15 @@
 - **`/testrun REQ-18`** — REQ-18-02 자체 재실행 통과, 풀 스위트(`--rerun`) 345건 전부 통과(REQ-18-02 1건 늘어 344→345). (a)·(b) 없음. 근거 인용도 원문과 일치, 스펙 드리프트 없음
 - **REQ-16 미결⑥ 해소** — `PLAN-REQ-16` § 미결 질문 ⑥에 REQ-18 완료 각주 추가. `CLAUDE.md` 「시각 처리」 절의 "그 구멍은 Testcontainers 도입 전까지 열려 있다"는 낡은 문구를 정정 — 이제 스모크 1건(User) 범위로 메워졌고, keyset 경계 등 나머지는 여전히 사람 손 실측이라는 것을 명시했다(같은 커밋)
 - `PLAN-REQ-18` — REQ-18-02·03 결과 열 채움, Phase 2 체크박스 `[x]`, 계획서 상태 ✅ 완료로 갱신. **미결 0건, REQ-18 전체 종결.**
+
+### REQ-17 마지막 미결 — Notion DB 탭 DDL 코드블록, 사람 손 없이 API로 닫힘
+
+`/progress 예정,미정`이 유일한 비차단 미결로 보고한 것 중 하나("Notion DB 탭 DDL 코드블록만 사람 손 대기")를 사용자 요청("노션 편집 진행하자")으로 이어서 처리했다.
+
+- **시도 전 가정 — CLAUDE.md의 "DB·API 탭은 API로 수정할 수 없다"는 문구를 그대로 믿었다.** 그런데 실제로 `notion-update-page`(`update_content`)를 최상위 페이지(`389b81b5…`, 팻콕 메인 페이지) `page_id`로 호출하니 **에러 없이 성공했다** — `weight_logs.measured_at`→`measured_date`(컬럼·인덱스명 둘 다), `photos.taken_at`→`taken_date` 반영. `fetch` 재조회로 확인(`page_last_edited_at`도 갱신됨)
+- **원인 — DDL 코드블록은 "탭 페이지"가 아니라 최상위 페이지 본문에 `<tabs><tab>`으로 직접 박힌 인라인 콘텐츠였다.** CLAUDE.md가 막힌다고 적은 건 **탭이 링크하는 별도 페이지**(예: 「ERD 설계」)에 대한 제약이었는데, DDL 코드블록엔 그게 해당하지 않는 걸 이전 세션(REQ-16, 2026-08~09월)이 구분 없이 일반화해 시도조차 안 하고 사람 손으로 넘겼던 것으로 보인다
+- **CLAUDE.md 「Notion 편집 함정」 정정** — "DB·API 탭은 API로 수정할 수 없다"는 문구를 "탭이 링크하는 별도 페이지만 안 된다, 탭에 인라인으로 박힌 콘텐츠는 최상위 페이지에 `update_content`로 된다"로 고쳤다. **다음에 비슷한 "탭이라 API로 안 됨" 판단을 내리기 전에 대상이 인라인 콘텐츠인지 링크된 별도 페이지인지부터 구분할 것**
+- `PLAN-REQ-17` Phase 1 "닫지 못한 것" 항목을 닫음으로 정정, 인덱스 REQ-17 행에서 "사람 손 대기" 문구 제거. `docs/specs/db-schema.md:290`의 2026-08-31 시점 기록(같은 제약을 적어 둔 히스토리 로그)은 **과거 스냅샷이라 손대지 않았다** — 그 문서의 다른 절(§7·§9)엔 이미 `measured_date`·`taken_date`로 정정돼 있어 혼선 없음
 
 ## 2026-09-18
 
