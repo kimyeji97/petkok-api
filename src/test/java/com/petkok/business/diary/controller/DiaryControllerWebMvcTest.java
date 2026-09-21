@@ -37,10 +37,11 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * 다이어리의 <b>HTTP 계약</b>. 검증 계약 REQ-10-94 · 95 · 99 · 103 · 104 · 108 ~ 110 · 113 · 114 (PLAN-REQ-10
- * § 검증 계약). 구성은 AGENTS §6 관례.
+ * 다이어리의 <b>HTTP 계약</b>. 검증 계약 REQ-10-94 · 95 · 99 · 103 · 104 · 108 ~ 110 · 113 · 114 · REQ-19-05 ~
+ * 08 (PLAN-REQ-10 · PLAN-REQ-19 § 검증 계약). 구성은 AGENTS §6 관례.
  *
- * <p>⚠️ 이 파일은 {@code DiaryController} 등이 아직 없어 컴파일되지 않는다 — {@code /implement REQ-10 5} 가 만든다.
+ * <p>⚠️ REQ-19-05~08 은 {@code DiaryController} 에 {@code GET /{entryId}} 매핑이 아직 없어 컴파일되지 않는다 —
+ * {@code /implement REQ-19 1} 이 만든다.
  *
  * <p>REQ-10-108·109는 REQ-11 Phase 2(다이어리↔사진 연결)에서 단언이 뒤집혔다 — 원래 "필드 없음"이었던 것이 "필드 있고 값이 채워짐"으로
  * 바뀌었다. ID는 그대로 유지한다(PLAN-REQ-11 § 검증 계약 참고). REQ-10-110(photo_ids 무시)은 그대로다.
@@ -231,5 +232,50 @@ class DiaryControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"entry_date\":\"2026-07-20\",\"condition_tag\":\"정상\"}"))
         .andExpect(jsonPath("$.data.condition_tag").value("정상"));
+  }
+
+  @Test
+  @DisplayName("[REQ-19-05] GET /diary/{entry_id} 는 200 을 반환한다")
+  void req_19_05_getReturnsOk() throws Exception {
+    when(diaryService.get(any(), any(), any())).thenReturn(sample(null));
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get(BASE + "/" + ENTRY_ID).with(asUser()))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("[REQ-19-06] GET /diary/{entry_id} 응답에 photos 배열이 있다")
+  void req_19_06_getResponseHasPhotosField() throws Exception {
+    List<PhotoSummary> photos =
+        List.of(
+            new PhotoSummary(
+                UUID.fromString("aaaaaaaa-0000-0000-0000-000000000009"),
+                "https://img.petkok.com/photos/a.jpg",
+                null,
+                null));
+    when(diaryService.get(any(), any(), any())).thenReturn(sample(null, photos, null));
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get(BASE + "/" + ENTRY_ID).with(asUser()))
+        .andExpect(jsonPath("$.data.photos").isArray())
+        .andExpect(
+            jsonPath("$.data.photos[0].image_url").value("https://img.petkok.com/photos/a.jpg"));
+  }
+
+  @Test
+  @DisplayName("[REQ-19-07] 토큰 없는 GET /diary/{entry_id} 요청은 401 이다")
+  void req_19_07_unauthenticatedGetIsUnauthorized() throws Exception {
+    mockMvc
+        .perform(MockMvcRequestBuilders.get(BASE + "/" + ENTRY_ID))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("[REQ-19-08] 토큰 없는 GET /diary/{entry_id} 의 에러 코드는 UNAUTHORIZED 다")
+  void req_19_08_unauthenticatedGetHasErrorCode() throws Exception {
+    mockMvc
+        .perform(MockMvcRequestBuilders.get(BASE + "/" + ENTRY_ID))
+        .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
   }
 }

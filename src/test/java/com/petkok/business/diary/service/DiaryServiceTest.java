@@ -40,16 +40,18 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * 다이어리의 <b>가드 위임 · D6 · 커서 · 병합 · 미래 날짜 거부 · condition_tag 필터</b>. 검증 계약 REQ-10-96 ~ 98 · 101 · 102
- * · 105 · 106 · 111 · 112 (PLAN-REQ-10 § 검증 계약). {@code WeightServiceTest} 와 같은 구성 — 날짜 필드가 {@code
- * LocalDate} 지만 "미래 불가" 판정에 KST 기준 "오늘"이 필요해 {@code Clock} 을 쓴다(2026-09-02 확정 — ADR-0002
- * 계산=Asia/Seoul).
+ * · 105 · 106 · 111 · 112 · REQ-19-01 ~ 04 (PLAN-REQ-10 · PLAN-REQ-19 § 검증 계약). {@code
+ * WeightServiceTest} 와 같은 구성 — 날짜 필드가 {@code LocalDate} 지만 "미래 불가" 판정에 KST 기준 "오늘"이 필요해 {@code
+ * Clock} 을 쓴다(2026-09-02 확정 — ADR-0002 계산=Asia/Seoul).
  *
- * <p>⚠️ 이 파일은 {@code DiaryService} 등 Phase 5 대상 클래스가 아직 없어 컴파일되지 않는다. {@code /implement REQ-10 5} 가
- * 만든다.
+ * <p>⚠️ REQ-19-01~04 는 {@code DiaryService.get}(단건 조회)이 아직 없어 컴파일되지 않는다 — {@code /implement REQ-19
+ * 1} 이 만든다.
  *
  * <p>가정한 계약 — {@code DiaryService(PetAccessGuard, DiaryEntryRepository, CursorCodec, Clock,
  * PhotoLookup)}. {@code list} 는 {@code ConditionTag} 필터(nullable)를 추가로 받아, 필터가 있으면 저장소의 필터 전용 쿼리
- * 메서드를 쓴다.
+ * 메서드를 쓴다. {@code get(userId, petId, entryId)} 은 {@code update}/{@code delete} 와 같은 가드·조회 체인({@code
+ * PetAccessGuard.getOwnedPet} → {@code findByIdAndPetId})을 타고, {@code create}/{@code update} 가 쓰는
+ * {@code toDetailResponse} 를 그대로 재사용한다(PLAN-REQ-19 § 범위).
  *
  * <p>{@code PhotoLookup}은 REQ-11 Phase 2에서 추가된 포트다(REQ-11-30 · 31) — {@code create}가 반환하는 {@code
  * photos}는 {@code findByDiaryEntryId}, {@code list} 항목의 {@code photoCount}는 {@code
@@ -262,6 +264,64 @@ class DiaryServiceTest {
         service.list(OWNER, PET_ID, new CursorRequest(null, 20), ConditionTag.FLOPPY_TAIL);
 
     assertThat(page.items()).hasSize(1);
+  }
+
+  // ── 상세 조회 (REQ-19) ──────────────────────────────────────
+
+  @Test
+  @DisplayName("[REQ-19-01] 남의 펫이면 가드의 PET_FORBIDDEN 이 그대로 나간다")
+  void req_19_01_strangerGetsForbiddenFromGuardOnGet() {
+    when(guard.getOwnedPet(PET_ID, STRANGER))
+        .thenThrow(new BusinessException(ErrorCode.PET_FORBIDDEN));
+
+    assertThatThrownBy(() -> service.get(STRANGER, PET_ID, ENTRY_A))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.PET_FORBIDDEN);
+  }
+
+  @Test
+  @DisplayName("[REQ-19-02] 삭제된 펫이면 가드의 PET_NOT_FOUND 가 그대로 나간다")
+  void req_19_02_deletedPetGetsNotFoundFromGuardOnGet() {
+    when(guard.getOwnedPet(PET_ID, OWNER))
+        .thenThrow(new BusinessException(ErrorCode.PET_NOT_FOUND));
+
+    assertThatThrownBy(() -> service.get(OWNER, PET_ID, ENTRY_A))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.PET_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("[REQ-19-03] 다른 펫에 속한 기록 id 는 RESOURCE_NOT_FOUND 다")
+  void req_19_03_recordOfAnotherPetIsNotFoundOnGet() {
+    owned();
+    when(repository.findByIdAndPetId(ENTRY_A, PET_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.get(OWNER, PET_ID, ENTRY_A))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("[REQ-19-04] 상세 조회 응답의 photos 에 PhotoLookup 조회 결과가 그대로 담긴다")
+  void req_19_04_getResponseCarriesPhotosFromLookup() {
+    owned();
+    DiaryEntry entry = entry(ENTRY_A, TODAY, null);
+    when(repository.findByIdAndPetId(ENTRY_A, PET_ID)).thenReturn(Optional.of(entry));
+    List<PhotoSummary> photos =
+        List.of(
+            new PhotoSummary(
+                UUID.fromString("aaaaaaaa-0000-0000-0000-000000000009"),
+                "https://img.petkok.com/photos/a.jpg",
+                null,
+                null));
+    when(photoLookup.findByDiaryEntryId(ENTRY_A)).thenReturn(photos);
+
+    DiaryResponse response = service.get(OWNER, PET_ID, ENTRY_A);
+
+    assertThat(response.photos()).isEqualTo(photos);
   }
 
   // ── 다이어리 ↔ 사진 연결 (REQ-11 Phase 2) ──────────────────────

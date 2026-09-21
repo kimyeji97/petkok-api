@@ -25,9 +25,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 다이어리 엔드포인트 (Notion {@code API I/F} Diary 5행). <b>전부 인증이 필요하다.</b> 종 제한 없음. 상태코드 — {@code POST}
- * 201 · {@code GET} 200 · {@code PATCH} 200 · {@code DELETE} 204. 검증 계약 REQ-10-94 · 95 · 99 · 103 ·
- * 104 · 108 ~ 110 · 113 · 114.
+ * 다이어리 엔드포인트 (Notion {@code API I/F} Diary 5행 — {@code GET /{entryId}}(상세)는 REQ-19에서 채워짐). <b>전부
+ * 인증이 필요하다.</b> 종 제한 없음. 상태코드 — {@code POST} 201 · {@code GET} 200 · {@code PATCH} 200 · {@code
+ * DELETE} 204. 검증 계약 REQ-10-94 · 95 · 99 · 103 · 104 · 108 ~ 110 · 113 · 114 · REQ-19-05 ~ 08.
  */
 @RestController
 @RequestMapping("/api/v1/pets/{petId}/diary")
@@ -62,6 +62,12 @@ public class DiaryController {
     return ApiResponse.success(
         diaryService.list(
             principal.userId(), petId, new CursorRequest(cursor, limit), conditionTag));
+  }
+
+  @GetMapping("/{entryId}")
+  public ApiResponse<DiaryResponse> get(
+      @CurrentUser AuthPrincipal principal, @PathVariable UUID petId, @PathVariable UUID entryId) {
+    return ApiResponse.success(diaryService.get(principal.userId(), petId, entryId));
   }
 
   @PatchMapping("/{entryId}")
