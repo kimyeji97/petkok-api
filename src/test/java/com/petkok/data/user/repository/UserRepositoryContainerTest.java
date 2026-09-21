@@ -13,8 +13,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Testcontainers 실물 DB에 {@link User}를 저장→조회해 JPA Auditing 배선이 실제로 동작하는지 확인한다(카카오 자동가입 경로 재현). 검증
- * 계약 REQ-18-02 (PLAN-REQ-18 § 검증 계약).
+ * Testcontainers 실물 DB에 {@link User}를 저장→조회해 JPA Auditing 배선이 실제로 동작하는지 확인한다(카카오 자동가입 경로 재현). 검증 계약
+ * REQ-18-02 (PLAN-REQ-18 § 검증 계약).
  */
 @SpringBootTest
 @ActiveProfiles("test")
