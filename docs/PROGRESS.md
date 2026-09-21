@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-21 (REQ-18 전체 완료 — Phase 2 스모크 테스트·프로브까지 통과, REQ-16 미결⑥ 해소. REQ-17 마지막 미결(Notion DB 탭 DDL)도 API로 닫혀 남은 활성 항목 없음 — 이전에 "탭은 API로 안 됨"이라 믿었던 CLAUDE.md 문구가 틀렸던 것으로 드러나 정정. REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
+> 최종 갱신: 2026-09-21 (REQ-18 전체 완료 — Phase 2 스모크 테스트·프로브까지 통과, REQ-16 미결⑥ 해소. REQ-17 마지막 미결(Notion DB 탭 DDL)도 API로 닫혀 남은 활성 항목 없음. REQ-19(다이어리 상세 엔드포인트, REQ-10 스코프 누락분)도 완료 — REQ-18 브랜치가 `main`에 먼저 병합된 뒤 REQ-19 브랜치를 그 위로 리베이스하며 두 브랜치의 로그를 합쳤다. REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -27,7 +27,8 @@
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 | REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록도 2026-09-21 API로 반영 완료 — 남은 것 없음) |
-| REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | 2026-09-21 | ✅ (Phase 1·2 전부 완료 · 검증 계약 REQ-18-01·02 통과 + REQ-18-03 수동 프로브 통과, 풀 스위트 345건 회귀 없음 · 미결 0건 · REQ-16 미결⑥ 해소 · `CLAUDE.md` 문구 정정 완료) |
+| REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | 2026-09-21 | ✅ (Phase 1·2 전부 완료 · 검증 계약 REQ-18-01·02 통과 + REQ-18-03 수동 프로브 통과, 풀 스위트 345건 회귀 없음 · 미결 0건 · REQ-16 미결⑥ 해소 · `CLAUDE.md` 문구 정정 완료 · `main` 병합 완료(PR #55)) |
+| REQ-19 | 다이어리 상세 엔드포인트 (`GET /diary/{entry_id}`, REQ-10 스코프 누락분) | [PLAN-REQ-19](plans/PLAN-REQ-19-diary-detail.md) | 2026-09-21 | ✅ (Phase 1(유일) 완료 · 검증 계약 8건 전부 통과 · 미결 0건 · 브랜치 `feat/req19-diary-detail` → origin 푸쉬 완료) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -69,6 +70,20 @@
 - **원인 — DDL 코드블록은 "탭 페이지"가 아니라 최상위 페이지 본문에 `<tabs><tab>`으로 직접 박힌 인라인 콘텐츠였다.** CLAUDE.md가 막힌다고 적은 건 **탭이 링크하는 별도 페이지**(예: 「ERD 설계」)에 대한 제약이었는데, DDL 코드블록엔 그게 해당하지 않는 걸 이전 세션(REQ-16, 2026-08~09월)이 구분 없이 일반화해 시도조차 안 하고 사람 손으로 넘겼던 것으로 보인다
 - **CLAUDE.md 「Notion 편집 함정」 정정** — "DB·API 탭은 API로 수정할 수 없다"는 문구를 "탭이 링크하는 별도 페이지만 안 된다, 탭에 인라인으로 박힌 콘텐츠는 최상위 페이지에 `update_content`로 된다"로 고쳤다. **다음에 비슷한 "탭이라 API로 안 됨" 판단을 내리기 전에 대상이 인라인 콘텐츠인지 링크된 별도 페이지인지부터 구분할 것**
 - `PLAN-REQ-17` Phase 1 "닫지 못한 것" 항목을 닫음으로 정정, 인덱스 REQ-17 행에서 "사람 손 대기" 문구 제거. `docs/specs/db-schema.md:290`의 2026-08-31 시점 기록(같은 제약을 적어 둔 히스토리 로그)은 **과거 스냅샷이라 손대지 않았다** — 그 문서의 다른 절(§7·§9)엔 이미 `measured_date`·`taken_date`로 정정돼 있어 혼선 없음
+
+### REQ-18 `main` 병합 (PR #55) → REQ-19 리베이스로 로그 합류
+
+REQ-18(Testcontainers)·REQ-17 마무리를 담은 `feat/req18-phase1-testcontainers`를 PR #55로 `main`에 스쿼시 머지했다(CI 통과·헤드 SHA 확인 후). `feat/req19-diary-detail`은 이 병합 이전의 `origin/main`에서 분기했던 터라, `main`을 다시 받아 그 위로 리베이스하며 `docs/PROGRESS.md`가 충돌했다 — 두 브랜치가 독립적으로 오늘 자 로그·인덱스 REQ-17/18/19 행을 각자 적어 둔 게 원인. 리베이스 충돌 해소로 이 섹션 전체(REQ-18 판정부터 여기까지)를 손으로 합쳤다.
+
+### REQ-19 — 다이어리 상세 엔드포인트, REQ-10 스코프 누락분 채움
+
+Notion `API I/F` 개발상태를 컨트롤러 실제 구현과 전수 대조하던 중 `GET /pets/{pet_id}/diary/{entry_id}`(다이어리 상세)만 유일하게 `시작 전`으로 남아 있는 걸 발견 → `/workplan`으로 원인을 추적해 새 REQ로 등록 → `/testgen`·`/implement`·`/testrun`까지 여섯 커맨드 한 바퀴를 이 REQ에 대해 돌렸다.
+
+- **원인 — REQ-10이 계획서에 "Diary 5행"으로 스코프를 적어 두고도 실제로는 4개(작성·목록·수정·삭제)만 구현했다.** 명시적 제외 결정이 없다 — REQ-11(사진 연결)처럼 다른 REQ로 이관된 것도 아니고, `## 범위 — 제외`에도 안 적혀 있다. "CRUD 5행"이라는 Phase 5 헤딩 표현 자체가 4개 동작(CRUD)에 Notion 원본 행 수(5)를 그대로 갖다 붙인 것으로 보이고, 그 밑에서 조용히 1개가 빠졌다.
+- **구현은 기존 패턴 100% 재사용** — `update`/`delete`가 쓰는 `PetAccessGuard.getOwnedPet` → `findOwnedEntry` 체인, `create`/`update`가 쓰는 `toDetailResponse`(photos 포함)를 그대로 가져다 썼다. 새 로직 0줄, `DiaryService.get` 메서드 하나 추가로 끝났다.
+- **브랜치 판단** — 착수 시점 현재 브랜치가 `feat/req18-phase1-testcontainers`(REQ-18 작업용, PR 미생성)였다. REQ-19를 여기 얹으면 서로 무관한 두 REQ가 한 브랜치에 섞이므로, 사용자 확인 후 `origin/main` 기준 새 브랜치 `feat/req19-diary-detail`을 팠다. 이 과정에서 진행 중이던 REQ-19 테스트 파일·계획서를 stash로 옮겨 새 브랜치에만 골라 복원했고, REQ-18 브랜치에 남아 있던 무관한 문서 변경(REQ-17 Notion DDL 반영·`api-list.md` 갱신)은 라벨을 붙여 그 브랜치에 stash로 남겨 뒀다(`git stash list`, `feat/req18-phase1-testcontainers`).
+- **`/testrun REQ-19`** — 8케이스 전부 1차 통과, 풀 스위트(이 브랜치 기준 351건) 회귀 없음. 근거 인용 5건 전부 원문과 일치.
+- 커밋 `91ab659`, 브랜치 `feat/req19-diary-detail` → origin 푸쉬 완료.
 
 ## 2026-09-18
 
