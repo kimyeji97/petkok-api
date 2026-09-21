@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-18 (REQ-11 presigned 스키마 불일치 해소 — Notion 원본을 구현대로 정정. REQ-08 2건은 배포·클라이언트 앱 부재로, REQ-17은 Notion 탭 API 제약으로 여전히 보류)
+> 최종 갱신: 2026-09-21 (REQ-18 Phase 1 판정 — `/testrun REQ-18`로 REQ-18-01 통과·풀 스위트 회귀 없음 확인. REQ-08 2건은 배포·클라이언트 앱 부재로, REQ-17은 Notion 탭 API 제약으로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -27,7 +27,7 @@
 | REQ-15 | 컨트롤러 테스트 관례 도입 (`@WebMvcTest`) | [PLAN-REQ-15](plans/PLAN-REQ-15-controller-test-convention.md) | 2026-08-10 | ✅ |
 | REQ-16 | 시각 처리 규약 — `timestamptz` 전환 (저장 = 순간 · 노출·계산 KST 고정) | [PLAN-REQ-16](plans/PLAN-REQ-16-time-handling-timestamptz.md) · [ADR-0002](adr/ADR-0002-time-handling-timestamptz.md) | 2026-09-03 | ✅ (Phase 0~4 전부 완료 · Notion 탭 2곳 사람 손 반영 확인 · 미결 0건 — ⑦⑧ 2026-09-03 해소) |
 | REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록만 사람 손 대기) |
-| REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | — | 🟡 (계획서 확정 · 결정·미결 3건 전부 확정, 미결 0건 · Phase 착수 전) |
+| REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | — | 🟡 (Phase 1 완료 · 검증 계약 REQ-18-01 통과, 풀 스위트 344건 회귀 없음 · Phase 2 착수 전) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -36,6 +36,22 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-21
+
+### `/testrun REQ-18` — Phase 1 판정, 전부 그린
+
+`c44278e`(2026-09-18, Testcontainers 의존성·컨테이너 배선)가 구현만 되고 판정·기록이 안 된 채 사흘 남아 있던 것을 `/progress 전주` 조회에서 확인한 뒤 이어서 처리했다.
+
+- **REQ-18-01** — `FlywayMigrationContainerTest`를 실행, 1차 통과. 로그로 실제 동작을 확인했다: `postgres:17` 컨테이너 기동 → `petkok_test` 스키마 생성 → 마이그레이션 5건(V1~V5) 적용 → `flyway_schema_history`에 행 생성. `flyway.info().applied()` 비어있지 않음 단언 성공
+- **풀 스위트(`--rerun`) 344건 전부 통과** — Phase 1 완료 기준의 "회귀 없음, 컨테이너 관련 신규 실패 0건"을 충족. REQ-18-01 1건이 늘어 343(09-18 기준) → 344
+- **Phase 1 완료 기준 나머지 항목도 코드로 확인** — `build.gradle.kts`에 의존성 3종(`spring-boot-testcontainers`·`org.testcontainers:postgresql`·`org.testcontainers:junit-jupiter`) 존재, `TestcontainersConfig`가 `@TestConfiguration` + `@ServiceConnection` 싱글톤 빈으로 배선됨
+- 수정 없음(1차 통과라 (a)·(b)·(c) 분류 대상 자체가 없었다) — 검증 계약 표 근거 인용도 원문과 그대로 일치, 스펙 드리프트 없음
+- ⚠️ **이 머신에서 Testcontainers를 돌리려면 매 셸 세션마다 `DOCKER_HOST`·`TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 export해야 한다**(`CLAUDE.local.md`에 이미 문서화된 함정, 재확인만 함) — 이번에도 그대로 필요했다
+
+`PLAN-REQ-18` 검증 계약 REQ-18-01 `결과` 열 ✅, Phase 1 체크박스 `[x]`, 계획서 상태 🟡 진행으로 갱신(아래 3.5절과 동일 내용).
+
+**남은 것** — Phase 2(스모크 통합 테스트 + 프로브 검증)는 착수 전. 계획서가 명시한 대로 `/testgen REQ-18`을 다시 돌려 Phase 2 검증 계약을 먼저 추가해야 한다.
 
 ## 2026-09-18
 
