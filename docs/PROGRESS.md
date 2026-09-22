@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과, `main` 병합 완료(PR #57). REQ-21(FR-FEED-04(SVL) 폐기 + FR-FEED-03 감사 누락 보정)도 완료 — 코드 변경 없이 Notion·`docs/TODO.md` 문서 작업만. REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
+> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과, `main` 병합 완료(PR #57). REQ-21(FR-FEED-04(SVL) 폐기 + FR-FEED-03 감사 누락 보정)도 완료 — 코드 변경 없이 Notion·`docs/TODO.md` 문서 작업만. REQ-22(사진 자유 태그 + 월별 대표 사진 성장 앨범)도 완료 — Phase 0·1 전부 완료, 검증 계약 25건 전부 통과, 브랜치 푸쉬 완료·`main` 미병합. REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -31,6 +31,7 @@
 | REQ-19 | 다이어리 상세 엔드포인트 (`GET /diary/{entry_id}`, REQ-10 스코프 누락분) | [PLAN-REQ-19](plans/PLAN-REQ-19-diary-detail.md) | 2026-09-21 | ✅ (Phase 1(유일) 완료 · 검증 계약 8건 전부 통과 · 미결 0건 · 브랜치 `feat/req19-diary-detail` → origin 푸쉬 완료) |
 | REQ-20 | 게코 사육 환경(온습도) 기록 (`FR-FEED-05`, `docs/TODO.md` 갭) | [PLAN-REQ-20](plans/PLAN-REQ-20-environment-logs.md) | 2026-09-22 | ✅ (Phase 0·1 전부 완료 · 검증 계약 15건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #57, 스쿼시)) |
 | REQ-21 | FR-FEED-04(SVL) 폐기 표시 + FR-FEED-03 감사 누락 보정 | [PLAN-REQ-21](plans/PLAN-REQ-21-weight-graph-fr-cleanup.md) | 2026-09-22 | ✅ (Phase 1(유일) 완료 · 코드 변경 없음(Notion·`docs/TODO.md` 문서 작업뿐) · 미결 0건) |
+| REQ-22 | 사진 자유 태그 + 월별 대표 사진 성장 앨범 (`FR-GAL-03`·`04`) | [PLAN-REQ-22](plans/PLAN-REQ-22-photo-tags-and-growth-album.md) | 2026-09-22 | ✅ (Phase 0·1 전부 완료 · 검증 계약 25건 전부 통과 · 미결 0건 · 브랜치 `feat/req22-photo-tags-growth-album` → origin 푸쉬 완료, `main` 미병합) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -82,6 +83,26 @@ REQ-20 완료 후 `docs/TODO.md` 잔여 갭을 살펴보던 사용자가 "몸무
 - **Notion·`docs/` 작업 주체 분리** — `/implement`는 Notion(FR-FEED-04·연결 유저 스토리 US-FEED-05 폐기 콜아웃)만 처리하고, `docs/TODO.md` 갱신(FR-FEED-04 갭 행 제거·FR-FEED-03 확인 완료 추가·「폐기됨」 절 신설)은 `docs/`가 `/checkpoint` 소관이라 이 체크포인트에서 마무리했다 — REQ-20 Phase 0(순수 Notion, repo 파일 0건)과 달리 이번엔 계획서 완료 기준에 `docs/` 파일 변경이 섞여 있어 두 커맨드가 나눠 처리한 첫 사례
 
 REQ-21은 **코드 변경이 전혀 없다** — Notion 2페이지 + `docs/TODO.md` 1개 파일만 바뀌었다. `docs/PROGRESS.md` 인덱스에 REQ-21 신규 행 추가, Notion Task 행(`시작 전`)도 `/workplan` 시점에 생성 완료.
+
+### REQ-22 — 사진 자유 태그(FR-GAL-03) + 월별 대표 사진 성장 앨범(FR-GAL-04). 여섯 커맨드 한 바퀴, 이번엔 실제 코드 구현까지
+
+`/progress todo` 조회로 남은 갤러리 갭(FR-GAL-01·03·04·05)을 확인한 사용자가 "FR-GAL-03이랑 FR-GAL-04 묶어서 하나로 진행하자"고 요청했다.
+
+**`/workplan` — 설계가 예상보다 컸다.** Notion 원본을 확인하니 FR-GAL-04엔 이미 비즈니스 규칙(`BR-GAL-04`: "해당 월 첫 번째 업로드 사진을 기본 대표 사진으로 지정. 수동 변경 가능")이 있었지만, **`photos`엔 `PATCH` 엔드포인트 자체가 없었다**(`POST`·`GET`·`DELETE`뿐) — "수동 지정"이 성립하려면 수정 경로부터 새로 설계해야 했다. `AskUserQuestion`으로 세 가지를 먼저 확정: 태그 값 집합(처음엔 "고정 enum 4개"로 추천했으나 사용자가 직접 "인스타 해시태그처럼, 미리 설정하는 게 아니라 그때그때 다는 것"으로 뒤집어 **자유 텍스트**로 확정) · 수정 API 모양(`PATCH` 신설, `tags`·`is_representative` 한 엔드포인트에 포함) · 대상 종(전종 공통). 나머지(태그 다중 허용·정규화 세부·대표 사진 저장 방식·월 그룹 기준·정렬)는 레포 기존 관례(저장 안 하고 조회 시 계산, KST 달력 판정 등)로 추정 결정해 계획서 `## 결정` 표에 "추정" 표기와 함께 남겼다.
+
+**`/implement REQ-22 0` — Notion 4행 작업**(신규 `PATCH 사진 수정`·`GET 성장 앨범` + 기존 "갤러리 목록"·"사진 메타데이터 저장" 행 보강). REQ-20·21에서 반복 확인된 리터럴 개행·이스케이프 함정은 이번엔 처음부터 리터럴 문자로 써서 재발하지 않았다.
+
+**`/testgen REQ-22` — 기존 REQ-11 테스트 4곳을 기계적으로 고쳤다.** `PhotoResponse`·`PhotoCreateRequest`·`PhotoService` 생성자에 새 필드(`tags`·`is_representative`·`PhotoTagRepository`)가 붙으면서 REQ-11 시절 테스트의 위치 기반 생성자 호출이 컴파일이 안 됐다 — 새 필드 추가는 계획서에서 이미 승인된 결정이라, 중립값(`null`/`List.of()`/`false`)을 채우는 기계적 수정만 하고 어떤 기존 단언도 바꾸지 않았다. 케이스 25건(REQ-22-01~25) 작성.
+
+**`/implement REQ-22 1` — 구현 중 (b) 2건을 직접 잡았다** (테스트는 안 건드리고 구현만 고침):
+- 컨트롤러가 `tag` 파라미터 유무와 무관하게 항상 새 4-arg `PhotoService.list(...)`를 호출하도록 짰더니, 기존 REQ-11 컨트롤러 테스트(`req_11_11`, 3-arg 스텁)가 깨졌다 — `tag == null`이면 기존 3-arg 메서드를 그대로 호출하도록 분기해 해결
+- `effectiveDate()` 메서드 javadoc에 "계산은 Asia/Seoul"이라고 그대로 적었다가 **REQ-16-16 회귀 테스트**(이 문자열이 `TimeConstant.java` 밖 어디에도 있으면 안 됨 — 주석도 포함해서 훑음)를 깨뜨렸다. `TimeConstant#KST` 참조로 바꿔 해결 — 이 레포의 "한 곳만 바꾸면 조용히 갈린다" 계약이 주석에도 그대로 적용된다는 걸 실측으로 재확인
+- 착수 시점 브랜치가 `main`이라 `feat/req22-photo-tags-growth-album`을 새로 팜(사용자 확인 후)
+- **전체 스위트(396건)를 돌려 REQ-22 범위 밖 회귀도 확인.** 남은 실패 2건(`FlywayMigrationContainerTest`·`UserRepositoryContainerTest`)은 이 세션이 `DOCKER_HOST`·`TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 export 안 해서였다 — `CLAUDE.local.md`대로 export 후 재실행해 REQ-22와 무관함을 직접 확인(둘 다 통과)
+
+**`/testrun REQ-22`** — 4개 테스트 클래스 25건 전부 1차 통과. (a)·(b)·(c) 없음. 근거 인용 22건 전부 원문과 일치(REQ-22-23·25는 계획서가 이미 "Notion 반영, 로컬 grep 불가"로 표시해 둔 항목이라 grep 대상 제외).
+
+커밋 `8cfacf8`, 브랜치 `feat/req22-photo-tags-growth-album` → origin 푸쉬 완료. `main` 미병합.
 
 ## 2026-09-21
 

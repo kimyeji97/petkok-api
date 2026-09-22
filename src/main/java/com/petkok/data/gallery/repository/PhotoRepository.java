@@ -43,4 +43,28 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
       @Param("createdAt") OffsetDateTime createdAt,
       @Param("id") UUID id,
       Pageable pageable);
+
+  /** 태그 필터 첫 페이지(REQ-22). {@code PhotoTag} 는 {@code @ManyToOne} 이 아니라 서브쿼리로 조인한다. */
+  @Query(
+      "select p from Photo p where p.petId = :petId"
+          + " and p.id in (select pt.photoId from PhotoTag pt where pt.tag = :tag)"
+          + " order by p.createdAt desc, p.id desc")
+  List<Photo> findFirstPageByTag(
+      @Param("petId") UUID petId, @Param("tag") String tag, Pageable pageable);
+
+  /** 태그 필터 keyset 다음 페이지(REQ-22) — {@code findPageAfter} 와 같은 형태에 태그 조건만 더한다. */
+  @Query(
+      "select p from Photo p where p.petId = :petId"
+          + " and p.id in (select pt.photoId from PhotoTag pt where pt.tag = :tag)"
+          + " and (p.createdAt < :createdAt or (p.createdAt = :createdAt and p.id < :id))"
+          + " order by p.createdAt desc, p.id desc")
+  List<Photo> findPageAfterByTag(
+      @Param("petId") UUID petId,
+      @Param("tag") String tag,
+      @Param("createdAt") OffsetDateTime createdAt,
+      @Param("id") UUID id,
+      Pageable pageable);
+
+  /** 성장 앨범 월별 그룹핑용(REQ-22) — 정렬은 서비스에서 월 단위로 다시 하므로 여기선 강제하지 않는다. */
+  List<Photo> findAllByPetId(UUID petId);
 }
