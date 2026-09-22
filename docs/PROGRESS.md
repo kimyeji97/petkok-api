@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과, `main` 병합 완료(PR #57). REQ-21(FR-FEED-04(SVL) 폐기 + FR-FEED-03 감사 누락 보정)도 완료 — 코드 변경 없이 Notion·`docs/TODO.md` 문서 작업만. REQ-22(사진 자유 태그 + 월별 대표 사진 성장 앨범)도 완료 — Phase 0·1 전부 완료, 검증 계약 25건 전부 통과, `main` 병합 완료(PR #58). REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
+> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과, `main` 병합 완료(PR #57). REQ-21(FR-FEED-04(SVL) 폐기 + FR-FEED-03 감사 누락 보정)도 완료 — 코드 변경 없이 Notion·`docs/TODO.md` 문서 작업만. REQ-22(사진 자유 태그 + 월별 대표 사진 성장 앨범)도 완료 — Phase 0·1 전부 완료, 검증 계약 25건 전부 통과, `main` 병합 완료(PR #58). 이후 `docs/TODO.md`·인덱스 불일치 2건 정정 + 이 머신에 `lefthook` 신규 설치(오래된 "pre-commit 훅 없음" 반복 함정 해소). REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -113,6 +113,12 @@ REQ-21은 **코드 변경이 전혀 없다** — Notion 2페이지 + `docs/TODO.
 - **교훈** — 구현 완료 후 "사소한" 후속 수정(주석 하나 고치기 등)도 반드시 `spotlessApply`부터 다시 돌리고 나서 `build -x test`로 재검증해야 한다. "코드 로직은 안 건드렸으니 포맷은 그대로겠지"라는 가정이 틀렸다
 
 REQ-22 전체(Phase 0·1 + Notion 선반영 + `main` 병합)가 이 시점에 완전히 종결됐다. 머지 커밋 `b9a4139`.
+
+### `/progress todo` → 문서 불일치 발견·정정 + `lefthook` 설치로 근본 원인 닫음
+
+`/progress todo` 조회 중 두 가지 불일치를 발견했다 — `docs/TODO.md`가 FR-GAL-03·04를 여전히 갭으로 올려두고 있었고(REQ-22가 이미 `main`에 병합됐는데도), `docs/PROGRESS.md`의 REQ-22 행도 "main 미병합"으로 낡아 있었다(체크포인트가 PR 머지보다 먼저 끝나서 생긴 순서 문제). 둘 다 정정(커밋 `93321e7`).
+
+**근본 원인까지 닫았다.** 이 머신엔 `lefthook`이 아예 설치돼 있지 않았다 — `docs/PROGRESS.md` 자체에 이미 두 번(2026-08-03·09-01 무렵) "이 머신에는 lefthook이 없어 pre-commit 훅이 안 걸린다"는 기록이 남아 있었는데도 실제 설치로 이어지진 않았었다. 이번에 REQ-22 머지 직전 CI가 정확히 이 이유로 한 번 막힌 뒤(`spotlessApply` 재실행을 빠뜨린 채 커밋 → 로컬엔 걸러줄 훅이 없어 그대로 푸시됨) 사용자 요청으로 `brew install lefthook` + `lefthook install`을 실행해 `pre-commit`(spotless 자동 적용 · checkstyle 경고) · `commit-msg` 훅을 연결했다. `lefthook run pre-commit`으로 정상 등록 확인. **이 레포의 오래된 반복 함정 하나가 실제로 닫혔다** — CLAUDE.md가 이미 경고해 두고 있었던 것을 이번에 처음 실행으로 옮겼다.
 
 ## 2026-09-21
 
