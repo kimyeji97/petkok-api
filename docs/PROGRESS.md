@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과, `main` 병합 완료(PR #57). REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
+> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과, `main` 병합 완료(PR #57). REQ-21(FR-FEED-04(SVL) 폐기 + FR-FEED-03 감사 누락 보정)도 완료 — 코드 변경 없이 Notion·`docs/TODO.md` 문서 작업만. REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -30,6 +30,7 @@
 | REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | 2026-09-21 | ✅ (Phase 1·2 전부 완료 · 검증 계약 REQ-18-01·02 통과 + REQ-18-03 수동 프로브 통과, 풀 스위트 345건 회귀 없음 · 미결 0건 · REQ-16 미결⑥ 해소 · `CLAUDE.md` 문구 정정 완료 · `main` 병합 완료(PR #55)) |
 | REQ-19 | 다이어리 상세 엔드포인트 (`GET /diary/{entry_id}`, REQ-10 스코프 누락분) | [PLAN-REQ-19](plans/PLAN-REQ-19-diary-detail.md) | 2026-09-21 | ✅ (Phase 1(유일) 완료 · 검증 계약 8건 전부 통과 · 미결 0건 · 브랜치 `feat/req19-diary-detail` → origin 푸쉬 완료) |
 | REQ-20 | 게코 사육 환경(온습도) 기록 (`FR-FEED-05`, `docs/TODO.md` 갭) | [PLAN-REQ-20](plans/PLAN-REQ-20-environment-logs.md) | 2026-09-22 | ✅ (Phase 0·1 전부 완료 · 검증 계약 15건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #57, 스쿼시)) |
+| REQ-21 | FR-FEED-04(SVL) 폐기 표시 + FR-FEED-03 감사 누락 보정 | [PLAN-REQ-21](plans/PLAN-REQ-21-weight-graph-fr-cleanup.md) | 2026-09-22 | ✅ (Phase 1(유일) 완료 · 코드 변경 없음(Notion·`docs/TODO.md` 문서 작업뿐) · 미결 0건) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -69,6 +70,18 @@
 - **스쿼시 머지 + 브랜치 삭제**(`gh pr merge --squash --delete-branch`) — 머지 커밋 `6b72dc1`. `gh`가 로컬 체크아웃을 자동으로 `main`으로 전환하고 fast-forward까지 했다(수동 `git checkout main && git pull` 불필요했음). 원격 브랜치 삭제 후 로컬에 남은 `remotes/origin/feat/req20-environment-logs` 참조는 `git fetch --prune`으로 정리
 
 REQ-20 전체(Phase 0·1 + Notion 선반영 + `main` 병합)가 이 시점에 완전히 종결됐다.
+
+### REQ-21 — FR-FEED-04(SVL) 폐기 표시 + FR-FEED-03 감사 누락 보정. `docs/TODO.md` 남은 갭을 검토하다 발견한 중복
+
+REQ-20 완료 후 `docs/TODO.md` 잔여 갭을 살펴보던 사용자가 "몸무게 성장 그래프는 있냐"고 물었고, 답변(없다 — `GET /weight` 목록+`weight_change_rate` 파생 필드뿐, 전용 그래프 엔드포인트는 과거에 있었다가 Notion API I/F에 없어 제거된 전례) 이후 "FR-FEED-04(SVL)를 몸무게로 범위 변경해서 작업하자"고 제안했다.
+
+- **`/workplan` 조사 중 중복 발견** — Notion `요구사항` 데이터소스를 직접 확인하니 **FR-FEED-03**(🔴 Must Have, "체중 기록 및 꺾은선 그래프 시각화")이 이미 별개로 존재했다. FR-FEED-04(🟡, "게코 전용 SVL 성장 그래프")를 체중으로 바꾸면 이 FR-FEED-03과 완전히 중복된다는 사실을 사용자에게 보고
+- **덤으로 발견한 감사 결함** — `docs/TODO.md`(2026-09-21 "Notion FR 25건 전수 대조" 표기)가 FR-FEED-03을 갭 목록에도 "확인 완료" 목록에도 올리지 않았다. 실제 Notion 요구사항 데이터소스 행 수를 SQL로 세어보니 **23건**이라 "25건" 표기 자체도 어긋나 있었다(원인 불명 — 이번 REQ 범위 밖으로 남김)
+- **최종 결정(대화 확정, 두 차례 확인 끝에)** — FR-FEED-04는 SVL/몸길이 정체성 그대로 두고 **폐기만 표시**한다. 문구를 체중으로 덮어쓰면 FR-FEED-03과 중복되므로, "재지정"이 아니라 "폐기 + FR-FEED-03 참조"로 처리. 대상 종(전종 공통)·API 모양(신규 엔드포인트 불필요, 기존 `GET /weight`로 충분)은 `AskUserQuestion`으로 먼저 확정한 뒤였음
+- **`/implement REQ-21 1`에서 CLAUDE.md 「Notion 편집 함정」이 실제로 재현됐다** — FR-FEED-04 페이지에 폐기 콜아웃을 추가하며 개행을 `&#10;` HTML 엔티티로, `<callout>` 태그를 백슬래시로 이스케이프해서 보냈더니 **리터럴 텍스트로 저장되고 빈 콜아웃 블록까지 하나 더 생겼다**(성공 응답은 정상 반환). `replace_content`로 리터럴 개행·리터럴 꺾쇠로 다시 써서 정정, 재조회로 정상 렌더 확인. 파일명 `.md`가 Notion 마크다운에 자동 하이퍼링크(`[..md](http://..md)`)로 걸린 것도 백틱 코드로 감싸 정리
+- **Notion·`docs/` 작업 주체 분리** — `/implement`는 Notion(FR-FEED-04·연결 유저 스토리 US-FEED-05 폐기 콜아웃)만 처리하고, `docs/TODO.md` 갱신(FR-FEED-04 갭 행 제거·FR-FEED-03 확인 완료 추가·「폐기됨」 절 신설)은 `docs/`가 `/checkpoint` 소관이라 이 체크포인트에서 마무리했다 — REQ-20 Phase 0(순수 Notion, repo 파일 0건)과 달리 이번엔 계획서 완료 기준에 `docs/` 파일 변경이 섞여 있어 두 커맨드가 나눠 처리한 첫 사례
+
+REQ-21은 **코드 변경이 전혀 없다** — Notion 2페이지 + `docs/TODO.md` 1개 파일만 바뀌었다. `docs/PROGRESS.md` 인덱스에 REQ-21 신규 행 추가, Notion Task 행(`시작 전`)도 `/workplan` 시점에 생성 완료.
 
 ## 2026-09-21
 
