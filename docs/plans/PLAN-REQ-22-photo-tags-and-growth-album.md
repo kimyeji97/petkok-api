@@ -65,7 +65,7 @@ Notion `비즈니스 규칙` DB에 자동 선택 기준이 이미 정해져 있�
 
 - [x] **Phase 1 — 사진 자유 태그 + 월별 대표 사진**
       완료 기준: `V7__photo_tags.sql` 적용(`photo_tags` 테이블 신설 + `photos.is_representative` 컬럼 추가) · `POST /photos`가 `tags` 배열을 받아 저장 · `PATCH /photos/{id}` 신설, `caption`·`taken_date`·`tags`(전체 교체)·`is_representative`(같은 달 기존 대표 자동 해제) 반영 · `GET /photos`가 `tag` 쿼리 파라미터로 필터링 · `GET /photos/growth-album`이 월별 대표(수동 우선, 없으면 그 달 최이른 사진)를 시간순으로 반환 · 태그 문자열은 공백 제거 후 저장, 빈 문자열이 되면 무시 · 컨트롤러 테스트(AGENTS §6 관례) 통과
-      → 2026-09-22 완료. `/testrun REQ-22`에서 검증 계약 25건 전부 1차 통과 확인, 전체 스위트(396건) 회귀 없음(REQ-22 범위 밖 실패 2건은 Testcontainers 환경변수 미설정 — REQ-22와 무관함을 직접 재확인). 커밋 `8cfacf8` · 브랜치 `feat/req22-photo-tags-growth-album` → origin 푸쉬 완료(main 미병합)
+      → 2026-09-22 완료. `/testrun REQ-22`에서 검증 계약 25건 전부 1차 통과 확인, 전체 스위트(396건) 회귀 없음(REQ-22 범위 밖 실패 2건은 Testcontainers 환경변수 미설정 — REQ-22와 무관함을 직접 재확인). 커밋 `8cfacf8` · PR #58(스쿼시)로 `main` 병합 완료(`b9a4139`) — 머지 직전 CI가 spotless 포맷 위반(사후 주석 수정 후 `spotlessApply` 재실행 누락)으로 한 번 막혀 `fix(req22)` 커밋으로 정정
 
 ## 검증 계약
 

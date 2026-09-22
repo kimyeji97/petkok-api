@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과, `main` 병합 완료(PR #57). REQ-21(FR-FEED-04(SVL) 폐기 + FR-FEED-03 감사 누락 보정)도 완료 — 코드 변경 없이 Notion·`docs/TODO.md` 문서 작업만. REQ-22(사진 자유 태그 + 월별 대표 사진 성장 앨범)도 완료 — Phase 0·1 전부 완료, 검증 계약 25건 전부 통과, 브랜치 푸쉬 완료·`main` 미병합. REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
+> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과, `main` 병합 완료(PR #57). REQ-21(FR-FEED-04(SVL) 폐기 + FR-FEED-03 감사 누락 보정)도 완료 — 코드 변경 없이 Notion·`docs/TODO.md` 문서 작업만. REQ-22(사진 자유 태그 + 월별 대표 사진 성장 앨범)도 완료 — Phase 0·1 전부 완료, 검증 계약 25건 전부 통과, `main` 병합 완료(PR #58). REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -31,7 +31,7 @@
 | REQ-19 | 다이어리 상세 엔드포인트 (`GET /diary/{entry_id}`, REQ-10 스코프 누락분) | [PLAN-REQ-19](plans/PLAN-REQ-19-diary-detail.md) | 2026-09-21 | ✅ (Phase 1(유일) 완료 · 검증 계약 8건 전부 통과 · 미결 0건 · 브랜치 `feat/req19-diary-detail` → origin 푸쉬 완료) |
 | REQ-20 | 게코 사육 환경(온습도) 기록 (`FR-FEED-05`, `docs/TODO.md` 갭) | [PLAN-REQ-20](plans/PLAN-REQ-20-environment-logs.md) | 2026-09-22 | ✅ (Phase 0·1 전부 완료 · 검증 계약 15건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #57, 스쿼시)) |
 | REQ-21 | FR-FEED-04(SVL) 폐기 표시 + FR-FEED-03 감사 누락 보정 | [PLAN-REQ-21](plans/PLAN-REQ-21-weight-graph-fr-cleanup.md) | 2026-09-22 | ✅ (Phase 1(유일) 완료 · 코드 변경 없음(Notion·`docs/TODO.md` 문서 작업뿐) · 미결 0건) |
-| REQ-22 | 사진 자유 태그 + 월별 대표 사진 성장 앨범 (`FR-GAL-03`·`04`) | [PLAN-REQ-22](plans/PLAN-REQ-22-photo-tags-and-growth-album.md) | 2026-09-22 | ✅ (Phase 0·1 전부 완료 · 검증 계약 25건 전부 통과 · 미결 0건 · 브랜치 `feat/req22-photo-tags-growth-album` → origin 푸쉬 완료, `main` 미병합) |
+| REQ-22 | 사진 자유 태그 + 월별 대표 사진 성장 앨범 (`FR-GAL-03`·`04`) | [PLAN-REQ-22](plans/PLAN-REQ-22-photo-tags-and-growth-album.md) | 2026-09-22 | ✅ (Phase 0·1 전부 완료 · 검증 계약 25건 전부 통과 · 미결 1건(태그 길이 초과 처리 미실측) · `main` 병합 완료(PR #58, 스쿼시)) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -102,7 +102,17 @@ REQ-21은 **코드 변경이 전혀 없다** — Notion 2페이지 + `docs/TODO.
 
 **`/testrun REQ-22`** — 4개 테스트 클래스 25건 전부 1차 통과. (a)·(b)·(c) 없음. 근거 인용 22건 전부 원문과 일치(REQ-22-23·25는 계획서가 이미 "Notion 반영, 로컬 grep 불가"로 표시해 둔 항목이라 grep 대상 제외).
 
-커밋 `8cfacf8`, 브랜치 `feat/req22-photo-tags-growth-album` → origin 푸쉬 완료. `main` 미병합.
+커밋 `8cfacf8`, 브랜치 `feat/req22-photo-tags-growth-album` → origin 푸쉬 완료.
+
+### PR #58 → `main` 병합 — CI가 한 번 막혔다(spotless, 내 실수)
+
+체크포인트 직후 사용자 요청("커밋 -> 푸쉬 -> 머지")으로 이어서 진행했다. 체크포인트 커밋(`0bb9ccf`)까지 포함해 푸쉬한 뒤 PR #58 생성.
+
+- **CI Build 단계에서 `spotlessJavaCheck` 실패.** 원인은 바로 앞 `/implement` 단계에서 `PhotoService.effectiveDate()`의 javadoc을 "Asia/Seoul" 리터럴 → `TimeConstant#KST` 참조로 고치면서(REQ-16-16 회귀 테스트 대응) **그 수정 이후 `spotlessApply`를 다시 안 돌렸다** — 로컬에서 마지막으로 통과 확인한 `build -x test`가 그 수정 *이전* 상태였다는 걸 놓쳤다. google-java-format이 원하는 줄바꿈과 내가 손으로 쓴 줄바꿈이 달라 CI에서만 걸렸다
+- **대응** — `spotlessApply` 재실행 → 로컬 `build -x test`로 재확인 → 별도 커밋(`fix(req22): spotless 포맷 위반 수정`)으로 분리해서 푸쉬 → CI를 그 새 SHA 기준으로 다시 지켜봐서(`gh run watch`) 통과 확인 → 머지
+- **교훈** — 구현 완료 후 "사소한" 후속 수정(주석 하나 고치기 등)도 반드시 `spotlessApply`부터 다시 돌리고 나서 `build -x test`로 재검증해야 한다. "코드 로직은 안 건드렸으니 포맷은 그대로겠지"라는 가정이 틀렸다
+
+REQ-22 전체(Phase 0·1 + Notion 선반영 + `main` 병합)가 이 시점에 완전히 종결됐다. 머지 커밋 `b9a4139`.
 
 ## 2026-09-21
 
