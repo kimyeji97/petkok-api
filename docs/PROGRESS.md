@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과. 브랜치 `feat/req20-environment-logs` → origin 푸쉬 완료, `main` 미병합. REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
+> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과, `main` 병합 완료(PR #57). REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -29,7 +29,7 @@
 | REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록도 2026-09-21 API로 반영 완료 — 남은 것 없음) |
 | REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | 2026-09-21 | ✅ (Phase 1·2 전부 완료 · 검증 계약 REQ-18-01·02 통과 + REQ-18-03 수동 프로브 통과, 풀 스위트 345건 회귀 없음 · 미결 0건 · REQ-16 미결⑥ 해소 · `CLAUDE.md` 문구 정정 완료 · `main` 병합 완료(PR #55)) |
 | REQ-19 | 다이어리 상세 엔드포인트 (`GET /diary/{entry_id}`, REQ-10 스코프 누락분) | [PLAN-REQ-19](plans/PLAN-REQ-19-diary-detail.md) | 2026-09-21 | ✅ (Phase 1(유일) 완료 · 검증 계약 8건 전부 통과 · 미결 0건 · 브랜치 `feat/req19-diary-detail` → origin 푸쉬 완료) |
-| REQ-20 | 게코 사육 환경(온습도) 기록 (`FR-FEED-05`, `docs/TODO.md` 갭) | [PLAN-REQ-20](plans/PLAN-REQ-20-environment-logs.md) | 2026-09-22 | ✅ (Phase 0·1 전부 완료 · 검증 계약 15건 전부 통과 · 미결 0건 · 브랜치 `feat/req20-environment-logs` → origin 푸쉬 완료, `main` 미병합) |
+| REQ-20 | 게코 사육 환경(온습도) 기록 (`FR-FEED-05`, `docs/TODO.md` 갭) | [PLAN-REQ-20](plans/PLAN-REQ-20-environment-logs.md) | 2026-09-22 | ✅ (Phase 0·1 전부 완료 · 검증 계약 15건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #57, 스쿼시)) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -58,7 +58,17 @@
 
 **`/testrun REQ-20`** — 4개 테스트 클래스 18개 메서드(REQ-20-01~15, 01은 세부 4개 메서드) 전부 1차 통과. (a)·(b)·(c) 없음. 근거 인용 전건 원문과 일치, 스펙 드리프트 없음.
 
-커밋 `cef14f7`, 브랜치 `feat/req20-environment-logs` → origin 푸쉬 완료. **`main` 미병합** — PR 생성은 이번 세션 범위 밖.
+커밋 `cef14f7`, 브랜치 `feat/req20-environment-logs` → origin 푸쉬 완료.
+
+### PR #57 → `main` 병합
+
+체크포인트 직후 사용자 요청("커밋,푸쉬,pr,머지까지 해줘")으로 이어서 진행했다. `/checkpoint`가 남긴 문서 커밋(`ea7d429`)까지 포함해 푸쉬한 뒤 PR #57을 생성했다.
+
+- **PR head SHA와 로컬 HEAD 대조** — AGENTS §4 경고대로 머지 직전에 `git rev-parse HEAD`와 `gh pr view --json headRefOid`를 대조해 일치 확인(`ea7d429`)
+- **CI를 SHA 기준으로 확인** — `gh pr checks` 대신 `gh run watch`로 그 SHA의 실행을 끝까지 지켜봤다(같은 경고 — `gh pr checks`는 이전 실행분을 보여줄 수 있음). Build·Spotless·Checkstyle·Test·JaCoCo 전부 통과(1m37s)
+- **스쿼시 머지 + 브랜치 삭제**(`gh pr merge --squash --delete-branch`) — 머지 커밋 `6b72dc1`. `gh`가 로컬 체크아웃을 자동으로 `main`으로 전환하고 fast-forward까지 했다(수동 `git checkout main && git pull` 불필요했음). 원격 브랜치 삭제 후 로컬에 남은 `remotes/origin/feat/req20-environment-logs` 참조는 `git fetch --prune`으로 정리
+
+REQ-20 전체(Phase 0·1 + Notion 선반영 + `main` 병합)가 이 시점에 완전히 종결됐다.
 
 ## 2026-09-21
 

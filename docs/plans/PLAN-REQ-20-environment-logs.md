@@ -46,7 +46,7 @@ Notion 요구사항 DB의 `FR-FEED-05`(🔴 Must Have)와 `US-FEED-03`이 "게�
 
 - [x] **Phase 1 — 게코 사육 환경 기록 CRUD + 일간 평균**
       완료 기준: `V6__environment_logs.sql` 적용(신규 테이블) · CRUD 4개 엔드포인트가 원본 상태코드(201/200/200/204)대로 동작 · 게코 외 종 → `FEATURE_NOT_SUPPORTED_SPECIES`(400) · `daily-summary`가 지정 날짜의 `avg_temperature`·`avg_humidity`·`record_count`를 반환(기록 0건이면 `record_count: 0`이고 평균은 `null`) · 컨트롤러 테스트(AGENTS §6 관례) 통과
-      → 2026-09-22 완료. `ShedService`/`FeedingLogRepository` 패턴 그대로 재사용(신규 로직 최소화). `/testrun REQ-20`에서 검증 계약 15건 전부 1차 통과 확인, 커밋 `cef14f7` · 브랜치 `feat/req20-environment-logs` → origin 푸쉬 완료(main 미병합)
+      → 2026-09-22 완료. `ShedService`/`FeedingLogRepository` 패턴 그대로 재사용(신규 로직 최소화). `/testrun REQ-20`에서 검증 계약 15건 전부 1차 통과 확인, 커밋 `cef14f7` · PR #57(스쿼시)로 `main` 병합 완료(`6b72dc1`)
 
 ## 검증 계약
 
