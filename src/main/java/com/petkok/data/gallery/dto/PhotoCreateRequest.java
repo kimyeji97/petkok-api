@@ -3,6 +3,7 @@ package com.petkok.data.gallery.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -10,9 +11,12 @@ import java.util.UUID;
  * `caption`·`taken_date`·`diary_entry_id`(전부 선택)". 검증 계약 REQ-11-05 · 06 · 09 · 10.
  *
  * <p>{@code diaryEntryId} 를 이 요청 시점에 받는 것도 계획서 결정이다 — 사후에 diary 쪽에서 연결하지 않는다.
+ *
+ * <p>{@code tags} 는 REQ-22 추가 — 업로드 시점에 바로 태그를 달 수 있다(선택, 고정 목록 없음). 검증 계약 REQ-22-08 · 09.
  */
 public record PhotoCreateRequest(
     @NotBlank String imageUrl,
     @Size(max = 500) String caption,
     LocalDate takenDate,
-    UUID diaryEntryId) {}
+    UUID diaryEntryId,
+    List<String> tags) {}

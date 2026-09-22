@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.petkok.business.gallery.service.PhotoService;
+import com.petkok.data.gallery.dto.GrowthAlbumEntryResponse;
+import com.petkok.data.gallery.dto.GrowthAlbumResponse;
 import com.petkok.data.gallery.dto.PhotoPresignedUrlResponse;
 import com.petkok.data.gallery.dto.PhotoResponse;
 import com.petkok.framework.config.JacksonConfig;
@@ -70,6 +72,8 @@ class PhotoControllerWebMvcTest {
         "https://img.petkok.com/photos/a.jpg",
         null,
         null,
+        List.of(),
+        false,
         OffsetDateTime.now());
   }
 
@@ -170,5 +174,63 @@ class PhotoControllerWebMvcTest {
         .perform(MockMvcRequestBuilders.delete(BASE + "/" + PHOTO_ID).with(asUser()))
         .andExpect(status().isNoContent())
         .andExpect(content().string(""));
+  }
+
+  // ── 사진 수정 — PATCH (REQ-22) ──────────────────────────────────
+
+  @Test
+  @DisplayName("[REQ-22-22] PATCH /photos/{photo_id} 는 200 을 반환한다")
+  void req_22_22_updateReturnsOk() throws Exception {
+    when(photoService.update(any(), any(), any(), any())).thenReturn(sample());
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.patch(BASE + "/" + PHOTO_ID)
+                .with(asUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"caption\":\"새 캡션\"}"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("[REQ-22-23] PATCH 응답에 tags·is_representative 키가 있다")
+  void req_22_23_updateResponseHasTagsAndIsRepresentativeKeys() throws Exception {
+    when(photoService.update(any(), any(), any(), any())).thenReturn(sample());
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.patch(BASE + "/" + PHOTO_ID)
+                .with(asUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"caption\":\"새 캡션\"}"))
+        .andExpect(jsonPath("$.data.tags").isArray())
+        .andExpect(jsonPath("$.data.is_representative").value(false));
+  }
+
+  // ── 성장 앨범 (REQ-22) ────────────────────────────────────────────
+
+  @Test
+  @DisplayName("[REQ-22-24] GET /photos/growth-album 은 200 을 반환한다")
+  void req_22_24_growthAlbumReturnsOk() throws Exception {
+    when(photoService.getGrowthAlbum(any(), any()))
+        .thenReturn(
+            new GrowthAlbumResponse(List.of(new GrowthAlbumEntryResponse("2026-06", sample()))));
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get(BASE + "/growth-album").with(asUser()))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("[REQ-22-25] growth-album 응답 각 항목에 year_month·photo 키가 있다")
+  void req_22_25_growthAlbumResponseHasYearMonthAndPhotoKeys() throws Exception {
+    when(photoService.getGrowthAlbum(any(), any()))
+        .thenReturn(
+            new GrowthAlbumResponse(List.of(new GrowthAlbumEntryResponse("2026-06", sample()))));
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get(BASE + "/growth-album").with(asUser()))
+        .andExpect(jsonPath("$.data.items[0].year_month").value("2026-06"))
+        .andExpect(jsonPath("$.data.items[0].photo").exists());
   }
 }

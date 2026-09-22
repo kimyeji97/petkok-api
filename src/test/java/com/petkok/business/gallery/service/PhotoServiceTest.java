@@ -7,17 +7,23 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.petkok.business.pet.service.PetAccessGuard;
 import com.petkok.data.common.entity.BaseSoftDeleteEntity;
+import com.petkok.data.gallery.dto.GrowthAlbumEntryResponse;
+import com.petkok.data.gallery.dto.GrowthAlbumResponse;
 import com.petkok.data.gallery.dto.PhotoCreateRequest;
 import com.petkok.data.gallery.dto.PhotoPresignedUrlRequest;
 import com.petkok.data.gallery.dto.PhotoResponse;
+import com.petkok.data.gallery.dto.PhotoUpdateRequest;
 import com.petkok.data.gallery.entity.Photo;
+import com.petkok.data.gallery.entity.PhotoTag;
 import com.petkok.data.gallery.repository.PhotoRepository;
+import com.petkok.data.gallery.repository.PhotoTagRepository;
 import com.petkok.data.pet.dto.OwnedPetResponse;
 import com.petkok.data.pet.enums.Species;
 import com.petkok.framework.config.R2Properties;
@@ -28,12 +34,14 @@ import com.petkok.framework.pagination.CursorPage;
 import com.petkok.framework.pagination.CursorRequest;
 import com.petkok.framework.port.PhotoSummary;
 import java.net.URL;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -68,6 +76,7 @@ class PhotoServiceTest {
 
   private final PetAccessGuard guard = mock(PetAccessGuard.class);
   private final PhotoRepository repository = mock(PhotoRepository.class);
+  private final PhotoTagRepository photoTagRepository = mock(PhotoTagRepository.class);
   private final CursorCodec codec = new CursorCodec(new ObjectMapper().findAndRegisterModules());
   private final S3Client s3Client = mock(S3Client.class);
   private final S3Presigner s3Presigner = mock(S3Presigner.class);
@@ -75,12 +84,23 @@ class PhotoServiceTest {
       new R2Properties(
           "account", "key", "secret", "bucket", "https://r2.example.com", "https://img.petkok.com");
   private final PhotoService service =
-      new PhotoService(guard, repository, codec, s3Client, s3Presigner, r2Properties);
+      new PhotoService(
+          guard, repository, photoTagRepository, codec, s3Client, s3Presigner, r2Properties);
 
   private static Photo photo(UUID id, UUID diaryEntryId, OffsetDateTime createdAt) {
     Photo photo = Photo.of(PET_ID, diaryEntryId, IMAGE_URL, null, null);
     ReflectionTestUtils.setField(photo, "id", id);
     ReflectionTestUtils.setField(photo, "createdAt", createdAt);
+    return photo;
+  }
+
+  // ⚠️ REQ-22 추가 — 기존 photo() 는 건드리지 않고, taken_date·is_representative 가 필요한 케이스용으로 새로 둔다.
+  private static Photo photoWithDetails(
+      UUID id, LocalDate takenDate, boolean isRepresentative, OffsetDateTime createdAt) {
+    Photo photo = Photo.of(PET_ID, null, IMAGE_URL, null, takenDate);
+    ReflectionTestUtils.setField(photo, "id", id);
+    ReflectionTestUtils.setField(photo, "createdAt", createdAt);
+    ReflectionTestUtils.setField(photo, "isRepresentative", isRepresentative);
     return photo;
   }
 
@@ -148,7 +168,7 @@ class PhotoServiceTest {
     assertThatThrownBy(
             () ->
                 service.create(
-                    STRANGER, PET_ID, new PhotoCreateRequest(IMAGE_URL, null, null, null)))
+                    STRANGER, PET_ID, new PhotoCreateRequest(IMAGE_URL, null, null, null, null)))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.PET_FORBIDDEN);
@@ -162,7 +182,8 @@ class PhotoServiceTest {
 
     assertThatThrownBy(
             () ->
-                service.create(OWNER, PET_ID, new PhotoCreateRequest(IMAGE_URL, null, null, null)))
+                service.create(
+                    OWNER, PET_ID, new PhotoCreateRequest(IMAGE_URL, null, null, null, null)))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.PET_NOT_FOUND);
@@ -177,7 +198,7 @@ class PhotoServiceTest {
 
     PhotoResponse response =
         service.create(
-            OWNER, PET_ID, new PhotoCreateRequest(IMAGE_URL, null, null, DIARY_ENTRY_ID));
+            OWNER, PET_ID, new PhotoCreateRequest(IMAGE_URL, null, null, DIARY_ENTRY_ID, null));
 
     assertThat(response.diaryEntryId()).isEqualTo(DIARY_ENTRY_ID);
   }
@@ -188,7 +209,7 @@ class PhotoServiceTest {
     ownedByMe();
 
     PhotoResponse response =
-        service.create(OWNER, PET_ID, new PhotoCreateRequest(IMAGE_URL, null, null, null));
+        service.create(OWNER, PET_ID, new PhotoCreateRequest(IMAGE_URL, null, null, null, null));
 
     assertThat(response.diaryEntryId()).isNull();
   }
@@ -410,5 +431,207 @@ class PhotoServiceTest {
     List<PhotoSummary> summaries = service.findByDiaryEntryId(DIARY_ENTRY_ID);
 
     assertThat(summaries).containsExactly(new PhotoSummary(PHOTO_A, IMAGE_URL, null, null));
+  }
+
+  // ── 사진 자유 태그 (REQ-22) ───────────────────────────────────────
+
+  @Test
+  @DisplayName("[REQ-22-08] 사진 생성 시 보낸 tags 를 저장한다")
+  void req_22_08_createSavesTags() {
+    ownedByMe();
+
+    service.create(
+        OWNER, PET_ID, new PhotoCreateRequest(IMAGE_URL, null, null, null, List.of("탈피", "핸들링")));
+
+    ArgumentCaptor<PhotoTag> captor = ArgumentCaptor.forClass(PhotoTag.class);
+    verify(photoTagRepository, times(2)).save(captor.capture());
+    assertThat(captor.getAllValues())
+        .extracting(PhotoTag::getTag)
+        .containsExactlyInAnyOrder("탈피", "핸들링");
+  }
+
+  @Test
+  @DisplayName("[REQ-22-09] tags 없이 생성하면 태그를 저장하지 않는다")
+  void req_22_09_createWithoutTagsSavesNoTags() {
+    ownedByMe();
+
+    service.create(OWNER, PET_ID, new PhotoCreateRequest(IMAGE_URL, null, null, null, null));
+
+    verify(photoTagRepository, never()).save(any());
+  }
+
+  // ── 사진 수정 — PATCH (REQ-22) ──────────────────────────────────
+
+  @Test
+  @DisplayName("[REQ-22-10] caption 만 보내면 caption 만 바뀌고 taken_date 는 유지된다")
+  void req_22_10_updateCaptionOnlyKeepsTakenDate() {
+    ownedByMe();
+    LocalDate original = LocalDate.of(2026, 6, 30);
+    Photo target = photoWithDetails(PHOTO_A, original, false, JUN_30);
+    when(repository.findByIdAndPetId(PHOTO_A, PET_ID)).thenReturn(Optional.of(target));
+
+    PhotoResponse response =
+        service.update(OWNER, PET_ID, PHOTO_A, new PhotoUpdateRequest("새 캡션", null, null, null));
+
+    assertThat(response.caption()).isEqualTo("새 캡션");
+    assertThat(response.takenDate()).isEqualTo(original);
+  }
+
+  @Test
+  @DisplayName("[REQ-22-11] tags 를 누락하면 기존 태그를 건드리지 않는다")
+  void req_22_11_updateWithoutTagsFieldKeepsExistingTags() {
+    ownedByMe();
+    Photo target = photoWithDetails(PHOTO_A, null, false, JUN_30);
+    when(repository.findByIdAndPetId(PHOTO_A, PET_ID)).thenReturn(Optional.of(target));
+
+    service.update(OWNER, PET_ID, PHOTO_A, new PhotoUpdateRequest("caption", null, null, null));
+
+    verify(photoTagRepository, never()).deleteByPhotoId(any());
+    verify(photoTagRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("[REQ-22-12] tags 가 빈 배열이면 기존 태그를 전부 삭제한다")
+  void req_22_12_updateWithEmptyTagsDeletesAllTags() {
+    ownedByMe();
+    Photo target = photoWithDetails(PHOTO_A, null, false, JUN_30);
+    when(repository.findByIdAndPetId(PHOTO_A, PET_ID)).thenReturn(Optional.of(target));
+
+    service.update(OWNER, PET_ID, PHOTO_A, new PhotoUpdateRequest(null, null, List.of(), null));
+
+    verify(photoTagRepository).deleteByPhotoId(PHOTO_A);
+    verify(photoTagRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("[REQ-22-13] tags 를 보내면 기존 태그를 전체 교체한다")
+  void req_22_13_updateWithTagsReplacesExistingTags() {
+    ownedByMe();
+    Photo target = photoWithDetails(PHOTO_A, null, false, JUN_30);
+    when(repository.findByIdAndPetId(PHOTO_A, PET_ID)).thenReturn(Optional.of(target));
+
+    service.update(OWNER, PET_ID, PHOTO_A, new PhotoUpdateRequest(null, null, List.of("일상"), null));
+
+    verify(photoTagRepository).deleteByPhotoId(PHOTO_A);
+    ArgumentCaptor<PhotoTag> captor = ArgumentCaptor.forClass(PhotoTag.class);
+    verify(photoTagRepository).save(captor.capture());
+    assertThat(captor.getValue().getTag()).isEqualTo("일상");
+  }
+
+  @Test
+  @DisplayName("[REQ-22-14] is_representative=true 로 보내면 같은 달의 기존 대표 사진은 해제된다")
+  void req_22_14_updateRepresentativeUnsetsSiblingInSameMonth() {
+    ownedByMe();
+    Photo target = photoWithDetails(PHOTO_A, LocalDate.of(2026, 6, 15), false, JUN_30);
+    Photo existingRepresentative =
+        photoWithDetails(PHOTO_B, LocalDate.of(2026, 6, 1), true, JUN_30);
+    when(repository.findByIdAndPetId(PHOTO_A, PET_ID)).thenReturn(Optional.of(target));
+    when(repository.findAllByPetId(PET_ID)).thenReturn(List.of(target, existingRepresentative));
+
+    service.update(OWNER, PET_ID, PHOTO_A, new PhotoUpdateRequest(null, null, null, true));
+
+    assertThat(existingRepresentative.isRepresentative()).isFalse();
+    assertThat(target.isRepresentative()).isTrue();
+  }
+
+  @Test
+  @DisplayName("[REQ-22-15] 존재하지 않는 photo_id 는 RESOURCE_NOT_FOUND 다")
+  void req_22_15_updateUnknownPhotoIsNotFound() {
+    ownedByMe();
+    when(repository.findByIdAndPetId(PHOTO_A, PET_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    OWNER, PET_ID, PHOTO_A, new PhotoUpdateRequest("x", null, null, null)))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+  }
+
+  // ── 목록 태그 필터 (REQ-22) ──────────────────────────────────────
+
+  @Test
+  @DisplayName("[REQ-22-16] tag 로 필터링하면 그 태그를 가진 사진만 반환한다")
+  void req_22_16_listFiltersByTag() {
+    ownedByMe();
+    when(repository.findFirstPageByTag(eq(PET_ID), eq("탈피"), any()))
+        .thenReturn(List.of(photoWithDetails(PHOTO_A, null, false, JUN_30)));
+
+    CursorPage<PhotoResponse> page = service.list(OWNER, PET_ID, new CursorRequest(null, 20), "탈피");
+
+    assertThat(page.items()).hasSize(1);
+    verify(repository, never()).findFirstPage(any(), any());
+  }
+
+  @Test
+  @DisplayName("[REQ-22-17] tag 파라미터 없이 호출하면 기존 목록 동작 그대로다")
+  void req_22_17_listWithoutTagKeepsOriginalBehavior() {
+    ownedByMe();
+    when(repository.findFirstPage(eq(PET_ID), any()))
+        .thenReturn(List.of(photoWithDetails(PHOTO_A, null, false, JUN_30)));
+
+    CursorPage<PhotoResponse> page = service.list(OWNER, PET_ID, new CursorRequest(null, 20));
+
+    assertThat(page.items()).hasSize(1);
+    verify(repository, never()).findFirstPageByTag(any(), any(), any());
+  }
+
+  // ── 월별 대표 사진 — 성장 앨범 (REQ-22) ──────────────────────────
+
+  @Test
+  @DisplayName("[REQ-22-18] 수동 지정된 대표 사진이 있으면 그것을 반환한다")
+  void req_22_18_growthAlbumPrefersManualRepresentative() {
+    ownedByMe();
+    Photo early = photoWithDetails(PHOTO_A, LocalDate.of(2026, 6, 1), false, JUN_30);
+    Photo manual = photoWithDetails(PHOTO_B, LocalDate.of(2026, 6, 20), true, JUN_30);
+    when(repository.findAllByPetId(PET_ID)).thenReturn(List.of(early, manual));
+
+    GrowthAlbumResponse album = service.getGrowthAlbum(OWNER, PET_ID);
+
+    assertThat(album.items()).hasSize(1);
+    assertThat(album.items().get(0).photo().id()).isEqualTo(PHOTO_B);
+  }
+
+  @Test
+  @DisplayName("[REQ-22-19] 수동 지정된 대표가 없으면 그 달 가장 이른 사진을 반환한다")
+  void req_22_19_growthAlbumFallsBackToEarliestPhotoInMonth() {
+    ownedByMe();
+    Photo earliest = photoWithDetails(PHOTO_A, LocalDate.of(2026, 6, 1), false, JUN_30);
+    Photo later = photoWithDetails(PHOTO_B, LocalDate.of(2026, 6, 20), false, JUN_30);
+    when(repository.findAllByPetId(PET_ID)).thenReturn(List.of(later, earliest));
+
+    GrowthAlbumResponse album = service.getGrowthAlbum(OWNER, PET_ID);
+
+    assertThat(album.items().get(0).photo().id()).isEqualTo(PHOTO_A);
+  }
+
+  @Test
+  @DisplayName("[REQ-22-20] taken_date 가 없으면 created_at 의 KST 날짜로 월을 판단한다")
+  void req_22_20_growthAlbumUsesKstDateWhenTakenDateMissing() {
+    ownedByMe();
+    // KST 로는 2026-07-01 01:00 — UTC 자정 근처 어긋남(REQ-16 류) 회귀 케이스.
+    OffsetDateTime nearMidnightUtc = OffsetDateTime.parse("2026-06-30T16:00:00Z");
+    Photo photoWithoutTakenDate = photoWithDetails(PHOTO_A, null, false, nearMidnightUtc);
+    when(repository.findAllByPetId(PET_ID)).thenReturn(List.of(photoWithoutTakenDate));
+
+    GrowthAlbumResponse album = service.getGrowthAlbum(OWNER, PET_ID);
+
+    assertThat(album.items().get(0).yearMonth()).isEqualTo("2026-07");
+  }
+
+  @Test
+  @DisplayName("[REQ-22-21] 여러 달이 있으면 오래된 달부터 반환한다")
+  void req_22_21_growthAlbumOrdersChronologically() {
+    ownedByMe();
+    Photo july = photoWithDetails(PHOTO_A, LocalDate.of(2026, 7, 1), false, JUN_30);
+    Photo june = photoWithDetails(PHOTO_B, LocalDate.of(2026, 6, 1), false, JUN_30);
+    when(repository.findAllByPetId(PET_ID)).thenReturn(List.of(july, june));
+
+    GrowthAlbumResponse album = service.getGrowthAlbum(OWNER, PET_ID);
+
+    assertThat(album.items())
+        .extracting(GrowthAlbumEntryResponse::yearMonth)
+        .containsExactly("2026-06", "2026-07");
   }
 }
