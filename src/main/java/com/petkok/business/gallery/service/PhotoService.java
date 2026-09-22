@@ -281,8 +281,8 @@ public class PhotoService implements PhotoLookup {
   }
 
   /**
-   * {@code taken_date} 우선, 없으면 {@code created_at} 의 {@link TimeConstant#KST} 달력 날짜(REQ-16/ADR-0002 "계산은
-   * KST 기준").
+   * {@code taken_date} 우선, 없으면 {@code created_at} 의 {@link TimeConstant#KST} 달력 날짜(REQ-16/ADR-0002
+   * "계산은 KST 기준").
    */
   private static LocalDate effectiveDate(Photo photo) {
     return photo.getTakenDate() != null
