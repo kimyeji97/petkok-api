@@ -4,7 +4,7 @@
 > 파일명·라인수처럼 `git show`로 볼 수 있는 건 적지 않는다.
 > 깨면 회귀하는 **계약**은 이 파일이 아니라 CLAUDE.md/AGENTS.md에 둔다.
 >
-> 최종 갱신: 2026-09-21 (REQ-18 전체 완료 — Phase 2 스모크 테스트·프로브까지 통과, REQ-16 미결⑥ 해소. REQ-17 마지막 미결(Notion DB 탭 DDL)도 API로 닫혀 남은 활성 항목 없음. REQ-19(다이어리 상세 엔드포인트, REQ-10 스코프 누락분)도 완료 — REQ-18 브랜치가 `main`에 먼저 병합된 뒤 REQ-19 브랜치를 그 위로 리베이스하며 두 브랜치의 로그를 합쳤다. REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
+> 최종 갱신: 2026-09-22 (REQ-20(게코 사육 환경 온습도 기록) 전체 완료 — Phase 0(Notion API I/F 선반영)·Phase 1(CRUD+일간 평균 구현) 전부 완료, 검증 계약 15건 전부 `/testrun` 통과. 브랜치 `feat/req20-environment-logs` → origin 푸쉬 완료, `main` 미병합. REQ-08 2건만 배포·클라이언트 앱 부재로 여전히 보류)
 
 ## 요구사항 인덱스
 
@@ -29,6 +29,7 @@
 | REQ-17 | `_at`/`_date` 컬럼 네이밍 정합화 (`measured_at`→`measured_date`, `taken_at`→`taken_date`) | [PLAN-REQ-17](plans/PLAN-REQ-17-at-date-column-naming.md) | 2026-09-14 | ✅ (Phase 1·2 전부 완료 · 검증 계약 4건 전부 통과 · 미결 0건 · `main` 병합 완료(PR #53) · Notion DB 탭 DDL 코드블록도 2026-09-21 API로 반영 완료 — 남은 것 없음) |
 | REQ-18 | Testcontainers 도입 — DB 실물 대조 통합 테스트 (REQ-16 미결⑥ 해소) | [PLAN-REQ-18](plans/PLAN-REQ-18-testcontainers-db-integration.md) | 2026-09-21 | ✅ (Phase 1·2 전부 완료 · 검증 계약 REQ-18-01·02 통과 + REQ-18-03 수동 프로브 통과, 풀 스위트 345건 회귀 없음 · 미결 0건 · REQ-16 미결⑥ 해소 · `CLAUDE.md` 문구 정정 완료 · `main` 병합 완료(PR #55)) |
 | REQ-19 | 다이어리 상세 엔드포인트 (`GET /diary/{entry_id}`, REQ-10 스코프 누락분) | [PLAN-REQ-19](plans/PLAN-REQ-19-diary-detail.md) | 2026-09-21 | ✅ (Phase 1(유일) 완료 · 검증 계약 8건 전부 통과 · 미결 0건 · 브랜치 `feat/req19-diary-detail` → origin 푸쉬 완료) |
+| REQ-20 | 게코 사육 환경(온습도) 기록 (`FR-FEED-05`, `docs/TODO.md` 갭) | [PLAN-REQ-20](plans/PLAN-REQ-20-environment-logs.md) | 2026-09-22 | ✅ (Phase 0·1 전부 완료 · 검증 계약 15건 전부 통과 · 미결 0건 · 브랜치 `feat/req20-environment-logs` → origin 푸쉬 완료, `main` 미병합) |
 
 범례: ✅ 완료 · 🟡 진행 · ⏸ 보류 · ❌ 기각
 
@@ -37,6 +38,27 @@
 # 로그
 
 <!-- 최신이 위. 날짜 헤딩은 `## YYYY-MM-DD` 형식을 반드시 지킬 것 (/progress 가 파싱) -->
+
+## 2026-09-22
+
+### REQ-20 — 게코 사육 환경(온습도) 기록. `/workplan`부터 `/testrun`까지 한 세션에 여섯 커맨드 한 바퀴
+
+`docs/TODO.md`가 2026-09-21 Notion FR 25건 전수 대조에서 찾아낸 갭 중 유일한 🔴 Must Have(`FR-FEED-05`)를 이어서 처리했다. 다른 record 도메인과 달리 **Notion `API I/F`에 엔드포인트 정의 자체가 없어**(요구사항·유저 스토리 둘 다 제목 한 줄뿐) 이번이 그 설계를 처음 하는 자리였다 — 계획서 `## 결정` 표가 사실상 1차 API 설계안 역할을 했다(저장 방식 개별 로그 · `measured_at` timestamptz · 게코 전용 · 일간 평균 별도 엔드포인트 · 소수 1자리 `decimal(4,1)`, 전부 대화로 확정해 미결 0건으로 시작).
+
+**`/implement REQ-20 0` — Notion API I/F 선반영에서 걸린 함정**
+- 신규 도메인이라 `도메인` multi_select 속성에 `Environment` 옵션 자체가 없었다 — `notion-create-pages`가 `Invalid multi_select value` 로 거부. `notion-update-data-source`(`ALTER COLUMN "도메인" SET MULTI_SELECT(...)`)로 기존 9개 옵션 전체 + `Environment`를 다시 선언해야 통과했다(옵션 목록을 통째로 다시 써야 한다 — 추가만 하는 문법이 아니다). 색상은 `teal`이 거부돼(`Valid colors: default, gray, brown, orange, yellow, green, blue, purple, pink, red` 10종 고정) `pink`로 대체
+- 5행 생성 후 재조회 도중 `notion-fetch` 한 건이 "Permission for this action was denied by the Claude Code auto mode classifier" 로 일시 거부됐다 — 재시도하니 정상 처리. Notion 쓰기가 아니라 읽기(fetch) 호출인데도 발생 — harness 쪽 간헐 현상으로 보이고 레포 문제는 아니다
+- 5행 전부 `fetch` 재조회로 콜아웃·코드블록이 리터럴 텍스트가 아니라 정상 블록으로 렌더링됨을 확인(CLAUDE.md 「Notion 편집 함정」 경고대로)
+
+**`/implement REQ-20 1` — 구현은 전부 기존 패턴 재사용**
+- `ShedService`(게코 전용 가드 패턴)·`FeedingLogRepository`(timestamptz keyset 커서)를 그대로 복제 — 새로 설계한 부분은 없음
+- `EnvironmentSummaryCalculator`는 `ShedPredictionCalculator`와 같은 자리(I/O 없는 순수 계산기). `daily-summary` 날짜 경계는 `TimelineService`가 쓰는 `date.atStartOfDay(TimeConstant.KST).toOffsetDateTime()` 패턴을 그대로 가져다 씀
+- 착수 시점 브랜치가 `main`이라 `feat/req20-environment-logs`를 새로 팜(사용자 확인 후) — REQ-19 세션에서 겪은 "무관한 REQ가 한 브랜치에 섞이는" 문제를 애초에 피함
+- `./gradlew build -x test` · `checkstyleMain/Test -PciStrict` · `spotlessApply` 전부 1차 통과, ArchUnit 구조 규칙(8+1) 회귀 없음
+
+**`/testrun REQ-20`** — 4개 테스트 클래스 18개 메서드(REQ-20-01~15, 01은 세부 4개 메서드) 전부 1차 통과. (a)·(b)·(c) 없음. 근거 인용 전건 원문과 일치, 스펙 드리프트 없음.
+
+커밋 `cef14f7`, 브랜치 `feat/req20-environment-logs` → origin 푸쉬 완료. **`main` 미병합** — PR 생성은 이번 세션 범위 밖.
 
 ## 2026-09-21
 
